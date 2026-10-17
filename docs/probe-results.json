@@ -1,0 +1,60 @@
+{
+  "timestamp_utc": "2026-10-17T23:26:15.824967+00:00",
+  "connection": "environment HTTPS proxy",
+  "key_source": "public_documented_example",
+  "dns": [
+    {
+      "host": "api.wikimapia.org",
+      "status": "ENV_BLOCKED",
+      "error_type": "gaierror"
+    },
+    {
+      "host": "wikimapia.org",
+      "status": "ENV_BLOCKED",
+      "error_type": "gaierror"
+    },
+    {
+      "host": "registry.npmjs.org",
+      "status": "ENV_BLOCKED",
+      "error_type": "gaierror"
+    }
+  ],
+  "checks": [
+    {
+      "label": "documentation",
+      "status": 200,
+      "server_date": "Sat, 17 Oct 2026 23:26:19 GMT",
+      "content_type": "text/html; charset=UTF-8",
+      "cors_origin": null,
+      "bytes": 48477,
+      "json": false
+    },
+    {
+      "label": "box",
+      "status": 200,
+      "server_date": "Sat, 17 Oct 2026 23:26:23 GMT",
+      "content_type": "application/json; charset=utf-8",
+      "cors_origin": "*",
+      "bytes": 21073,
+      "verified": true,
+      "places": 5,
+      "polygons": 5,
+      "reason": "objects_with_geometry"
+    },
+    {
+      "label": "place.getbyid",
+      "status": 200,
+      "server_date": "Sat, 17 Oct 2026 23:26:33 GMT",
+      "content_type": "application/json; charset=utf-8",
+      "cors_origin": "*",
+      "bytes": 46250,
+      "verified": true,
+      "id_matches": true,
+      "description_chars": 1032,
+      "polygon_points": 112,
+      "photos_type": "list",
+      "comments_type": "list"
+    }
+  ],
+  "ready_for_map_mvp": true
+}

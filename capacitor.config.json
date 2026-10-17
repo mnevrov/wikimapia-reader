@@ -1,0 +1,15 @@
+{
+  "appId": "org.example.wikimapreader",
+  "appName": "Wikimapia Reader (prototype)",
+  "webDir": "dist",
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": false
+    }
+  },
+  "loggingBehavior": "none",
+  "android": {
+    "webContentsDebuggingEnabled": false,
+    "allowMixedContent": false
+  }
+}

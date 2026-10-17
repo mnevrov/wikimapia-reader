@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Wikimapia Reader (prototype)</string>
+    <string name="title_activity_main">Wikimapia Reader (prototype)</string>
+    <string name="package_name">org.example.wikimapreader</string>
+    <string name="custom_url_scheme">org.example.wikimapreader</string>
+</resources>

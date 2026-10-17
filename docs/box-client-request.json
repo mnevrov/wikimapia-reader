@@ -1,0 +1,12 @@
+{
+  "method": "box",
+  "request_constructor": "src/api.js buildRequest",
+  "key_source": "public_documented_example",
+  "requested_count": 50,
+  "status": 200,
+  "server_date": "Sat, 17 Oct 2026 23:32:13 GMT",
+  "bytes": 66586,
+  "folder_count": 50,
+  "found": "295",
+  "page": 1
+}
