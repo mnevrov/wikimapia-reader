@@ -3,7 +3,7 @@ const ENDPOINT = 'https://api.wikimapia.org/';
 const FORMATS = new Set(['https:']);
 
 export function buildRequest(func, key, opts = {}) {
-  if (!['box', 'place.getbyarea', 'place.getbyid'].includes(func)) throw new Error('Неизвестный метод API');
+  if (!['box', 'place.getbyarea', 'place.getbyid', 'search'].includes(func)) throw new Error('Неизвестный метод API');
   if (!key || !String(key).trim()) throw new Error('Нужен личный ключ Wikimapia API');
   const url = new URL(ENDPOINT);
   if (!FORMATS.has(url.protocol)) throw new Error('Для ключа разрешён только HTTPS');
@@ -17,6 +17,15 @@ export function buildRequest(func, key, opts = {}) {
     if (!Number.isSafeInteger(id) || id < 1) throw new Error('Неверный ID объекта');
     url.searchParams.set('id', String(id));
     url.searchParams.set('data_blocks', 'main,location,geometry,photos,comments');
+  } else if (func === 'search') {
+    const query = String(opts.query ?? '').trim();
+    if (!query || query.length > 200) throw new Error('Введите запрос длиной до 200 символов');
+    const lat=Number(opts.lat),lon=Number(opts.lon);
+    if (!Number.isFinite(lat)||!Number.isFinite(lon)||Math.abs(lat)>90||Math.abs(lon)>180) throw new Error('Некорректные координаты поиска');
+    url.searchParams.set('lat',String(lat));
+    url.searchParams.set('lon',String(lon));
+    url.searchParams.set('q', query);
+    url.searchParams.set('count', '20');
   } else {
     const bbox = opts.bbox;
     if (!Array.isArray(bbox) || bbox.length !== 4 || bbox.some(v => !Number.isFinite(Number(v)))) {
@@ -29,7 +38,9 @@ export function buildRequest(func, key, opts = {}) {
     if (east - west > 0.035 || north - south > 0.035) throw new Error('Увеличьте масштаб карты');
     url.searchParams.set('bbox', bbox.join(','));
     url.searchParams.set('coordsby', 'bbox');
-    url.searchParams.set('page', '1');
+    const page = Number(opts.page ?? 1);
+    if (!Number.isSafeInteger(page) || page < 1) throw new Error('Некорректная страница API');
+    url.searchParams.set('page', String(page));
     url.searchParams.set('count', '50');
   }
   return url.toString();
@@ -112,9 +123,16 @@ export function normalizePlace(payload) {
     })).filter(p => p.src),
     comments: commentItems.filter(c => c && ![true,1,'1'].includes(c.is_deleted)).map(c => ({
       author: plainText(c?.author_name ?? c?.user_name ?? c?.name ?? c?.author) || 'Участник Wikimapia',
-      text: plainText(c?.text ?? c?.comment ?? c?.message)
+      text: plainText(c?.text ?? c?.comment ?? c?.message),
+      date: commentDate(c?.date)
     })).filter(c => c.text)
   };
+}
+export function commentDate(value) {
+  if (!['number','string'].includes(typeof value) || !String(value).trim()) return null;
+  const seconds = Number(value);
+  if (!Number.isFinite(seconds) || seconds <= 0 || seconds > Date.now()/1000 + 86400) return null;
+  return new Date(seconds * 1000).toISOString();
 }
 function photoUrl(candidate) {
   const value = safeUrl(candidate);
@@ -133,8 +151,8 @@ export function validateResponse(result, func, expectedId) {
     throw new ApiError('Wikimapia API отклонил запрос.');
   }
   if (!result || typeof result !== 'object' || Array.isArray(result)) throw new ApiError('Неподтверждённая структура ответа API (в том числе пустой массив).');
-  if (func === 'place.getbyarea' || func === 'box') {
-    if (!Array.isArray(func === 'box' ? result.folder : result.places)) throw new ApiError('Неподтверждённая структура списка объектов API.');
+  if (func === 'place.getbyarea' || func === 'box' || func === 'search') {
+    if (!Array.isArray(func === 'place.getbyarea' ? result.places : result.folder)) throw new ApiError('Неподтверждённая структура списка объектов API.');
   } else {
     const place = result.place ?? result;
     const id = Number(place.id ?? place.main?.id);
@@ -148,7 +166,7 @@ export function diagnosticError(error) {
   if (/Failed to fetch|Network request failed|network error|cors|ERR_NAME_NOT_RESOLVED|dns/i.test(message)) return 'Не удалось подключиться к API: проверьте DNS, HTTPS и CORS (для браузера).';
   if (/429|limit|quota|too many/i.test(message)) return 'Вероятно, исчерпан лимит API-запросов. Не повторяйте запросы часто.';
   if (/401|403|invalid key|api key/i.test(message)) return 'Ключ API отклонён или нет доступа к API.';
-  if (/масштаб|координаты|границы|ID объекта|личный ключ/.test(message)) return message;
+  if (/масштаб|координаты|границы|ID объекта|личный ключ|страница API|Введите запрос/.test(message)) return message;
   if (/abort|timeout/i.test(message)) return 'Сервер не ответил вовремя. Повторите запрос позже.';
   return 'Не удалось загрузить данные. Проверьте подключение и повторите позже.';
 }

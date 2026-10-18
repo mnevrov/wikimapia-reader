@@ -1,7 +1,7 @@
 {
   "name": "wikimapia-mobile-preflight",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
@@ -17,7 +17,9 @@
   },
   "dependencies": {
     "@capacitor/android": "8.5.3",
+    "@capacitor/app": "8.1.2",
     "@capacitor/core": "8.5.3",
+    "@capacitor/geolocation": "8.2.4",
     "leaflet": "1.9.4",
     "react": "19.2.0",
     "react-dom": "19.2.0"

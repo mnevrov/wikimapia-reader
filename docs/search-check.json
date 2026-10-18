@@ -1,0 +1,35 @@
+{
+  "checked_at": "2026-10-18T00:37:53.610726+00:00",
+  "method": "search",
+  "credential": "official public example",
+  "query": "Eiffel",
+  "lat": 48.858,
+  "lon": 2.294,
+  "http_status": 200,
+  "response_type": "dict",
+  "fields": [
+    "version",
+    "language",
+    "folder",
+    "found",
+    "page",
+    "count"
+  ],
+  "objects": 20,
+  "found": 111,
+  "sample": [
+    {
+      "id": 55,
+      "name": "Эйфелева башня"
+    },
+    {
+      "id": 385,
+      "name": "Ресторан \"Жюль Верн\""
+    },
+    {
+      "id": 14381198,
+      "name": "Маленькая башня"
+    }
+  ],
+  "api_error": false
+}

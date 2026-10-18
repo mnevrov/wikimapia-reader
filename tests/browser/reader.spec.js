@@ -10,7 +10,7 @@ test('demo: polygon, tabs, expand and close at mobile width',async({page})=>{
  await expect(page.locator('.status')).toContainText('ДЕМО');
  await page.locator('path.leaflet-interactive').first().click({force:true});
  await expect(page.locator('.sheet')).toBeVisible();
- await page.getByRole('button',{name:/Фото/}).click();
+ await page.getByRole('tab',{name:/Фото/}).click();
  await expect(page.locator('.sheet-scroll')).toBeVisible();
  await page.getByTitle('Развернуть').click();
  await expect(page.locator('.sheet')).toHaveClass(/expanded/);

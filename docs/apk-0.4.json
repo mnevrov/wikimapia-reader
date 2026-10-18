@@ -1,0 +1,12 @@
+{
+  "file": "WikiReader-0.4.0-debug.apk",
+  "size": 4965790,
+  "sha256": "0a4b0aa42471de50d9508ba3800070a03f7c6c27b441a3d1e805da02822d2991",
+  "signature": "PASS",
+  "same_signer_as_0_3": true,
+  "assets_equal_dist": true,
+  "plugins": [
+    "com.capacitorjs.plugins.app.AppPlugin",
+    "com.capacitorjs.plugins.geolocation.GeolocationPlugin"
+  ]
+}
