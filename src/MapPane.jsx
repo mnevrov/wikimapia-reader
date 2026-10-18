@@ -14,7 +14,7 @@ function initialView() {
   } catch {}
   return {lat:55.752,lng:37.618,zoom:16};
 }
-export default function MapPane({demo,apiKey,auto,active,paused,refresh,moreRequest,focus,location,cacheEpoch,cacheView,selectedId,onCandidates,onSelect,onState,onMessage}) {
+export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refresh,moreRequest,focus,location,cacheEpoch,cacheView,selectedId,onCandidates,onSelect,onState,onMessage}) {
   const el=useRef(null), mapRef=useRef(null), overlayRef=useRef(null);
   const [viewport,setViewport]=useState(0);
   const [moving,setMoving]=useState(false);
@@ -40,7 +40,7 @@ export default function MapPane({demo,apiKey,auto,active,paused,refresh,moreRequ
     const v=initialView();
     const map=L.map(el.current,{zoomControl:false,attributionControl:false,inertia:false}).setView([v.lat,v.lng],v.zoom);
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
-    L.control.zoom({position:'topright'}).addTo(map);
+
     L.control.attribution({position:'bottomleft',prefix:false}).addTo(map);
     mapRef.current=map;overlayRef.current=L.featureGroup().addTo(map);
     map.on('click',event=>pick.current?.(event.latlng));
@@ -108,6 +108,7 @@ export default function MapPane({demo,apiKey,auto,active,paused,refresh,moreRequ
     const [w,s,e,n]=cacheView.bbox;
     mapRef.current.fitBounds([[s,w],[n,e]],{padding:[24,90],maxZoom:18});
   },[cacheView]);
+  useEffect(()=>{if(zoomRequest&&mapRef.current)mapRef.current.setZoom(Math.max(2,Math.min(19,mapRef.current.getZoom()+zoomRequest.delta)));},[zoomRequest]);
   useEffect(()=>{
     if(!location||!mapRef.current)return;
     const map=mapRef.current;

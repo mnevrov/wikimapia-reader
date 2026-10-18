@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#000000" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
-    <style>html{background:#000;color-scheme:dark}html[data-theme="light"]{background:#e3e9ef;color-scheme:light}</style>
+    <style>body{margin:0}html{background:#000;color-scheme:dark}html[data-theme="light"]{background:#e3e9ef;color-scheme:light}</style>
     <script>
       try {
         const preference = localStorage.getItem('wikimapia-reader-theme');
@@ -14,10 +14,17 @@
         document.querySelector('meta[name="theme-color"]').content = light ? '#ffffff' : '#000000';
       } catch {}
     </script>
-    <title>Wikimapia Reader — прототип</title>
+
+    <style>
+      #root>.startup{position:relative;box-sizing:border-box;width:100%;height:100vh;height:100dvh;min-height:240px;display:flex;flex-direction:column;align-items:center;justify-content:center;margin:0;padding:32px 24px;background:#000;color:#f1f5f9;font-family:system-ui,-apple-system,Roboto,sans-serif;gap:0;text-align:center}
+      .startup .startup-symbol{width:96px;height:96px;margin:0 0 24px}.startup h1{font-size:30px;line-height:1.2;letter-spacing:-1px;margin:0;font-weight:750}.startup h1 span{color:#43dfba}.startup .startup-caption{margin:10px 0 32px;font-size:14px;line-height:1.5;color:#9ca9b0}.startup-status{display:flex;align-items:center;gap:10px;font-size:13px;color:#9ca9b0}.startup-indicator{width:12px;height:12px;border:2px solid #25483f;border-top-color:#43dfba;border-radius:50%;animation:startup-spin 1s linear infinite}.startup .startup-note{position:absolute;bottom:max(24px,env(safe-area-inset-bottom));margin:0;font-size:11px;color:#9ca9b0}
+      html[data-theme=light] #root>.startup{background:#f4f6f5;color:#192d2a}html[data-theme=light] .startup-status,html[data-theme=light] .startup .startup-caption,html[data-theme=light] .startup .startup-note{color:#61716b}html[data-theme=light] .startup h1 span{color:#11735d}
+      @keyframes startup-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.startup-indicator{animation:none}}@media(max-height:450px){.startup .startup-symbol{width:64px;height:64px;margin-bottom:12px}.startup .startup-caption{margin:6px 0 16px}.startup .startup-note{display:none}}
+    </style>
+    <title>WikiReader</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><main class="startup" aria-busy="true"><img class="startup-symbol" src="/brand.svg" alt=""/><h1>Wiki<span>Reader</span></h1><p class="startup-caption">Места и истории Wikimapia</p><div class="startup-status" role="status"><span class="startup-indicator" aria-hidden="true"></span>Открываем карту…</div><p class="startup-note">Неофициальный клиент Wikimapia</p></main></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

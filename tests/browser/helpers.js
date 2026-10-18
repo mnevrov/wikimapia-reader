@@ -9,6 +9,7 @@ export async function tiles(page){await page.route('https://tile.openstreetmap.o
 export async function nativeVault(page,state){
  await page.exposeFunction('__nativeVault',async(method,args)=>{
   state.calls.push(method);
+  if(method==='load'&&state.beforeLoad)await state.beforeLoad();
   if(state.fail===method)throw Error('mock vault unavailable');
   if(method==='load')return{key:state.key};
   if(method==='save'){state.key=args.key;return{};}
