@@ -74,8 +74,8 @@ function App(){
       if(credentials.ready&&credentials.key)void car.pending().then(({id})=>{if(Number.isSafeInteger(id)&&id>0)selectRef.current({id,source:'wikimapia',title:`Объект #${id}`});}).catch(()=>{});
     };
     const visible=()=>{if(document.visibilityState==='visible')resume();};
-    resume();document.addEventListener('visibilitychange',visible);
-    return()=>{unwatch();document.removeEventListener('visibilitychange',visible);};
+    resume();document.addEventListener('visibilitychange',visible);window.addEventListener('wikireadercaropen',resume);
+    return()=>{unwatch();document.removeEventListener('visibilitychange',visible);window.removeEventListener('wikireadercaropen',resume);};
   },[credentials.ready,credentials.key]);
   const active=usePlatform(()=>{if(screen==='settings'&&confirmForget){setConfirmForget(false);return true;}if(screen!=='map'){setScreen('map');return true;}if(candidates.length){setCandidates([]);return true;}if(selected){dismissCard();return true;}return false;});
   useEffect(()=>{const on=()=>setOnline(true),off=()=>setOnline(false);window.addEventListener('online',on);window.addEventListener('offline',off);return()=>{window.removeEventListener('online',on);window.removeEventListener('offline',off);};},[]);
