@@ -1,6 +1,6 @@
 import React,{useEffect,useState} from 'react';
 import Icon from './Icon.jsx';
-export default function Settings({credentials,theme,setTheme,auto,setAuto,onApply,onForget,demo,onDemo,onReal}){
+export default function Settings({credentials,onClearCache,cacheClearing,theme,setTheme,auto,setAuto,onApply,onForget,demo,onDemo,onReal}){
   const [editing,setEditing]=useState(false),[draft,setDraft]=useState('');
   useEffect(()=>{setEditing(false);setDraft('');},[credentials.key]);
   const submit=async e=>{e.preventDefault();if(await onApply(draft)){setDraft('');setEditing(false);}};
@@ -13,9 +13,10 @@ export default function Settings({credentials,theme,setTheme,auto,setAuto,onAppl
       <p className="helper">{credentials.persistentSupported?'Ключ хранится зашифрованным только на этом устройстве. После удаления приложения его нужно ввести заново.':'В браузере ключ действует до закрытия страницы. Для сохранения используйте Android-приложение.'}</p>
       <a className="inline-link" href="https://wikimapia.org/api?action=create_key" target="_blank" rel="noreferrer">Получить API-ключ <Icon name="external" size={16}/></a>
     </section>
-    <section className="settings-group"><h2>Карта</h2><label className="setting-row" htmlFor="auto-load"><span><strong>Автозагрузка области</strong><small>После остановки карты, с учётом лимита API</small></span><input id="auto-load" type="checkbox" checked={auto} onChange={e=>setAuto(e.target.checked)}/></label><p className="helper">Следующие 50 объектов — по кнопке «Ещё». Кнопка обновления повторно загружает текущую область.</p></section>
+    <section className="settings-group"><h2>Карта</h2><label className="setting-row" htmlFor="auto-load"><span><strong>Автозагрузка области</strong><small>После остановки карты, с учётом лимита API</small></span><input id="auto-load" type="checkbox" checked={auto} onChange={e=>setAuto(e.target.checked)}/></label><p className="helper">Объекты загружаются при перемещении карты. В плотных областях после первых трёх страниц появится кнопка «Показать ещё объекты».</p></section>
+    <section className="settings-group"><h2>Кэш областей</h2><p className="helper">Просмотренные контуры сохраняются на устройстве: до 32 областей и 12 МБ, не дольше суток. Через 5 минут данные обновляются в фоне. Подложка карты и карточки объектов требуют интернета.</p><button className="secondary" disabled={cacheClearing} onClick={onClearCache}>{cacheClearing?'Очищаем…':'Очистить кэш областей'}</button></section>
     <fieldset className="settings-group theme-choice"><legend>Оформление</legend><div>{[['dark','Чёрная'],['light','Светлая'],['system','Как в системе']].map(([value,label])=><button key={value} aria-pressed={theme===value} onClick={()=>setTheme(value)}>{label}</button>)}</div></fieldset>
     <section className="settings-group"><h2>Демонстрация</h2><p className="helper">Вымышленные объекты для знакомства с карточками. Сохранённый ключ не удаляется.</p><button className="secondary" disabled={credentials.busy} onClick={demo&&credentials.key?onReal:onDemo}>{demo&&credentials.key?'Вернуться к реальным данным':'Открыть деморежим'}</button></section>
-    <p className="about">WikiReader 0.5 · Неофициальный клиент<br/>Данные © участники Wikimapia</p>
+    <p className="about">WikiReader 0.5.1 · Неофициальный клиент<br/>Данные © участники Wikimapia</p>
   </div>;
 }

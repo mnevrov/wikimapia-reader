@@ -28,7 +28,7 @@ test('late detail ignored after switching to demo from navigation',async({page})
 test('box contour leads to real-shaped detail',async({page})=>{
  const area=JSON.parse(fs.readFileSync(new URL('../fixtures/box-moscow.projection.json',import.meta.url)));const p=area.folder.find(p=>p.id==='5195049');
  await page.route('https://api.wikimapia.org/**',r=>r.fulfill({json:new URL(r.request().url()).searchParams.get('function')==='box'?{...area,folder:[p]}:{id:Number(p.id),title:p.name,description:'Синтетическое описание',polygon:p.polygon}}));
- await page.goto('/');await connect(page);await expect(page.locator('.status')).toContainText('1 объектов');await page.locator('path.leaflet-interactive').first().dispatchEvent('click');
+ await page.goto('/');await connect(page);await expect(page.locator('path.leaflet-interactive')).toHaveCount(1);await page.locator('path.leaflet-interactive').first().dispatchEvent('click');
  await expect(page.locator('.sheet h2')).toHaveText('Московский Кремль',{timeout:15000});
 });
 test('demo favorites never open a real object sharing the same id',async({page})=>{
