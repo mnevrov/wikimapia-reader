@@ -42,3 +42,12 @@ main::before,main::after{content:'';position:fixed;left:0;right:0;z-index:2000;b
 .map-feedback{bottom:16px;left:12px;padding:6px 10px;max-width:min(360px,calc(100% - 88px));border-radius:12px}.network-hint{top:calc(12px + var(--safe-top));right:76px;left:12px}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
 .has-sheet .map-tools{visibility:hidden}@media(min-width:700px) and (min-height:501px){.has-sheet .map-tools{visibility:visible;left:12px;right:auto}}
+/* Motion layers preserve only inert visual snapshots during a short exit. */
+.motion-layer{position:absolute;inset:0;pointer-events:none;z-index:1100}.motion-layer>*{pointer-events:auto}.motion-layer[data-motion=screen]{z-index:1200}.motion-layer[data-motion=toast]{z-index:1500}
+.motion-layer[inert],.motion-layer[inert] *{pointer-events:none!important}.motion-layer[data-phase=enter]>*,.motion-layer[data-phase=exit]>*{will-change:transform,opacity}
+.motion-layer[data-motion=disclosure]{position:relative;inset:auto;z-index:auto;overflow:hidden;pointer-events:auto}.motion-layer[data-motion=disclosure]>*{display:flow-root}
+.animated-disclosure>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;list-style:none}.animated-disclosure>summary::-webkit-details-marker{display:none}.animated-disclosure>summary::after{content:'';width:8px;height:8px;flex-shrink:0;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg);transition:transform 180ms ease}.animated-disclosure>summary[aria-expanded=true]::after{transform:rotate(225deg)}
+.sheet{transition:height 240ms cubic-bezier(.2,.8,.2,1)}.sheet-scroll[role=tabpanel]{animation:content-arrive 160ms ease-out}.has-toast .undo-toast{bottom:calc(var(--nav-height) + var(--safe-bottom) + 88px)}
+@keyframes content-arrive{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.sheet,.animated-disclosure>summary::after{transition:none}.sheet-scroll[role=tabpanel]{animation:none}}
+.undo-toast{transition:bottom 180ms ease}.map-feedback{animation:content-arrive 140ms ease-out}@media(prefers-reduced-motion:reduce){.undo-toast{transition:none}.map-feedback{animation:none}}
