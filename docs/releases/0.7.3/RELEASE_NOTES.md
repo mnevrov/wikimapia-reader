@@ -15,9 +15,9 @@ package org.example.wikimapreader.next. Репозиторий приватны�
 
 ## Проверки
 
-65 модульных, 3 вспомогательных и 69 браузерных тестов прошли.
+65 модульных, 7 вспомогательных и 69 браузерных тестов прошли.
 Android CI: testDebugUnitTest, assembleDebug и lintDebug — PASS.
-https://github.com/mnevrov/wikimapia-reader/actions/runs/39142835434
+https://github.com/mnevrov/wikimapia-reader/actions/runs/39153258482
 
 Проверены подпись APK, версия, package и совпадение assets с протестированной
 сборкой. Независимое повторное ревью: открытых P1/P2 нет.
@@ -25,3 +25,6 @@ https://github.com/mnevrov/wikimapia-reader/actions/runs/39142835434
 не проверялись. Полный отчёт: docs/CHECKS-0.7.3.md.
 
 SHA256: a1b050c144194e5c737fa3a07684bdfc60dd16b1b7e8a7af8090b4cd203593de
+
+GitHub Release опубликован автоматически через Actions #38. Job publish скачал
+APK и SHA256SUMS.txt обратно и проверил контрольную сумму перед публикацией.
