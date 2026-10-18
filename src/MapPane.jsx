@@ -2,6 +2,7 @@ import React, {useEffect, useMemo, useRef, useState} from 'react';
 import L from 'leaflet';
 import {wikimapiaCall} from './client.js';
 import {AreaLoader} from './area.js';
+import {areaCache} from './areaCache.js';
 import {DEMO_AREA} from './demo.js';
 
 function initialView() {
@@ -11,29 +12,30 @@ function initialView() {
   } catch {}
   return {lat:55.752,lng:37.618,zoom:16};
 }
-export default function MapPane({demo,apiKey,auto,active,paused,refresh,moreRequest,focus,location,onSelect,onState,onMessage}) {
+export default function MapPane({demo,apiKey,auto,active,paused,refresh,moreRequest,focus,location,cacheEpoch,onSelect,onState,onMessage}) {
   const el=useRef(null), mapRef=useRef(null), overlayRef=useRef(null);
   const [viewport,setViewport]=useState(0);
   const [moving,setMoving]=useState(false);
   const [places,setPlaces]=useState(()=>demo?DEMO_AREA:[]);
-  const blocked=useRef(false);
+  const blocked=useRef(false), retries=useRef(0);
+  const [progress,setProgress]=useState({});
   const currentLoader=useRef(null);
   const loader=useMemo(()=>new AreaLoader(opts=>wikimapiaCall('box',apiKey,opts), state=>{
     if(demo)return;
-    setPlaces(state.places);onState(state);
-    if(state.error){blocked.current=true;onMessage(state.error);}
-    else if(state.loading)onMessage(state.page?'Загружаем следующую страницу…':'Загружаем область…');
-    else if(state.page)onMessage(`${state.places.length} объектов${state.found!==null?` из ${state.found}`:''}`);
-  }),[demo,apiKey,onState,onMessage]);
+    setPlaces(state.displayPlaces??state.places);setProgress(state);onState(state);
+    if(state.error){blocked.current=!state.retryable;onMessage(state.error);}
+    else if(state.loading)onMessage('Загружаем объекты…');
+    else if(state.page){if(!state.more||state.page>=3)retries.current=0;onMessage(state.places.length?'':'Здесь пока нет объектов Wikimapia');}
+  },areaCache),[demo,apiKey,cacheEpoch,onState,onMessage]);
   currentLoader.current=loader;
   useEffect(()=>{
     const v=initialView();
-    const map=L.map(el.current,{zoomControl:false,attributionControl:false}).setView([v.lat,v.lng],v.zoom);
+    const map=L.map(el.current,{zoomControl:false,attributionControl:false,inertia:false}).setView([v.lat,v.lng],v.zoom);
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
     L.control.zoom({position:'topright'}).addTo(map);
     L.control.attribution({position:'bottomleft',prefix:false}).addTo(map);
     mapRef.current=map;overlayRef.current=L.featureGroup().addTo(map);
-    map.on('movestart',()=>{setMoving(true);currentLoader.current?.invalidate();});
+    map.on('movestart',()=>{setMoving(true);retries.current=0;currentLoader.current?.invalidate();});
     map.on('moveend',()=>{
       setMoving(false);
       const c=map.getCenter();
@@ -47,25 +49,39 @@ export default function MapPane({demo,apiKey,auto,active,paused,refresh,moreRequ
     blocked.current=false;
     setPlaces(demo?DEMO_AREA:[]);
     onState({places:[],page:0,found:null,more:false,loading:false,error:''});
-    onMessage(demo?'Демо · вымышленные объекты':auto?'Остановите карту, чтобы загрузить объекты':'Нажмите обновление, чтобы загрузить область');
+    onMessage(demo?'Демо · вымышленные объекты':'');
     return()=>loader.stop();
   },[demo,loader,onState,onMessage]);
   const loadRef=useRef(null);
   loadRef.current=(force=false)=>{
     const map=mapRef.current;
     if(demo||!apiKey||!active||!map)return;
-    if(map.getZoom()<16){onMessage('Приблизьте карту: масштаб 16+');return;}
     const b=map.getBounds();
     const bbox=[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()];
     if(bbox[2]-bbox[0]>.035||bbox[3]-bbox[1]>.035){onMessage('Приблизьте карту для загрузки объектов');return;}
-    return loader.load(bbox,{force});
+    // Fetch a small margin with the same documented box request. No requests for
+    // unseen remote tiles; stay inside the existing 0.035 degree API safety bound.
+    const dx=Math.min((bbox[2]-bbox[0])*.2,(.034999-(bbox[2]-bbox[0]))/2);
+    const dy=Math.min((bbox[3]-bbox[1])*.2,(.034999-(bbox[3]-bbox[1]))/2);
+    const padded=[Math.max(-180,bbox[0]-dx),Math.max(-85,bbox[1]-dy),Math.min(180,bbox[2]+dx),Math.min(85,bbox[3]+dy)];
+    return loader.load(padded,{force,view:bbox});
   };
   useEffect(()=>{
     if(demo||!apiKey||!active||paused||moving||!auto||blocked.current){loader.stop();return;}
-    const timer=setTimeout(()=>loadRef.current(),900);
+    const timer=setTimeout(()=>loadRef.current(),250);
     return()=>{clearTimeout(timer);loader.stop();};
   },[demo,apiKey,active,paused,auto,moving,viewport,loader]);
-  useEffect(()=>{if(refresh){blocked.current=false;loadRef.current(true);}},[refresh]);
+  useEffect(()=>{
+    if(demo||!auto||!active||paused||moving||progress.loading||progress.error||!progress.more||progress.page>=3||blocked.current)return;
+    const timer=setTimeout(()=>loader.more(),250);
+    return()=>clearTimeout(timer);
+  },[demo,auto,active,paused,moving,progress,loader]);
+  useEffect(()=>{
+    if(!auto||!active||paused||moving||!progress.error||!progress.retryable||retries.current>=2)return;
+    const timer=setTimeout(()=>{retries.current++;if(progress.page&&progress.more)loader.more();else loadRef.current(true);},8000);
+    return()=>clearTimeout(timer);
+  },[auto,active,paused,moving,progress,loader]);
+  useEffect(()=>{if(refresh){blocked.current=false;retries.current=0;loadRef.current(true);}},[refresh]);
   useEffect(()=>{if(moreRequest&&active&&!paused)loader.more();},[moreRequest]);
   useEffect(()=>{
     const layer=overlayRef.current;if(!layer)return;layer.clearLayers();

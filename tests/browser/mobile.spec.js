@@ -2,16 +2,15 @@ import {test,expect} from '@playwright/test';
 const polygon=[{x:37.617,y:55.751},{x:37.619,y:55.751},{x:37.619,y:55.753}];
 import {tiles,connect,openId,screen,map} from './helpers.js';
 async function setup(page){await tiles(page);await page.goto('/');await connect(page);}
-test('auto area then more merges pages without duplicates',async({page})=>{
+test('auto area pagination merges pages without duplicates',async({page})=>{
  const pages=[];
  await page.route('https://api.wikimapia.org/**',r=>{
   const n=Number(new URL(r.request().url()).searchParams.get('page'));pages.push(n);
   return r.fulfill({json:{folder:(n===1?[1,2]:[2,3]).map(id=>({id,name:'Object '+id,polygon})),found:3}});
  });
  await setup(page);
- await expect(page.locator('.status')).toContainText('2 объектов из 3');
- await page.getByRole('button',{name:/Ещё/}).click();
- await expect(page.locator('.status')).toContainText('3 объектов из 3',{timeout:15000});
+ await expect(page.locator('path.leaflet-interactive')).toHaveCount(3,{timeout:15000});
+ await expect(page.locator('.map-feedback')).toHaveCount(0);
  expect(pages).toEqual([1,2]);await expect(page.locator('path.leaflet-interactive')).toHaveCount(3);
 });
 test('real-shaped comment date displayed; Escape closes settings before card',async({page})=>{
@@ -36,9 +35,9 @@ test('manual mode: moving map disables old pagination and makes no automatic req
  let requests=0;
  await page.route('https://api.wikimapia.org/**',r=>{requests++;return r.fulfill({json:{folder:[{id:1,name:'One',polygon}],found:100}});});
  await setup(page);await screen(page,'Настройки');await page.getByLabel('Автозагрузка области').uncheck();await map(page);
- await page.getByRole('button',{name:'Загрузить область'}).click();await expect(page.getByRole('button',{name:'Ещё 50'})).toBeVisible();
+ await page.getByRole('button',{name:'Загрузить область'}).click();await expect(page.getByRole('button',{name:'Показать ещё объекты'})).toBeVisible();
  await page.getByRole('button',{name:'Zoom in',exact:true}).click();
- await expect(page.getByRole('button',{name:'Ещё 50'})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'Показать ещё объекты'})).toHaveCount(0);
  await page.waitForTimeout(1500);expect(requests).toBe(1);
 });
 test('search shows documented results and opens selected object',async({page})=>{
@@ -58,7 +57,7 @@ test('permission denial is handled and geolocation is never requested on launch'
  await page.getByRole('button',{name:'Моё местоположение'}).click();
  await expect(page.locator('.status')).toContainText('Местоположение недоступно');expect(await page.evaluate(()=>window.geoRequests)).toBe(1);
 });
-test('auto pan debounces; background cancels queued load and resume loads latest view',async({page})=>{
+test('auto pan debounces; background cancels queued load and resume reuses covering cache',async({page})=>{
  let requests=0;
  await page.route('https://api.wikimapia.org/**',r=>{requests++;return r.fulfill({json:{folder:[{id:requests,name:'Area',polygon}],found:1}});});
  await setup(page);await expect.poll(()=>requests).toBe(1);
@@ -66,7 +65,7 @@ test('auto pan debounces; background cancels queued load and resume loads latest
  await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});
  await page.waitForTimeout(6500);expect(requests).toBe(1);
  await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:false});document.dispatchEvent(new Event('visibilitychange'));});
- await expect.poll(()=>requests).toBe(2);await page.waitForTimeout(1400);expect(requests).toBe(2);
+ await page.waitForTimeout(1400);expect(requests).toBe(1);await expect(page.locator('path.leaflet-interactive')).toHaveCount(1);
 });
 test('card stays readable and attribution remains visible in portrait and landscape',async({page})=>{
  await page.route('https://tile.openstreetmap.org/**',r=>r.abort());await page.goto('/');
