@@ -20,8 +20,9 @@ test('backgrounding completes an exit and reduced motion can change at runtime',
  await watch(page);await page.goto('/');await clickContour(page);await page.getByLabel('Закрыть карточку').click();await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});await expect(page.locator('.sheet')).toHaveCount(0);await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:false});document.dispatchEvent(new Event('visibilitychange'));});await screen(page,'Настройки');await page.emulateMedia({reducedMotion:'reduce'});await expect(page.locator('[data-motion="screen"]')).toHaveAttribute('data-phase','idle');expect(await page.locator('[data-motion="screen"]').evaluate(el=>el.getAnimations({subtree:true}).length)).toBe(0);
 });
 test('reversing a screen transition continues from its current opacity',async({page})=>{
- await watch(page);await page.goto('/');await screen(page,'Настройки');
+ await watch(page);await page.goto('/');await page.getByRole('navigation').waitFor();
  const result=await page.evaluate(async()=>{
+  document.querySelector('.bottom-nav button:last-child').click();await new Promise(requestAnimationFrame);
   const panel=document.querySelector('.app-screen'),animation=panel.getAnimations()[0];animation.currentTime=30;
   const before=Number(getComputedStyle(panel).opacity);panel.querySelector('[aria-label="Вернуться на карту"]').click();await new Promise(requestAnimationFrame);
   const closing=Number(getComputedStyle(panel).opacity);document.querySelector('.bottom-nav button:last-child').click();await new Promise(requestAnimationFrame);
