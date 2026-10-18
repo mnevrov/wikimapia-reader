@@ -12,3 +12,9 @@ test('system theme reacts while open',async({page})=>{
  await page.emulateMedia({colorScheme:'light'});await page.goto('/');await screen(page,'Настройки');await page.getByRole('button',{name:'Как в системе',exact:true}).click();
  await expect(page.locator('html')).toHaveAttribute('data-theme','light');await page.emulateMedia({colorScheme:'dark'});await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
 });
+test('system inset stays opaque in both themes without blocking controls',async({page})=>{
+ await page.goto('/');await page.addStyleTag({content:':root{--safe-top:24px;--safe-bottom:16px}'});
+ const inset=()=>page.evaluate(()=>{const s=getComputedStyle(document.querySelector('main'),'::before');return{height:s.height,background:s.backgroundColor,pointer:s.pointerEvents};});
+ expect(await inset()).toEqual({height:'24px',background:'rgb(0, 0, 0)',pointer:'none'});
+ await screen(page,'Настройки');await page.getByRole('button',{name:'Светлая',exact:true}).click();expect((await inset()).background).toBe('rgb(244, 246, 245)');
+});
