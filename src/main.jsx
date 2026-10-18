@@ -1,95 +1,96 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { createRoot } from 'react-dom/client';
+import React,{useEffect,useRef,useState,useCallback} from 'react';
+import {createRoot} from 'react-dom/client';
+import {Geolocation} from '@capacitor/geolocation';
 import 'leaflet/dist/leaflet.css';
 import './style.css';
-import { wikimapiaCall } from './client.js';
-import { normalizeArea, normalizePlace, diagnosticError, geometryOf } from './api.js';
+import {wikimapiaCall} from './client.js';
+import {normalizeArea,normalizePlace,diagnosticError,geometryOf} from './api.js';
+import {useCredentials} from './useCredentials.js';
+import {useTheme} from './useTheme.js';
+import {usePlatform} from './usePlatform.js';
+import {DEMO_DETAILS} from './demo.js';
 import MapPane from './MapPane.jsx';
 import Details from './Details.jsx';
-import {usePlatform} from './usePlatform.js';
-import {Geolocation} from '@capacitor/geolocation';
-import {useTheme} from './useTheme.js';
-import { DEMO_DETAILS } from './demo.js';
+import Settings from './Settings.jsx';
+import Icon from './Icon.jsx';
+import {readFavorites,toggleFavorite as updateFavorites} from './favorites.js';
 
-function App() {
-  const [themePreference,setThemePreference] = useTheme();
-  const [demo,setDemo] = useState(true);
-  const [key,setKey] = useState('');
-  const [draftKey,setDraftKey] = useState('');
-  const [placeId,setPlaceId] = useState('55');
-  const [auto,setAuto] = useState(()=>{try{return localStorage.getItem('wikimapia-reader-auto')!=='false';}catch{return true;}});
-  const [moreRequest,setMoreRequest] = useState(0);
-  const [area,setArea] = useState({places:[],page:0,found:null,more:false,loading:false});
-  const [location,setLocation] = useState(null);
-  const [locating,setLocating] = useState(false);
-  const [query,setQuery] = useState('');
-  const [results,setResults] = useState([]);
-  const [searchBusy,setSearchBusy] = useState(false);
-  const searchAbort = useRef(null);
-  const [refresh,setRefresh] = useState(0);
-  const [focus,setFocus] = useState(null);
-  const [selected,setSelected] = useState(null);
-  const [details,setDetails] = useState(null);
-  const [busy,setBusy] = useState(false);
-  const [error,setError] = useState('');
-  const [notice,setNotice] = useState('Демонстрационные данные: не настоящие объекты Wikimapia');
-  const [settings,setSettings] = useState(false);
-  const [favorites,setFavorites] = useState(() => { try { const v=JSON.parse(localStorage.getItem('wikimapia-reader-favorites')||'[]'); return Array.isArray(v)?v.filter(Number.isSafeInteger):[]; }catch{return [];} });
-  const request = useRef(0);
-  const detailAbort = useRef(null);
-  const locationJob = useRef(0);
-  const onSelect = React.useCallback(async place => {
-    detailAbort.current?.abort();
-    const n=++request.current;
-    const controller = new AbortController(); detailAbort.current=controller;
-    setSelected(place);setDetails(null);setError('');
-    if (demo) { setDetails(DEMO_DETAILS[place.id]);setBusy(false);return; }
+const navigation=[['map','Карта','map'],['search','Поиск','search'],['saved','Избранное','bookmark'],['settings','Настройки','settings']];
+function App(){
+  const credentials=useCredentials();
+  const [theme,setTheme]=useTheme();
+  const [screen,setScreen]=useState('map'),[demoMode,setDemo]=useState(null);
+  const demo=demoMode??!credentials.key;
+  const [auto,setAutoState]=useState(()=>{try{return localStorage.getItem('wikimapia-reader-auto')!=='false';}catch{return true;}});
+  const [area,setArea]=useState({places:[],page:0,more:false,loading:false});
+  const [refresh,setRefresh]=useState(0),[moreRequest,setMoreRequest]=useState(0);
+  const [focus,setFocus]=useState(null),[location,setLocation]=useState(null),[locating,setLocating]=useState(false);
+  const [selected,setSelected]=useState(null),[details,setDetails]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
+  const [notice,setNotice]=useState('Открываем карту…'),[toast,setToast]=useState('');
+  const [favorites,setFavorites]=useState(()=>{try{return readFavorites(localStorage.getItem('wikimapia-reader-favorites'));}catch{return[];}});
+  const [query,setQuery]=useState(''),[results,setResults]=useState([]),[searchBusy,setSearchBusy]=useState(false),[searchStatus,setSearchStatus]=useState(''),[placeId,setPlaceId]=useState('55');
+  const detailAbort=useRef(null),searchAbort=useRef(null),request=useRef(0),locationJob=useRef(0);
+  const apiKey=demo?'':credentials.key;
+  useEffect(()=>{if(credentials.key)setDemo(false);},[credentials.key]);
+  const closeCard=useCallback(()=>{detailAbort.current?.abort();request.current++;setSelected(null);setDetails(null);setError('');setBusy(false);setFocus(null);},[]);
+  const onSelect=useCallback(async place=>{
+    detailAbort.current?.abort();const token=++request.current,controller=new AbortController();detailAbort.current=controller;
+    const useDemo=place.source==='demo'||(!place.source&&demo);
+    if(!useDemo&&!credentials.key){setToast('Подключите Wikimapia в настройках');setScreen('settings');return;}
+    setDemo(useDemo);setFocus(null);setScreen('map');setSelected({...place,source:useDemo?'demo':'wikimapia'});setDetails(null);setError('');
+    if(useDemo){setDetails(DEMO_DETAILS[place.id]||null);setBusy(false);return;}
     setBusy(true);
-    try { const payload=await wikimapiaCall('place.getbyid', key, {id:place.id,signal:controller.signal}); if(n===request.current){setDetails(normalizePlace(payload));setFocus(geometryOf(payload));} }
-    catch(e){if(n===request.current)setError(diagnosticError(e));}
-    finally{if(n===request.current)setBusy(false);}
-  },[demo,key]);
-  const onClose = () => {detailAbort.current?.abort();request.current++;setSelected(null);setDetails(null);setError('');setBusy(false);setFocus(null);};
-  const active=usePlatform(()=>{if(settings)setSettings(false);else if(selected)onClose();else return false;return true;});
-  useEffect(()=>{if(!active){detailAbort.current?.abort();searchAbort.current?.abort();request.current++;if(busy)setError('Загрузка прервана при уходе в фон. Нажмите «Повторить».');setBusy(false);setSearchBusy(false);locationJob.current++;setLocating(false);}},[active]);
+    try{const payload=await wikimapiaCall('place.getbyid',credentials.key,{id:place.id,signal:controller.signal});if(token===request.current){setDetails(normalizePlace(payload));setFocus(geometryOf(payload));}}
+    catch(e){if(token===request.current)setError(diagnosticError(e));}
+    finally{if(token===request.current)setBusy(false);}
+  },[demo,credentials.key]);
+  const active=usePlatform(()=>{if(screen!=='map'){setScreen('map');return true;}if(selected){closeCard();return true;}return false;});
+  useEffect(()=>{if(!active){detailAbort.current?.abort();searchAbort.current?.abort();request.current++;if(busy)setError('Загрузка прервана. Нажмите «Повторить».');setBusy(false);setSearchBusy(false);locationJob.current++;setLocating(false);}},[active]);
+  useEffect(()=>{if(screen!=='search'){searchAbort.current?.abort();setSearchBusy(false);}},[screen]);
   useEffect(()=>()=>{detailAbort.current?.abort();searchAbort.current?.abort();},[]);
+  useEffect(()=>{if(!toast)return;const t=setTimeout(()=>setToast(''),3000);return()=>clearTimeout(t);},[toast]);
+  const resetRequests=()=>{closeCard();searchAbort.current?.abort();setSearchBusy(false);setResults([]);setSearchStatus('');setRefresh(0);};
+  const applyKey=async value=>{if(await credentials.apply(value)){resetRequests();setDemo(false);setScreen('map');setToast('Wikimapia подключена');return true;}return false;};
+  const forgetKey=async()=>{if(await credentials.forget()){resetRequests();setDemo(true);setToast('Сохранённый ключ удалён');}};
+  const setAuto=value=>{setAutoState(value);try{localStorage.setItem('wikimapia-reader-auto',String(value));}catch{}};
+  const toggleFavorite=id=>{
+    const source=selected?.source||(demo?'demo':'wikimapia');
+    const next=updateFavorites(favorites,{id,source,title:details?.title||selected?.title||`Объект #${id}`});
+    try{localStorage.setItem('wikimapia-reader-favorites',JSON.stringify(next));setFavorites(next);}catch{setToast('Не удалось сохранить избранное');}
+  };
   const locate=async()=>{
-    if(locating)return;const job=++locationJob.current;setLocating(true);setNotice('Определяем местоположение…');
-    try{
-      const p=await Geolocation.getCurrentPosition({enableHighAccuracy:false,timeout:12000,maximumAge:60000});
-      if(job!==locationJob.current)return;
-      onClose();setLocation({lat:p.coords.latitude,lng:p.coords.longitude,accuracy:p.coords.accuracy});setNotice('Местоположение определено');
-    }catch{if(job===locationJob.current)setNotice('Местоположение недоступно. Разрешите доступ к геопозиции и проверьте, включена ли она.');}
-    finally{if(job===locationJob.current)setLocating(false);}
+    if(locating)return;const token=++locationJob.current;setLocating(true);setNotice('Определяем местоположение…');
+    try{const p=await Geolocation.getCurrentPosition({enableHighAccuracy:false,timeout:12000,maximumAge:60000});if(token!==locationJob.current)return;closeCard();setLocation({lat:p.coords.latitude,lng:p.coords.longitude,accuracy:p.coords.accuracy});setNotice('Местоположение определено');}
+    catch{if(token===locationJob.current)setNotice('Местоположение недоступно. Проверьте разрешение и геопозицию.');}
+    finally{if(token===locationJob.current)setLocating(false);}
   };
   const search=async e=>{
-    e.preventDefault();searchAbort.current?.abort();const controller=new AbortController();searchAbort.current=controller;
-    setSearchBusy(true);setResults([]);
+    e.preventDefault();searchAbort.current?.abort();const controller=new AbortController();searchAbort.current=controller;setSearchBusy(true);setResults([]);setSearchStatus('Поиск…');
     try{let center={lat:55.752,lng:37.618};try{const saved=JSON.parse(localStorage.getItem('wikimapia-reader-view'));if(saved)center=saved;}catch{}
-      const payload=await wikimapiaCall('search',key,{query,lat:center.lat,lon:center.lng,signal:controller.signal});
-      if(!controller.signal.aborted){setResults(normalizeArea(payload));setNotice(`Поиск: ${normalizeArea(payload).length} объектов из ${payload.found ?? '?'}`);}
-    }catch(e){if(!controller.signal.aborted)setNotice(diagnosticError(e));}
+      const payload=await wikimapiaCall('search',apiKey,{query,lat:center.lat,lon:center.lng,signal:controller.signal});
+      if(!controller.signal.aborted){const places=normalizeArea(payload);setResults(places);setSearchStatus(places.length?`Показано ${places.length} из ${payload.found??places.length}`:'Ничего не найдено. Попробуйте другое название.');}
+    }catch(e){if(!controller.signal.aborted)setSearchStatus(diagnosticError(e));}
     finally{if(searchAbort.current===controller)setSearchBusy(false);}
   };
-  const resetSearch=()=>{searchAbort.current?.abort();setSearchBusy(false);setResults([]);};
-  const toggleFavorite = id => {const next=favorites.includes(id)?favorites.filter(x=>x!==id):[...favorites,id];setFavorites(next);try{localStorage.setItem('wikimapia-reader-favorites',JSON.stringify(next));}catch{setNotice('Не удалось сохранить избранное на этом устройстве.');}};
-  return <main className={selected?'has-sheet':''}>
-    <MapPane demo={demo} apiKey={key} auto={auto} active={active} paused={settings||!!selected} refresh={refresh} moreRequest={moreRequest} focus={focus} location={location} onSelect={onSelect} onState={setArea} onMessage={setNotice} />
-    <div className="topbar"><div className="logo"><span className="logo-mark">◈</span><span>Wiki<span className="accent">Reader</span></span></div><button className="settings" onClick={()=>setSettings(v=>!v)}>⚙ Настройки</button></div>
-    <div className="status" role="status" aria-live="polite">{demo?'● ДЕМО':'● API'} <span>{notice}</span></div>
-    {settings && <aside className="settings-panel"><div className="settings-head"><strong>Настройки</strong><button className="icon-btn" aria-label="Закрыть настройки" onClick={()=>setSettings(false)}>×</button></div><fieldset className="theme-choice"><legend>Оформление</legend><div>{[["dark","Чёрная"],["light","Светлая"],["system","Как в системе"]].map(([id,label])=><button type="button" key={id} aria-pressed={themePreference===id} onClick={()=>setThemePreference(id)}>{label}</button>)}</div></fieldset><label className="auto-choice"><input type="checkbox" checked={auto} onChange={e=>{setAuto(e.target.checked);try{localStorage.setItem('wikimapia-reader-auto',String(e.target.checked));}catch{}}}/>Автозагрузка области</label><p className="small">После остановки карты загружается первая страница. Минимум 6 секунд между запросами; остальные страницы — по кнопке «Ещё».</p><p className="small">Для реальных данных примените свой ключ. Для краткой проверки доступен публичный example из документации (общий лимит). Демо содержит вымышленные объекты.</p>
-      <label htmlFor="api-key">API-ключ Wikimapia</label><input id="api-key" type="password" autoComplete="off" spellCheck="false" value={draftKey} onChange={e=>setDraftKey(e.target.value)} placeholder="Введите ключ локально" />
-      <button className="primary" disabled={!draftKey.trim()} onClick={()=>{onClose();resetSearch();setKey(draftKey.trim());setDemo(false);setRefresh(0);setNotice('Ключ применён. Можно открыть объект по ID или загрузить область.');}}>Применить ключ</button>
-      <button className="ghost" onClick={()=>{onClose();resetSearch();setDemo(true);setKey('');setDraftKey('');setRefresh(0);setFocus(null);setNotice('Демонстрационные данные: не настоящие объекты Wikimapia');}}>Включить демо</button>
-      {!demo && <><form className="search-form" onSubmit={search}><label htmlFor="place-query">Поиск объектов</label><div><input id="place-query" type="search" value={query} maxLength={200} onChange={e=>setQuery(e.target.value)} placeholder="Название места"/><button className="primary" disabled={searchBusy||!query.trim()}>{searchBusy?'Ищем…':'Найти'}</button></div></form>{results.length>0&&<ul className="search-results">{results.map(p=><li key={p.id}><button onClick={()=>{setSettings(false);onSelect(p);}}>{p.title}<small>#{p.id}</small></button></li>)}</ul>}</>}
-      {!demo && <div className="open-id"><label htmlFor="place-id">ID объекта Wikimapia</label><input id="place-id" type="number" min="1" value={placeId} onChange={e=>setPlaceId(e.target.value)} /><button className="primary" onClick={()=>{if(!Number.isSafeInteger(Number(placeId))||Number(placeId)<1){setNotice('Неверный ID объекта');return;}onSelect({id:Number(placeId),title:'Объект '+placeId});}}>Открыть по ID</button></div>}
-      {favorites.length>0 && <div className="saved"><strong>Избранные ID</strong>{favorites.map(id=><button className="ghost" key={id} onClick={()=>{if(demo && !DEMO_DETAILS[id]){setNotice('Примените ключ для реального объекта');return;}onSelect({id,title:'Объект '+id});}}>#{id}</button>)}</div>}
-      <p className="settings-feedback" role="status">{notice}</p><p className="small">Ключ хранится только в памяти приложения до перезапуска. Не отправляйте его в чат или репозиторий. Для веб-режима возможна ошибка CORS; Android использует нативный HTTP.</p>
-      <a target="_blank" rel="noreferrer" href="https://wikimapia.org/api?action=create_key">Получить ключ на Wikimapia ↗</a></aside>}
-    <div className="map-actions"><button className="icon-btn locate" aria-label="Моё местоположение" disabled={locating} onClick={locate}>{locating?'…':'⌖'}</button>{!demo && <button className="primary" disabled={area.loading||!active} onClick={()=>{onClose();setRefresh(v=>v+1);}}>{area.loading?'Загрузка…':'Загрузить область'}</button>}{!demo&&area.more&&<button className="ghost" disabled={area.loading} onClick={()=>setMoreRequest(v=>v+1)}>Ещё 50</button>}</div>
-    <div className="lower-hint">Нажми на выделенный контур, чтобы открыть карточку</div>
-    <Details data={details || (selected ? {id:selected.id,title:selected.title} : null)} busy={busy} error={error} onClose={onClose} onRetry={()=>selected&&onSelect(selected)} favorites={favorites} toggleFavorite={toggleFavorite}/>
-    <div className="credits">Данные © участники Wikimapia · {demo?'Демо':'WikiReader'}</div>
+  const openId=()=>{const id=Number(placeId);if(!Number.isSafeInteger(id)||id<1){setSearchStatus('Неверный ID объекта');return;}onSelect({id,title:`Объект #${id}`});};
+  const navigate=next=>{setScreen(next);};
+  if(!credentials.ready)return <main className="startup"><Icon name="map" size={36}/><h1>WikiReader</h1><p>Открываем карту…</p></main>;
+  return <main className={`${selected?'has-sheet':''} ${screen!=='map'?'has-screen':''}`}>
+    <div className="map-stage" inert={screen!=='map'} aria-hidden={screen!=='map'}>
+      <MapPane demo={demo} apiKey={apiKey} auto={auto} active={active} paused={screen!=='map'||!!selected} refresh={refresh} moreRequest={moreRequest} focus={focus} location={location} onSelect={onSelect} onState={setArea} onMessage={setNotice}/>
+      <header className="map-header"><button className="search-launch" onClick={()=>navigate('search')}><Icon name="search"/><span>Найти место<span>Название или ID Wikimapia</span></span></button></header>
+      <div className="map-tools"><button className="icon-btn" title="Моё местоположение" aria-label="Моё местоположение" disabled={locating} onClick={locate}><Icon name="locate"/></button>{!demo&&<button className="icon-btn" aria-label="Загрузить область" title="Обновить область" disabled={area.loading||!active} onClick={()=>{closeCard();setRefresh(x=>x+1);}}><Icon name="refresh"/></button>}</div>
+      {!selected&&<div className="map-summary"><div className="map-summary-heading"><span className={`source-dot ${demo?'demo':''}`}/><strong>{demo?'Демонстрация':area.loading?'Загрузка…':`${area.places.length} объектов${area.found!=null?` из ${area.found}`:''}`}</strong>{!demo&&area.more&&<button className="text-button" disabled={area.loading} onClick={()=>setMoreRequest(x=>x+1)}>Ещё 50 <Icon name="arrow" size={16}/></button>}</div><div className="status" role="status" aria-live="polite">{notice}</div>{demo&&<button className="connect-action" onClick={()=>navigate('settings')}>Подключить Wikimapia <Icon name="arrow" size={18}/></button>}</div>}
+      <Details data={details||(selected?{id:selected.id,title:selected.title}:null)} busy={busy} error={error} onClose={closeCard} onRetry={()=>selected&&onSelect(selected)} favorites={favorites.filter(x=>x.source===(demo?'demo':'wikimapia')).map(x=>x.id)} toggleFavorite={toggleFavorite}/>
+    </div>
+    {screen!=='map'&&<section className="app-screen" aria-label={navigation.find(x=>x[0]===screen)[1]}>
+      <header className="screen-header"><button className="icon-btn" aria-label="Вернуться на карту" onClick={()=>setScreen('map')}><Icon name="back"/></button><div><p>WikiReader</p><h1>{navigation.find(x=>x[0]===screen)[1]}</h1></div></header>
+      {screen==='settings'&&<Settings credentials={credentials} theme={theme} setTheme={setTheme} auto={auto} setAuto={setAuto} onApply={applyKey} onForget={forgetKey} demo={demo} onDemo={()=>{resetRequests();setDemo(true);setScreen('map');}} onReal={()=>{resetRequests();setDemo(false);setScreen('map');}}/>}
+      {screen==='search'&&<div className="screen-body search-page">{demo?<div className="empty-state"><Icon name="search" size={36}/><h2>Найдите нужное место</h2><p>Подключите Wikimapia, чтобы искать по названию или открывать объекты по ID.</p><button className="primary" onClick={()=>setScreen('settings')}>Добавить API-ключ</button></div>:<><form className="search-form" onSubmit={search}><label htmlFor="place-query">Название места</label><div className="search-input"><Icon name="search"/><input id="place-query" type="search" value={query} maxLength={200} onChange={e=>{searchAbort.current?.abort();setSearchBusy(false);setQuery(e.target.value);setResults([]);setSearchStatus('');}} placeholder="Например, Эйфелева башня"/><button className="primary" disabled={searchBusy||!query.trim()}>Найти</button></div></form><p className="search-feedback" role="status">{searchStatus||'Поиск по объектам Wikimapia рядом с текущей картой'}</p><ul className="search-results">{results.map(p=><li key={p.id}><button onClick={()=>onSelect(p)}><span><strong>{p.title}</strong><small>Wikimapia · #{p.id}</small></span><Icon name="arrow" size={18}/></button></li>)}</ul><details className="id-disclosure"><summary>Открыть объект по ID</summary><div className="open-id"><label htmlFor="place-id">Число из ссылки Wikimapia</label><input id="place-id" type="number" min="1" value={placeId} onChange={e=>setPlaceId(e.target.value)}/><button className="secondary" onClick={openId}>Открыть по ID</button></div></details></>}</div>}
+      {screen==='saved'&&<div className="screen-body">{favorites.length?<><p className="section-caption">Сохранённые места · {favorites.length}</p><ul className="saved-list">{favorites.map(p=><li key={`${p.source}:${p.id}`}><button className="saved-open" onClick={()=>onSelect(p)}><span className="saved-icon"><Icon name="bookmark"/></span><span><strong>{p.title}</strong><small>{p.source==='demo'?'Демо':'Wikimapia'} · #{p.id}</small></span><Icon name="arrow" size={18}/></button><button className="icon-btn" aria-label={`Удалить ${p.title} из избранного`} onClick={()=>{const next=favorites.filter(x=>x.id!==p.id||x.source!==p.source);try{localStorage.setItem('wikimapia-reader-favorites',JSON.stringify(next));setFavorites(next);}catch{setToast('Не удалось удалить избранное');}}}><Icon name="trash" size={18}/></button></li>)}</ul></>:<div className="empty-state"><Icon name="bookmark" size={36}/><h2>Места, к которым хочется вернуться</h2><p>Откройте объект на карте и нажмите «Сохранить» в его карточке.</p><button className="secondary" onClick={()=>setScreen('map')}>На карту</button></div>}</div>}
+    </section>}
+    <nav className="bottom-nav" aria-label="Основная навигация">{navigation.map(([id,label,icon])=><button key={id} aria-current={screen===id?'page':undefined} onClick={()=>navigate(id)}><Icon name={icon}/><span>{label}</span></button>)}</nav>
+    {toast&&<div className="toast" role="status">{toast}</div>}
   </main>;
 }
 createRoot(document.getElementById('root')).render(<App/>);

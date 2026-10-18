@@ -44,3 +44,9 @@ test('actual comment schema: display name/message, omit deleted entries and IP',
  assert.equal(p.comments.length,1);assert.equal(p.comments[0].author,'Синтетический автор');
  assert.equal(p.comments[0].text,'Тест');assert.ok(!JSON.stringify(p.comments).includes('192.0.2.1'));
 });
+test('transport URLs with validation-like query text never reveal keys',()=>{
+ for(const query of ['масштаб','координаты','Введите запрос','личный ключ']){
+  const value=diagnosticError(new Error(`https://api.wikimapia.org/?key=SECRET999&q=${query}`));
+  assert.ok(!value.includes('SECRET999'));assert.ok(!value.includes('https://'));
+ }
+});

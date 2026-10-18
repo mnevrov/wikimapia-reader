@@ -1,6 +1,6 @@
 {
   "appId": "org.example.wikimapreader",
-  "appName": "Wikimapia Reader (prototype)",
+  "appName": "WikiReader",
   "webDir": "dist",
   "plugins": {
     "CapacitorHttp": {
