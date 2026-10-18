@@ -110,10 +110,11 @@ export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refr
       if(current){
         // A renewed response can replace geometry without replacing the layer object.
         if(current.coords!==p.coords){current.layer.setLatLngs(p.coords);current.coords=p.coords;}
-        current.layer.setStyle(style);
+        const key=JSON.stringify(style);
+        if(current.styleSignature!==key){current.layer.setStyle(style);current.styleSignature=key;}
       }else{
         const polygon=L.polygon(p.coords,style).addTo(layer);
-        polygonsRef.current.set(p.id,{layer:polygon,coords:p.coords});
+        polygonsRef.current.set(p.id,{layer:polygon,coords:p.coords,styleSignature:JSON.stringify(style)});
       }
     }
     for(const [id,record] of polygonsRef.current){

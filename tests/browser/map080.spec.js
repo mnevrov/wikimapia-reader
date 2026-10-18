@@ -46,6 +46,17 @@ test('map search opens on top of map, finds objects, and returns to results',asy
  await expect(page.getByRole('region',{name:'Поиск на карте'})).toBeVisible();
  await expect(page.locator('#map-query')).toHaveValue('Tower');
 });
+test('density changes keep existing Leaflet polygon elements',async({page})=>{
+ await tiles(page);await page.goto('/');
+ const polygon=page.locator('path.leaflet-interactive').first();
+ await expect(polygon).toBeVisible();
+ await page.evaluate(()=>{window.__contourPath=document.querySelector('path.leaflet-interactive');});
+ await page.getByRole('button',{name:'Список объектов области'}).click();
+ await page.locator('#map-density').selectOption('calm');
+ expect(await page.evaluate(()=>window.__contourPath?.isSameNode(document.querySelector('path.leaflet-interactive')))).toBe(true);
+ await page.locator('#map-density').selectOption('detailed');
+ expect(await page.evaluate(()=>window.__contourPath?.isSameNode(document.querySelector('path.leaflet-interactive')))).toBe(true);
+});
 test('Escape dismisses map discovery without navigating away',async({page})=>{
  await tiles(page);await page.goto('/');
  await page.getByRole('button',{name:'Список объектов области'}).click();
