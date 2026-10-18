@@ -38,11 +38,16 @@ export class AreaLoader {
   async load(bbox, {force = false, view = bbox} = {}) {
     this.stop();
     const n=this.sequence;
-    if (this.store && !this.hydrated) {
+    const inMemoryFresh=[...this.cache.values()].some(e=>Date.now()-e.updated<CACHE_AGE && contains(e.bbox,view));
+    if (this.store && (!this.hydrated || (!force && !inMemoryFresh))) {
       try {
         const entries=await this.store.read();
         if(n!==this.sequence)return;
-        for(const entry of [...entries].sort((a,b)=>a.updated-b.updated))this.cache.set(entry.bbox.join(','),entry);
+        for(const entry of entries) {
+          const key=entry.bbox.join(',');
+          if(!this.cache.has(key)||this.cache.get(key).updated<=entry.updated)this.cache.set(key,entry);
+        }
+        this.cache=new Map([...this.cache.entries()].sort((a,b)=>a[1].updated-b[1].updated));
       } catch {} // Storage unavailable: network and in-memory navigation still work.
       if(n!==this.sequence)return;
       this.hydrated=true;

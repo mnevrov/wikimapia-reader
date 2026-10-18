@@ -73,3 +73,9 @@ test('hydrated overlapping records prefer the newest contour and page state',asy
  const loader=new AreaLoader(async()=>{throw Error('unexpected network');},()=>{},{read:async()=>[fresh,old],put:async()=>{}});await loader.load([2.292,48.852,2.298,48.858]);
  assert.equal(loader.state.places[0].title,'Fresh');assert.equal(loader.state.displayPlaces[0].title,'Fresh');
 });
+test('an area evicted from memory still uses the fresh on-device cache',async()=>{
+ let calls=0;const disk=new Map();const store={read:async()=>[...disk.values()],put:async e=>disk.set(e.bbox.join(','),e)};
+ const loader=new AreaLoader(async()=>({folder:[place(++calls)],found:1}),()=>{},store);
+ for(let i=0;i<9;i++)await loader.load([2.29+i*.02,48.85,2.30+i*.02,48.86]);
+ await loader.load(bbox);assert.equal(calls,9);assert.equal(loader.state.places[0].id,1);
+});
