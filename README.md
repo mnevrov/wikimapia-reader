@@ -138,3 +138,13 @@ CI проверяет Node/Python/Chromium, native unit tests, APK и lint. Ли
 
 Публикация APK автоматизирована по тегу версии после однократной настройки
 подписи. [Как настроить Secrets и выпускать версии](docs/RELEASING.md).
+
+
+## Android Auto — отдельная ветка разработки
+
+Подготовлена изолированная Auto Dev сборка; рабочую Next удалять не требуется.
+[Установка, архитектура, проверки и ограничения](docs/android-auto/README.md).
+`mobileDebug` сохраняет package `org.example.wikimapreader.next`, `autoDevDebug`
+использует `org.example.wikimapreader.autodev.next`. Тестовый CI mobile не является
+подписанным обновлением установленной Next. Слияние и стабильный выпуск требуют
+отдельного разрешения владельца.

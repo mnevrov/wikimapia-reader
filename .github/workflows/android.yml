@@ -51,18 +51,31 @@ jobs:
         run: npx playwright test
       - name: Build and lint APK
         working-directory: android
-        run: ./gradlew --no-daemon testDebugUnitTest assembleDebug lintDebug
-      - name: Checksum
-        working-directory: android/app/build/outputs/apk/debug
-        run: sha256sum app-debug.apk > SHA256SUMS.txt
+        run: ./gradlew --no-daemon testMobileDebugUnitTest testAutoDevDebugUnitTest assembleMobileDebug assembleAutoDevDebug lintMobileDebug lintAutoDevDebug
+      - name: Verify APK isolation and checksums
+        run: python3 scripts/check-auto-apks.py
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: WikiReader-debug-${{ github.sha }}
-          path: |
-            android/app/build/outputs/apk/debug/app-debug.apk
-            android/app/build/outputs/apk/debug/SHA256SUMS.txt
-          retention-days: 14
+          name: WikiReader-mobile-${{ github.sha }}
+          path: apk-dist/mobile/*
+          retention-days: 30
           if-no-files-found: error
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: WikiReader-AutoDev-${{ github.sha }}
+          path: apk-dist/autoDev/*
+          retention-days: 30
+          if-no-files-found: error
+      - name: Retain test evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: WikiReader-checks-${{ github.sha }}
+          path: |
+            android/app/build/reports/
+            android/app/build/test-results/
+            playwright-report/
+          retention-days: 30
 
       - name: Require a release commit from main
         if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
@@ -117,3 +130,4 @@ jobs:
           RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || inputs.release_tag }}
           RELEASE_TARGET_SHA: ${{ github.sha }}
         run: bash scripts/publish-release.sh "$RELEASE_TAG"
+

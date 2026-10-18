@@ -25,7 +25,7 @@ printf '%s' "$NEXT_KEYSTORE_BASE64" | base64 --decode > "$private_dir/signing.jk
 chmod 600 "$private_dir/signing.jks"
 mkdir -p release-dist
 apk="WikiReader-Next-$version.apk"
-"$build_tools/zipalign" -f -P 16 4 android/app/build/outputs/apk/debug/app-debug.apk "$private_dir/aligned.apk"
+"$build_tools/zipalign" -f -P 16 4 android/app/build/outputs/apk/mobile/debug/app-mobile-debug.apk "$private_dir/aligned.apk"
 java -jar "$build_tools/lib/apksigner.jar" sign --ks "$private_dir/signing.jks" --ks-key-alias wikireader-next --ks-pass env:NEXT_STORE_PASSWORD --key-pass env:NEXT_KEY_PASSWORD --out "release-dist/$apk" "$private_dir/aligned.apk"
 java -jar "$build_tools/lib/apksigner.jar" verify --verbose --print-certs "release-dist/$apk" > "$private_dir/verify.txt"
 python3 - "$private_dir/verify.txt" <<'PYCERT'
@@ -43,7 +43,7 @@ assert f"versionName='{v}'" in s
 gradle=pathlib.Path('android/app/build.gradle').read_text()
 code=re.search(r'versionCode\s+(\d+)',gradle)[1]
 assert f"versionCode='{code}'" in s
-with zipfile.ZipFile(sys.argv[3]) as signed, zipfile.ZipFile('android/app/build/outputs/apk/debug/app-debug.apk') as raw:
+with zipfile.ZipFile(sys.argv[3]) as signed, zipfile.ZipFile('android/app/build/outputs/apk/mobile/debug/app-mobile-debug.apk') as raw:
     assert not any(n.endswith('.jks') for n in signed.namelist())
     for n in raw.namelist():
         if n.startswith('assets/'):
@@ -58,3 +58,4 @@ text='\n'.join(line for line in text.splitlines() if not line.startswith('SHA256
 pathlib.Path('release-dist/RELEASE_NOTES.md').write_text(text.rstrip()+'\n\nSHA256: '+hashlib.sha256(apk.read_bytes()).hexdigest()+'\n')
 PYNOTES
 printf 'Verified signed APK: %s\n' "$apk"
+

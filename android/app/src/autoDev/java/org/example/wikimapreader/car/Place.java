@@ -1,0 +1,16 @@
+package org.example.wikimapreader.car;
+import org.json.*;
+import java.util.*;
+public final class Place {
+ public final long id; public final String title,description; public final double[][] coords;
+ public Place(long id,String title,String description,double[][] coords){this.id=id;this.title=title;this.description=description;this.coords=coords;}
+ static Object value(JSONObject o,String... keys){for(String k:keys)if(o.has(k)&&!o.isNull(k))return o.opt(k);return null;}
+ static JSONObject obj(Object o){return o instanceof JSONObject?(JSONObject)o:new JSONObject();}
+ static double number(Object o){if(o==null||String.valueOf(o).trim().isEmpty())return Double.NaN;try{return Double.parseDouble(String.valueOf(o));}catch(Exception e){return Double.NaN;}}
+ public static double[][] geometry(JSONObject p){JSONObject g=p.optJSONObject("geometry");if(g==null)g=p;Object raw=value(g,"polygon","coordinates");if(raw==null)raw=p.opt("polygon");if(raw instanceof JSONObject)raw=value((JSONObject)raw,"points","point","coordinates");if(!(raw instanceof JSONArray))return new double[0][];JSONArray a=(JSONArray)raw;if(a.optJSONArray(0)!=null&&a.optJSONArray(0).optJSONArray(0)!=null)a=a.optJSONArray(0);List<double[]> out=new ArrayList<>();for(int i=0;i<a.length()&&i<20000;i++){Object q=a.opt(i);double lat,lon;if(q instanceof JSONArray){lon=number(((JSONArray)q).opt(0));lat=number(((JSONArray)q).opt(1));}else{JSONObject o=obj(q);lat=number(value(o,"lat","latitude","y"));lon=number(value(o,"lon","lng","longitude","x"));}if(Double.isFinite(lat)&&Double.isFinite(lon)&&Math.abs(lat)<=90&&Math.abs(lon)<=180)out.add(new double[]{lat,lon});}return out.toArray(new double[0][]);}
+ public static Place from(JSONObject p){JSONObject m=p.optJSONObject("main");if(m==null)m=p;double n=number(value(p,"id","place_id"));if(!Double.isFinite(n))n=number(m.opt("id"));if(n<1||n>9007199254740991d||n!=Math.rint(n))throw new IllegalArgumentException("Неверный ID");String title=m.optString("title",p.optString("title",p.optString("name","Без названия")));return new Place((long)n,title,m.optString("description",p.optString("description","")),geometry(p));}
+ public static List<Place> area(JSONObject p){List<Place> out=new ArrayList<>();JSONArray a=p.optJSONArray("folder");if(a==null)a=p.optJSONArray("places");if(a==null)return out;for(int i=0;i<a.length();i++)try{out.add(from(a.getJSONObject(i)));}catch(Exception ignored){}return out;}
+ public JSONObject contour() throws JSONException {JSONArray a=new JSONArray();for(double[] p:coords)a.put(new JSONArray(p));return new JSONObject().put("id",id).put("title",title).put("coords",a);}
+ public static Place contour(JSONObject p) throws JSONException {JSONArray a=p.getJSONArray("coords");List<double[]> out=new ArrayList<>();for(int i=0;i<a.length();i++){JSONArray q=a.getJSONArray(i);double lat=q.getDouble(0),lon=q.getDouble(1);if(Double.isFinite(lat)&&Double.isFinite(lon)&&Math.abs(lat)<=90&&Math.abs(lon)<=180)out.add(new double[]{lat,lon});}long id=p.getLong("id");if(id<1)throw new JSONException("id");return new Place(id,p.optString("title","Без названия"),"",out.toArray(new double[0][]));}
+ public double[] point(){return Geo.representative(coords);}
+}

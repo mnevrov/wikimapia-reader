@@ -8,6 +8,9 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(AppearancePlugin.class);
         registerPlugin(CredentialsVaultPlugin.class);
+        try { registerPlugin((Class<? extends com.getcapacitor.Plugin>) Class.forName("org.example.wikimapreader.car.CarDataPlugin")); }
+        catch (ClassNotFoundException ignored) { /* mobile has no car dependencies */ }
         super.onCreate(savedInstanceState);
     }
 }
+

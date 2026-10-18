@@ -1,3 +1,4 @@
+import {car,hasCar} from './carBridge.js';
 // Public contours only. Requests, credentials, descriptions and media are excluded.
 export const CACHE_MAX_AGE=24*60*60*1000;
 export const CACHE_MAX_BYTES=12*1024*1024;
@@ -54,7 +55,7 @@ function access(mutate){return serialized(async()=>{
   tx.oncomplete=()=>resolve(result);tx.onabort=()=>reject(failure??tx.error??new Error('cache transaction aborted'));tx.onerror=()=>{};
  });
 });}
-export const areaCache={
+const webAreaCache={
  read:async()=> (await access()).entries,
  snapshot:()=>access(),
  put:entry=>access((records,prefs)=>{
@@ -69,3 +70,22 @@ export const areaCache={
  }),
  clear:({includePinned=false}={})=>access(records=>({records:includePinned?[]:records.filter(r=>r.pinned)}))
 };
+
+
+let nativeQueue=Promise.resolve();
+function nativeAccess(action,options={}){
+ const task=nativeQueue.then(async()=>{
+  // Legacy data is retained as a recovery copy; native marks migration atomically.
+  const legacy=(await webAreaCache.read());
+  return car.cache({action,options:{...options,legacy}});
+ });nativeQueue=task.catch(()=>{});return task;
+}
+const nativeAreaCache={
+ read:async()=>(await nativeAccess('read')).entries,
+ snapshot:()=>nativeAccess('read'),
+ put:entry=>nativeAccess('put',{entry}),
+ setPreferences:value=>nativeAccess('preferences',cachePreferences(value)),
+ pinMany:(ids,pinned)=>nativeAccess('pin',{ids,pinned}),
+ clear:({includePinned=false}={})=>nativeAccess('clear',{includePinned})
+};
+export const areaCache=new Proxy(webAreaCache,{get(target,key){return (hasCar()?nativeAreaCache:target)[key];}});

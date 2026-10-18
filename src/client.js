@@ -1,9 +1,18 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
+import {car,hasCar} from './carBridge.js';
 import { buildRequest, validateResponse } from './api.js';
 
 let nextRequestAt = 0;
 export async function wikimapiaCall(func, key, opts = {}) {
   const url = buildRequest(func, key, opts);
+  if(hasCar()){
+    opts.signal?.throwIfAborted();
+    const requestId=crypto.randomUUID();
+    const abort=()=>{void car.cancel({requestId});};
+    opts.signal?.addEventListener('abort',abort,{once:true});
+    try {const {signal,...options}=opts;const result=await car.request({requestId,method:func,options});opts.signal?.throwIfAborted();return validateResponse(result.data,func,opts.id);}
+    finally{opts.signal?.removeEventListener('abort',abort);}
+  }
   opts.signal?.throwIfAborted();
   while (Date.now() < nextRequestAt) {
     const wait = nextRequestAt - Date.now();
@@ -37,3 +46,4 @@ export async function wikimapiaCall(func, key, opts = {}) {
   opts.signal?.throwIfAborted();
   return validateResponse(result, func, opts.id);
 }
+
