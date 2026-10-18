@@ -14,6 +14,8 @@ test('auto area pagination merges pages without duplicates',async({page})=>{
  expect(pages).toEqual([1,2]);await expect(page.locator('path.leaflet-interactive')).toHaveCount(3);
 });
 test('real-shaped comment date displayed; Escape closes settings before card',async({page})=>{
+ // Isolate this scenario from automatic area requests and the shared 6s API queue.
+ await page.addInitScript(()=>localStorage.setItem('wikimapia-reader-auto','false'));
  await page.route('https://api.wikimapia.org/**',r=>r.fulfill({json:{id:55,title:'Tower',description:'Text',polygon,comments:[{name:'Author',message:'Comment',date:1163698281},{name:'No date',message:'Undated'}]}}));
  await setup(page);await openId(page);
  await expect(page.locator('.sheet h2')).toHaveText('Tower');
@@ -41,6 +43,8 @@ test('manual mode: moving map disables old pagination and makes no automatic req
  await page.waitForTimeout(1500);expect(requests).toBe(1);
 });
 test('search shows documented results and opens selected object',async({page})=>{
+ // Isolate this scenario from automatic area requests and the shared 6s API queue.
+ await page.addInitScript(()=>localStorage.setItem('wikimapia-reader-auto','false'));
  const methods=[];
  await page.route('https://api.wikimapia.org/**',r=>{
   const u=new URL(r.request().url()),m=u.searchParams.get('function');methods.push(m);
