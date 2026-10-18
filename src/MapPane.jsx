@@ -81,7 +81,7 @@ export default function MapPane({demo,apiKey,auto,active,paused,refresh,moreRequ
     return()=>{clearTimeout(timer);loader.stop();};
   },[demo,apiKey,active,paused,auto,moving,viewport,loader]);
   useEffect(()=>{
-    if(demo||!auto||!active||paused||moving||progress.loading||progress.error||!progress.more||progress.page>=3||blocked.current)return;
+    if(demo||!auto||!active||paused||moving||progress.loading||progress.draining||progress.error||!progress.more||progress.page>=3||blocked.current)return;
     const timer=setTimeout(()=>loader.more(),250);
     return()=>clearTimeout(timer);
   },[demo,auto,active,paused,moving,progress,loader]);
@@ -91,7 +91,7 @@ export default function MapPane({demo,apiKey,auto,active,paused,refresh,moreRequ
     return()=>clearTimeout(timer);
   },[auto,active,paused,moving,progress,loader]);
   useEffect(()=>{if(refresh){blocked.current=false;retries.current=0;loadRef.current(true);}},[refresh]);
-  useEffect(()=>{if(moreRequest&&active&&!paused)loader.more();},[moreRequest]);
+  useEffect(()=>{if(moreRequest&&active&&!paused)loader.remaining();},[moreRequest]);
   useEffect(()=>{
     const layer=overlayRef.current;if(!layer)return;layer.clearLayers();
     for(const p of places){if(p.id===selectedId&&focus?.length>=3)continue;if(p.coords.length>=3)L.polygon(p.coords,{color:p.id===selectedId?'#f1a23b':'#16ac8d',weight:p.id===selectedId?3:1.5,fill:p.id===selectedId,fillColor:'#f1a23b',fillOpacity:.12}).addTo(layer);}

@@ -14,13 +14,15 @@ export class AreaLoader {
     this.notify = notify;
     this.cache = new Map();
     this.sequence = 0;
-    this.state = {places:[], displayPlaces:[], page:0, found:null, more:false, loading:false, error:'', retryable:false,background:false,cacheIds:[]};
+    this.continuation = 0;
+    this.state = {places:[], displayPlaces:[], page:0, found:null, more:false, loading:false, error:'', retryable:false,background:false,draining:false,batchLimited:false,cacheIds:[]};
   }
   publish(patch) { this.state = {...this.state, ...patch}; this.notify(this.state); }
   stop() {
     this.sequence++;
+    this.continuation++;
     this.controller?.abort();
-    if (this.state.loading) this.publish({loading:false,background:false});
+    if (this.state.loading || this.state.draining) this.publish({loading:false,background:false,draining:false});
   }
   invalidate() {
     this.stop();
@@ -61,7 +63,7 @@ export class AreaLoader {
       if (entry) {
         this.bbox = [...entry.bbox];
         this.cacheKey = this.bbox.join(',');
-        this.publish({...entry.state, displayPlaces:this.visibleCached(), cacheIds:[this.cacheKey],error:'', retryable:false, loading:false,background:false});
+        this.publish({...entry.state, displayPlaces:this.visibleCached(), cacheIds:[this.cacheKey],error:'', retryable:false, loading:false,background:false,batchLimited:false});
         return;
       }
     }
@@ -70,19 +72,33 @@ export class AreaLoader {
       if(isCovered(view,coverageEntries.map(e=>e.bbox))){
         this.bbox=[...view];this.cacheKey=null;
         const displayPlaces=this.visibleCached();
-        this.publish({places:displayPlaces,displayPlaces,page:1,found:null,more:false,loading:false,error:'',retryable:false,background:false,cacheIds:coverageEntries.map(e=>e.bbox.join(','))});
+        this.publish({places:displayPlaces,displayPlaces,page:1,found:null,more:false,loading:false,error:'',retryable:false,background:false,batchLimited:false,cacheIds:coverageEntries.map(e=>e.bbox.join(','))});
         return;
       }
     }
     this.bbox = [...bbox];
     this.cacheKey = bbox.join(',');
     const displayPlaces=this.visibleCached();
-    this.publish({places:[],displayPlaces,page:0,found:null,more:false,error:'',retryable:false,cacheIds:[...this.cache.values()].filter(e=>intersects(e.bbox,view)).map(e=>e.bbox.join(','))});
+    this.publish({places:[],displayPlaces,page:0,found:null,more:false,error:'',retryable:false,batchLimited:false,cacheIds:[...this.cache.values()].filter(e=>intersects(e.bbox,view)).map(e=>e.bbox.join(','))});
     await this.fetchPage(1);
   }
   async more() {
     if (!this.state.more || this.state.loading) return;
     await this.fetchPage(this.state.page + 1);
+  }
+  // Explicit user action: continue sequentially, without repeated taps. Keep a
+  // finite budget for inconsistent/changing API result sets. Navigation cancels it.
+  async remaining() {
+    if (!this.state.more || this.state.loading || this.state.draining) return;
+    const token = ++this.continuation;
+    this.publish({draining:true,batchLimited:false});
+    let requests = 0;
+    while (token === this.continuation && this.state.more && requests < 20) {
+      await this.more();
+      requests++;
+      if (this.state.error) break;
+    }
+    if (token === this.continuation) this.publish({draining:false,batchLimited:requests===20&&this.state.more&&!this.state.error});
   }
   async fetchPage(page) {
     const n = ++this.sequence;

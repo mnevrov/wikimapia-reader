@@ -49,3 +49,15 @@ test('stale disk contours remain available offline and never store the API key',
  const saved=await page.evaluate(async()=>{const db=await new Promise(resolve=>{const r=indexedDB.open('wikireader-areas');r.onsuccess=()=>resolve(r.result);});const rows=await new Promise(resolve=>{const r=db.transaction('areas').objectStore('areas').getAll();r.onsuccess=()=>resolve(r.result);});db.close();return JSON.stringify(rows);});
  expect(saved).toContain('Offline area');expect(saved).not.toContain('never-in-area-cache');expect(saved).not.toContain('key=');
 });
+test('one tap continues beyond the automatic three-page limit and the completed cache survives reload',async({page})=>{
+ test.setTimeout(65000);const pages=[];
+ await page.route('https://api.wikimapia.org/**',r=>{const n=Number(new URL(r.request().url()).searchParams.get('page'));pages.push(n);return r.fulfill({json:{folder:[{id:n,name:'Object '+n,polygon}],found:6}});});
+ await start(page,16);await expect(page.locator('path.leaflet-interactive')).toHaveCount(3,{timeout:18000});
+ await page.getByRole('button',{name:'Догрузить область'}).click();
+ await expect(page.getByRole('button',{name:'Догружаем: 3 из 6'})).toBeDisabled();
+ await expect(page.locator('path.leaflet-interactive')).toHaveCount(6,{timeout:25000});
+ await expect(page.getByRole('button',{name:/Догрузить область|Догружаем:/})).toHaveCount(0);
+ expect(pages).toEqual([1,2,3,4,5,6]);
+ await expect.poll(()=>page.evaluate(async()=>{const db=await new Promise(resolve=>{const r=indexedDB.open('wikireader-areas');r.onsuccess=()=>resolve(r.result);});const entries=await new Promise(resolve=>{const r=db.transaction('areas').objectStore('areas').getAll();r.onsuccess=()=>resolve(r.result);});db.close();return entries.some(e=>e.state.complete&&e.state.places.length===6);})).toBe(true);
+ await page.reload();await expect(page.locator('path.leaflet-interactive')).toHaveCount(6);expect(pages).toEqual([1,2,3,4,5,6]);
+});
