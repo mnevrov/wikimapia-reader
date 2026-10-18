@@ -104,3 +104,26 @@ test('complete union in memory avoids another disk transaction',async()=>{
  let reads=0;const loader=new AreaLoader(async()=>({folder:[place(1)],found:1}),()=>{},{read:async()=>{reads++;return[];},put:async()=>{}});
  await loader.load(bbox);await loader.load([2.30,48.85,2.31,48.86]);const before=reads;await loader.load([2.295,48.851,2.305,48.859]);assert.equal(reads,before);
 });
+test('one continuation action drains every remaining page',async()=>{
+ const pages=[];const states=[];const loader=new AreaLoader(async({page})=>{pages.push(page);return{folder:[place(page)],found:6};},s=>states.push(s));
+ await loader.load(bbox);await loader.more();await loader.more();await loader.remaining();
+ assert.deepEqual(pages,[1,2,3,4,5,6]);assert.equal(loader.state.more,false);assert.equal(loader.state.draining,false);assert.ok(states.some(s=>s.draining&&s.page===4));
+});
+test('continuation stops at a repeated page without falsely marking completeness',async()=>{
+ const pages=[];const loader=new AreaLoader(async({page})=>{pages.push(page);return{folder:[place(Math.min(page,2))],found:10};});
+ await loader.load(bbox);await loader.remaining();assert.deepEqual(pages,[1,2,3]);assert.equal(loader.state.complete,false);assert.equal(loader.state.draining,false);
+});
+test('continuation stops on an error and one deliberate retry resumes the failed page',async()=>{
+ const pages=[];let fail=true;const loader=new AreaLoader(async({page})=>{pages.push(page);if(page===3&&fail)throw Error('offline');return{folder:[place(page)],found:4};});
+ await loader.load(bbox);await loader.remaining();assert.deepEqual(pages,[1,2,3]);assert.equal(loader.state.draining,false);assert.ok(loader.state.error);
+ fail=false;await loader.remaining();assert.deepEqual(pages,[1,2,3,3,4]);assert.equal(loader.state.more,false);
+});
+test('moving to another area cancels continuation including late uncancellable responses',async()=>{
+ let deliver;const calls=[];const loader=new AreaLoader(async({page,bbox:b})=>{calls.push([b[0],page]);return b[0]===2.29&&page===2?new Promise(r=>deliver=r):{folder:[place(b[0]===2.29?1:9)],found:b[0]===2.29?5:1};});
+ await loader.load(bbox);const job=loader.remaining();await loader.load([2.30,48.85,2.31,48.86]);deliver({folder:[place(2)],found:5});await job;
+ assert.deepEqual(calls,[[2.29,1],[2.29,2],[2.30,1]]);assert.equal(loader.state.draining,false);assert.equal(loader.state.places[0].id,9);
+});
+test('continuation has a finite request budget and can be deliberately resumed',async()=>{
+ let calls=0;const loader=new AreaLoader(async({page})=>{calls++;return{folder:[place(page)],found:1000};});
+ await loader.load(bbox);await loader.remaining();assert.equal(calls,21);assert.equal(loader.state.more,true);assert.equal(loader.state.batchLimited,true);await loader.remaining();assert.equal(calls,41);
+});
