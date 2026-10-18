@@ -36,7 +36,7 @@ test('manual mode: moving map disables old pagination and makes no automatic req
  await page.route('https://api.wikimapia.org/**',r=>{requests++;return r.fulfill({json:{folder:[{id:1,name:'One',polygon}],found:100}});});
  await setup(page);await screen(page,'Настройки');await page.getByLabel('Автозагрузка области').uncheck();await map(page);
  await page.getByRole('button',{name:'Загрузить область'}).click();await expect(page.getByRole('button',{name:'Догрузить область'})).toBeVisible();
- await page.getByRole('button',{name:'Zoom in',exact:true}).click();
+ await page.getByRole('button',{name:'Приблизить карту',exact:true}).click();
  await expect(page.getByRole('button',{name:'Догрузить область'})).toHaveCount(0);
  await page.waitForTimeout(1500);expect(requests).toBe(1);
 });
@@ -61,7 +61,7 @@ test('auto pan debounces; background cancels queued load and resume reuses cover
  let requests=0;
  await page.route('https://api.wikimapia.org/**',r=>{requests++;return r.fulfill({json:{folder:[{id:requests,name:'Area',polygon}],found:1}});});
  await setup(page);await expect.poll(()=>requests).toBe(1);
- await page.getByRole('button',{name:'Zoom in',exact:true}).click();await page.getByRole('button',{name:'Zoom in',exact:true}).click();
+ await page.getByRole('button',{name:'Приблизить карту',exact:true}).click();await page.getByRole('button',{name:'Приблизить карту',exact:true}).click();
  await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});
  await page.waitForTimeout(6500);expect(requests).toBe(1);
  await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:false});document.dispatchEvent(new Event('visibilitychange'));});
