@@ -133,3 +133,8 @@ CI проверяет Node/Python/Chromium, native unit tests, APK и lint. Ли
 [Репозиторий](https://github.com/mnevrov/wikimapia-reader),
 [Android workflow](https://github.com/mnevrov/wikimapia-reader/actions/workflows/android.yml),
 [исследование источников](docs/DATA-SOURCES.md). Исторические отчёты 0.2–0.4 описывают свои версии.
+
+## Выпуски в GitHub
+
+Публикация APK автоматизирована по тегу версии после однократной настройки
+подписи. [Как настроить Secrets и выпускать версии](docs/RELEASING.md).
