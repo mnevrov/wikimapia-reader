@@ -1,5 +1,5 @@
 import {test,expect} from '@playwright/test';
-import {tiles,connect} from './helpers.js';
+import {tiles,connect,nativeVault} from './helpers.js';
 const polygon=[{x:37.617,y:55.751},{x:37.619,y:55.751},{x:37.619,y:55.753}];
 async function start(page,zoom=15){
  await tiles(page);await page.addInitScript(z=>localStorage.setItem('wikimapia-reader-view',JSON.stringify({lat:55.752,lng:37.618,zoom:z})),zoom);
@@ -50,7 +50,7 @@ test('stale disk contours remain available offline and never store the API key',
  expect(saved).toContain('Offline area');expect(saved).not.toContain('never-in-area-cache');expect(saved).not.toContain('key=');
 });
 test('one tap continues beyond the automatic three-page limit and the completed cache survives reload',async({page})=>{
- test.setTimeout(65000);const pages=[];
+ test.setTimeout(65000);const pages=[];await nativeVault(page,{key:null,calls:[]});
  await page.route('https://api.wikimapia.org/**',r=>{const n=Number(new URL(r.request().url()).searchParams.get('page'));pages.push(n);return r.fulfill({json:{folder:[{id:n,name:'Object '+n,polygon}],found:6}});});
  await start(page,16);await expect(page.locator('path.leaflet-interactive')).toHaveCount(3,{timeout:18000});
  await page.getByRole('button',{name:'Догрузить область'}).click();

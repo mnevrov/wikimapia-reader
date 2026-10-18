@@ -35,9 +35,9 @@ test('manual mode: moving map disables old pagination and makes no automatic req
  let requests=0;
  await page.route('https://api.wikimapia.org/**',r=>{requests++;return r.fulfill({json:{folder:[{id:1,name:'One',polygon}],found:100}});});
  await setup(page);await screen(page,'Настройки');await page.getByLabel('Автозагрузка области').uncheck();await map(page);
- await page.getByRole('button',{name:'Загрузить область'}).click();await expect(page.getByRole('button',{name:'Показать ещё объекты'})).toBeVisible();
+ await page.getByRole('button',{name:'Загрузить область'}).click();await expect(page.getByRole('button',{name:'Догрузить область'})).toBeVisible();
  await page.getByRole('button',{name:'Zoom in',exact:true}).click();
- await expect(page.getByRole('button',{name:'Показать ещё объекты'})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'Догрузить область'})).toHaveCount(0);
  await page.waitForTimeout(1500);expect(requests).toBe(1);
 });
 test('search shows documented results and opens selected object',async({page})=>{
