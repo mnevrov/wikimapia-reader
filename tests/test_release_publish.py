@@ -12,8 +12,11 @@ import os,sys,json,shutil
 from pathlib import Path
 args=sys.argv[1:]
 with open(os.environ['CALLS'],'a') as f:f.write(' '.join(args)+'\\n')
-if args[:2]==['release','view']:
- if os.environ['SCENARIO'].startswith('new') and 'isDraft' in args:sys.exit(1)
+if args[0]=='api':
+ if os.environ['SCENARIO'].startswith('new'):print('HTTP 404',file=sys.stderr);sys.exit(1)
+ print('commit\\t'+('1' if os.environ['SCENARIO']=='mismatch' else '0')*40)
+elif args[:2]==['release','view']:
+ if os.environ['SCENARIO'].startswith('new') and any('isDraft' in a for a in args):sys.exit(1)
  print(json.dumps({'isDraft':False,'url':'mock'}))
 elif args[:2]==['release','download']:
  dest=Path(args[args.index('--dir')+1]);dest.mkdir(exist_ok=True)
@@ -50,4 +53,11 @@ class ReleasePublishTests(unittest.TestCase):
     def test_corrupt_download_prevents_publication(self):
         code,calls=self.run_scenario('new-corrupt')
         self.assertNotEqual(code,0)
+        self.assertNotIn('release edit',calls)
+
+    def test_existing_tag_with_other_source_is_rejected(self):
+        code,calls=self.run_scenario('mismatch')
+        self.assertNotEqual(code,0)
+        self.assertNotIn('release create',calls)
+        self.assertNotIn('release upload',calls)
         self.assertNotIn('release edit',calls)
