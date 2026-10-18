@@ -1,17 +1,19 @@
 import React,{useEffect,useRef,useState} from 'react';
 import Icon from './Icon.jsx';
+import {useSheetGesture} from './useSheetGesture.js';
 const dateFormat=new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'long',year:'numeric'});
 export default function Details({data,busy,error,onClose,onRetry,favorites,toggleFavorite,returnLabel,onReturn}){
   const [tab,setTab]=useState('description'),[expanded,setExpanded]=useState(false);
-  const scroll=useRef(null),gesture=useRef(null),skipClick=useRef(false);
+  const scroll=useRef(null),root=useRef(null);
+  const gesture=useSheetGesture(root,{expanded,setExpanded,onClose,identity:data?.id});
   useEffect(()=>{setTab('description');setExpanded(!!returnLabel);},[data?.id]);
   useEffect(()=>{scroll.current?.scrollTo(0,0);},[data?.id,tab]);
   const tabs=['description','photos','comments'];
   const selectTab=id=>{setTab(id);if(id!=='description')setExpanded(true);};
   if(!data&&!busy&&!error)return null;
   const saved=favorites.includes(data?.id);
-  return <section className={`sheet ${expanded?'expanded':''}`} aria-label="Информация об объекте">
-    <button className="handle" aria-label={expanded?'Свернуть карточку':'Развернуть карточку'} onPointerDown={e=>{gesture.current=e.clientY;skipClick.current=false;e.currentTarget.setPointerCapture(e.pointerId);}} onPointerCancel={()=>{gesture.current=null;skipClick.current=false;}} onPointerUp={e=>{if(gesture.current===null)return;const delta=e.clientY-gesture.current;gesture.current=null;if(Math.abs(delta)>30){skipClick.current=true;if(delta>90&&!expanded)onClose();else setExpanded(delta<0);}}} onClick={()=>{if(skipClick.current){skipClick.current=false;return;}setExpanded(v=>!v);}}><span/></button>
+  return <section ref={root} className={`sheet ${expanded?'expanded':''}`} aria-label="Информация об объекте">
+    <button className="handle" aria-label={expanded?'Свернуть карточку':'Развернуть карточку'} {...gesture}><span/></button>
     {returnLabel&&<button className="return-to-list" onClick={onReturn}><Icon name="back" size={18}/>{returnLabel}</button>}
     <div className="sheet-header"><div><p className="eyebrow">Wikimapia · #{data?.id}</p><h2>{data?.title||'Загрузка объекта…'}</h2></div><button className="icon-btn" title="Закрыть" aria-label="Закрыть карточку" onClick={onClose}><Icon name="close"/></button></div>
     {busy?<div className="sheet-scroll loading-state"><span className="spinner"/><p>Получаем описание, фото и комментарии…</p></div>:error?<div className="sheet-scroll"><div className="error" role="alert"><p>{error}</p><button className="secondary" onClick={onRetry}>Повторить</button></div></div>:<>
