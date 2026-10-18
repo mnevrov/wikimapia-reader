@@ -34,3 +34,4 @@ main::before,main::after{content:'';position:fixed;left:0;right:0;z-index:2000;b
 .leaflet-touch .leaflet-bar a,.leaflet-touch .leaflet-bar a:hover{width:48px;height:48px;line-height:48px}
 .screen-network{flex-shrink:0;padding:10px 20px;font-size:13px;color:var(--muted);border-bottom:1px solid var(--border);background:var(--surface)}
 @media(max-height:500px){.sheet .handle{display:none}.sheet{padding-top:12px}.sheet .eyebrow{display:none}}
+@media(max-height:500px){.sheet,.sheet.expanded{padding-top:12px}}
