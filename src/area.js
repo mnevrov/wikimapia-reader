@@ -1,9 +1,10 @@
 import {normalizeArea, diagnosticError, ApiError} from './api.js';
 import {CACHE_MAX_AGE} from './areaCache.js';
+import {isCovered,contains,intersects} from './coverage.js';
 
 const CACHE_AGE = 5 * 60 * 1000;
-const contains = (a,b) => a[0]<=b[0] && a[1]<=b[1] && a[2]>=b[2] && a[3]>=b[3];
-const intersects = (a,b) => a[0]<=b[2] && a[2]>=b[0] && a[1]<=b[3] && a[3]>=b[1];
+const complete=e=>e.state.complete??(!e.state.more&&(e.state.found!=null?e.state.places.length>=e.state.found:e.state.places.length<50));
+
 
 // One instance per key/mode. Cache has a size and age limit; no credentials are stored.
 export class AreaLoader {
@@ -13,20 +14,20 @@ export class AreaLoader {
     this.notify = notify;
     this.cache = new Map();
     this.sequence = 0;
-    this.state = {places:[], displayPlaces:[], page:0, found:null, more:false, loading:false, error:'', retryable:false};
+    this.state = {places:[], displayPlaces:[], page:0, found:null, more:false, loading:false, error:'', retryable:false,background:false,cacheIds:[]};
   }
   publish(patch) { this.state = {...this.state, ...patch}; this.notify(this.state); }
   stop() {
     this.sequence++;
     this.controller?.abort();
-    if (this.state.loading) this.publish({loading:false});
+    if (this.state.loading) this.publish({loading:false,background:false});
   }
   invalidate() {
     this.stop();
     this.publish({more:false});
   }
   prune() {
-    for (const [key,entry] of this.cache) if (Date.now()-entry.updated>=CACHE_MAX_AGE) this.cache.delete(key);
+    for (const [key,entry] of this.cache) if (!entry.pinned&&Date.now()-entry.updated>=(entry.retentionDays??1)*CACHE_MAX_AGE) this.cache.delete(key);
   }
   visibleCached() {
     const unique = new Map();
@@ -38,7 +39,8 @@ export class AreaLoader {
   async load(bbox, {force = false, view = bbox} = {}) {
     this.stop();
     const n=this.sequence;
-    const inMemoryFresh=[...this.cache.values()].some(e=>Date.now()-e.updated<CACHE_AGE && contains(e.bbox,view));
+    const fresh=[...this.cache.values()].filter(e=>Date.now()>=e.updated&&Date.now()-e.updated<CACHE_AGE);
+    const inMemoryFresh=fresh.some(e=>(complete(e)||e.state.more)&&contains(e.bbox,view))||isCovered(view,fresh.filter(complete).map(e=>e.bbox));
     if (this.store && (!this.hydrated || (!force && !inMemoryFresh))) {
       try {
         const entries=await this.store.read();
@@ -55,17 +57,27 @@ export class AreaLoader {
     this.view = [...view];
     this.prune();
     if (!force) {
-      const entry = [...this.cache.values()].reverse().find(e=>Date.now()-e.updated<CACHE_AGE && contains(e.bbox,view));
+      const entry = [...this.cache.values()].reverse().find(e=>Date.now()>=e.updated&&Date.now()-e.updated<CACHE_AGE&&(complete(e)||e.state.more)&&contains(e.bbox,view));
       if (entry) {
         this.bbox = [...entry.bbox];
         this.cacheKey = this.bbox.join(',');
-        this.publish({...entry.state, displayPlaces:this.visibleCached(), error:'', retryable:false, loading:false});
+        this.publish({...entry.state, displayPlaces:this.visibleCached(), cacheIds:[this.cacheKey],error:'', retryable:false, loading:false,background:false});
+        return;
+      }
+    }
+    if (!force) {
+      const coverageEntries=[...this.cache.values()].filter(e=>Date.now()>=e.updated&&Date.now()-e.updated<CACHE_AGE&&complete(e)&&intersects(e.bbox,view));
+      if(isCovered(view,coverageEntries.map(e=>e.bbox))){
+        this.bbox=[...view];this.cacheKey=null;
+        const displayPlaces=this.visibleCached();
+        this.publish({places:displayPlaces,displayPlaces,page:1,found:null,more:false,loading:false,error:'',retryable:false,background:false,cacheIds:coverageEntries.map(e=>e.bbox.join(','))});
         return;
       }
     }
     this.bbox = [...bbox];
     this.cacheKey = bbox.join(',');
-    this.publish({places:[],displayPlaces:this.visibleCached(),page:0,found:null,more:false,error:'',retryable:false});
+    const displayPlaces=this.visibleCached();
+    this.publish({places:[],displayPlaces,page:0,found:null,more:false,error:'',retryable:false,cacheIds:[...this.cache.values()].filter(e=>intersects(e.bbox,view)).map(e=>e.bbox.join(','))});
     await this.fetchPage(1);
   }
   async more() {
@@ -76,7 +88,7 @@ export class AreaLoader {
     const n = ++this.sequence;
     this.controller?.abort();
     this.controller = new AbortController();
-    this.publish({loading:true,error:'',retryable:false});
+    this.publish({loading:true,background:this.state.displayPlaces.some(p=>p.coords.length>=3)||this.state.page>0,error:'',retryable:false});
     try {
       const payload = await this.call({bbox:this.bbox,page,signal:this.controller.signal});
       if (n !== this.sequence) return;
@@ -89,18 +101,21 @@ export class AreaLoader {
       // A repeated/empty page must not create an endless "more" loop.
       const progress = places.length > this.state.places.length;
       const more = progress && items.length > 0 && (found !== null ? places.length < found : items.length === 50);
-      const state = {places,page,found,more,loading:false,error:'',retryable:false};
-      this.cache.delete(this.cacheKey);
-      this.cache.set(this.cacheKey,{bbox:[...this.bbox],state,updated:Date.now()});
+      const fullyLoaded=found!==null?places.length>=found:items.length<50;
+      const state = {places,page,found,more,complete:fullyLoaded,loading:false,background:false,error:'',retryable:false};
+      const key=this.cacheKey,old=this.cache.get(key);
+      const record={bbox:[...this.bbox],state,updated:Date.now(),pinned:old?.pinned??false,retentionDays:old?.retentionDays??1};
+      this.cache.delete(key);
+      this.cache.set(key,record);
       while (this.cache.size > 8) this.cache.delete(this.cache.keys().next().value);
-      this.publish({...state,displayPlaces:this.visibleCached()});
-      try { await this.store?.put(this.cache.get(this.cacheKey)); } catch {}
+      this.publish({...state,displayPlaces:this.visibleCached(),cacheIds:[key]});
+      try { await this.store?.put(record); } catch {}
     } catch (error) {
       if (n !== this.sequence) return;
       // Authentication, quota and invalid payloads need deliberate user action.
       const message=String(error?.message??'');
       const retryable=!(error instanceof ApiError) && !/401|403|429|limit|quota/i.test(message);
-      this.publish({loading:false,error:diagnosticError(error),retryable});
+      this.publish({loading:false,background:false,error:diagnosticError(error),retryable});
     }
   }
 }

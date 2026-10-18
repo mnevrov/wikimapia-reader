@@ -11,3 +11,18 @@ test('disk cache is bounded by age, area count and bytes',()=>{
  const records=retainedRecords(entries);assert.equal(records.length,CACHE_MAX_AREAS);assert.ok(records.every(r=>r.bbox[0]!==90));assert.ok(records.reduce((n,r)=>n+r.bytes,0)<=CACHE_MAX_BYTES);
  const huge=entry();huge.state.places[0].title='x'.repeat(CACHE_MAX_BYTES+1);assert.equal(cacheRecord(huge),null);
 });
+test('pinned records survive expiration and ordinary eviction; retention is configurable',()=>{
+ const now=Date.now();const old={...entry(90),updated:now-2*CACHE_MAX_AGE,pinned:true};
+ const ordinary={...entry(91),updated:now-2*CACHE_MAX_AGE};
+ assert.ok(retainedRecords([old],now).some(r=>r.pinned));
+ assert.equal(retainedRecords([ordinary],now).length,0);assert.equal(retainedRecords([ordinary],now,{retentionDays:7}).length,1);
+ assert.equal(retainedRecords([...Array.from({length:40},(_,i)=>entry(i)),old],now)[0].id,cacheRecord(old).id);
+});
+test('capacity cannot silently discard a pinned area',async()=>{
+ const {CacheCapacityError}=await import('../src/areaCache.js');
+ assert.throws(()=>retainedRecords(Array.from({length:33},(_,i)=>({...entry(i),pinned:true}))),CacheCapacityError);
+ const pins=Array.from({length:32},(_,i)=>({...entry(i),pinned:true}));const keep=retainedRecords([...pins,entry(50)]);assert.equal(keep.length,32);assert.equal(keep.every(e=>e.pinned),true);
+});
+test('reported byte size includes the complete serialized stored record',()=>{
+ const record=cacheRecord(entry());assert.equal(record.bytes,new TextEncoder().encode(JSON.stringify(record)).length);
+});
