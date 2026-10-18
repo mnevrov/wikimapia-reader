@@ -16,7 +16,7 @@ production release не выпускался; APK этой ветки — отд
 | `npm run test:probe` | PASS: 7 |
 | Playwright после интеграции | PASS: 69, mocked API/native bridge/tiles |
 | `testMobileDebugUnitTest` | PASS: 3 |
-| `testAutoDevDebugUnitTest` | PASS: 31 (включая те же 3 cipher-теста) |
+| `testAutoDevDebugUnitTest` | PASS: 32 (включая те же 3 cipher-теста) |
 | `assembleMobileDebug`, `assembleAutoDevDebug` | PASS |
 | `lintMobileDebug`, `lintAutoDevDebug` | PASS: нет ошибок; предупреждения ниже |
 | `scripts/check-auto-apks.py` | PASS: package, manifest, DEX isolation, подписи, SHA256 |
