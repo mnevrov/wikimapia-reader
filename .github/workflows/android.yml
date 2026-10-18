@@ -2,7 +2,7 @@ name: Android APK
 
 on:
   push:
-    branches: [main, feat/black-theme]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 

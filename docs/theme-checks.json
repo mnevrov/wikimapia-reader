@@ -1,0 +1,15 @@
+{
+  "version": "0.3.0",
+  "node_tests": 18,
+  "python_tests": 3,
+  "browser_mocked_tests": 7,
+  "clean_assembleDebug_lintDebug_exit": 0,
+  "apk_signature_valid": true,
+  "same_signer_as_0_2_0": true,
+  "assets_equal_dist": true,
+  "initial_webview_background": "#000000",
+  "native_appearance_plugin_in_apk": true,
+  "apk_sha256": "309cde67c0303af5cf4f22cce10c087696b3eeb17b971b1cadde64e894849195",
+  "apk_bytes": 4265019,
+  "android_device_test_new_version": "NOT_RUN"
+}
