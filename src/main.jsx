@@ -5,6 +5,7 @@ import 'leaflet/dist/leaflet.css';
 import './style.css';
 import { wikimapiaCall } from './client.js';
 import { normalizeArea, normalizePlace, diagnosticError, geometryOf } from './api.js';
+import {useTheme} from './useTheme.js';
 import { DEMO_AREA, DEMO_DETAILS } from './demo.js';
 
 const DEFAULT_CENTER = [55.752, 37.618];
@@ -88,6 +89,7 @@ function Details({data, busy, error, onClose, onRetry, favorites, toggleFavorite
   </section>;
 }
 function App() {
+  const [themePreference,setThemePreference] = useTheme();
   const [demo,setDemo] = useState(true);
   const [key,setKey] = useState('');
   const [draftKey,setDraftKey] = useState('');
@@ -121,7 +123,7 @@ function App() {
     <MapPane demo={demo} apiKey={key} refresh={refresh} focus={focus} onSelect={onSelect} onError={setNotice} onCount={reportCount} />
     <div className="topbar"><div className="logo"><span className="logo-mark">◈</span><span>Wiki<span className="accent">Reader</span></span></div><button className="settings" onClick={()=>setSettings(v=>!v)}>⚙ Настройки</button></div>
     <div className="status">{demo?'● ДЕМО':'● API'} <span>{notice}</span></div>
-    {settings && <aside className="settings-panel"><div className="settings-head"><strong>Источник данных</strong><button className="icon-btn" aria-label="Закрыть настройки" onClick={()=>setSettings(false)}>×</button></div><p className="small">Для реальных данных примените свой ключ. Для краткой проверки доступен публичный example из документации (общий лимит). Демо содержит вымышленные объекты.</p>
+    {settings && <aside className="settings-panel"><div className="settings-head"><strong>Настройки</strong><button className="icon-btn" aria-label="Закрыть настройки" onClick={()=>setSettings(false)}>×</button></div><fieldset className="theme-choice"><legend>Оформление</legend><div>{[["dark","Чёрная"],["light","Светлая"],["system","Как в системе"]].map(([id,label])=><button type="button" key={id} aria-pressed={themePreference===id} onClick={()=>setThemePreference(id)}>{label}</button>)}</div></fieldset><p className="small">Для реальных данных примените свой ключ. Для краткой проверки доступен публичный example из документации (общий лимит). Демо содержит вымышленные объекты.</p>
       <label htmlFor="api-key">API-ключ Wikimapia</label><input id="api-key" type="password" autoComplete="off" spellCheck="false" value={draftKey} onChange={e=>setDraftKey(e.target.value)} placeholder="Введите ключ локально" />
       <button className="primary" disabled={!draftKey.trim()} onClick={()=>{onClose();setKey(draftKey.trim());setDemo(false);setRefresh(0);setNotice('Ключ применён. Можно открыть объект по ID или загрузить область.');}}>Применить ключ</button>
       <button className="ghost" onClick={()=>{onClose();setDemo(true);setKey('');setDraftKey('');setRefresh(0);setFocus(null);setNotice('Демонстрационные данные: не настоящие объекты Wikimapia');}}>Включить демо</button>
