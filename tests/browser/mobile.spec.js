@@ -1,6 +1,6 @@
 import {test,expect} from '@playwright/test';
 const polygon=[{x:37.617,y:55.751},{x:37.619,y:55.751},{x:37.619,y:55.753}];
-import {tiles,connect,openId,screen,map} from './helpers.js';
+import {clickContour,tiles,connect,openId,screen,map} from './helpers.js';
 async function setup(page){await tiles(page);await page.goto('/');await connect(page);}
 test('auto area pagination merges pages without duplicates',async({page})=>{
  const pages=[];
@@ -69,7 +69,7 @@ test('auto pan debounces; background cancels queued load and resume reuses cover
 });
 test('card stays readable and attribution remains visible in portrait and landscape',async({page})=>{
  await page.route('https://tile.openstreetmap.org/**',r=>r.abort());await page.goto('/');
- await page.locator('path.leaflet-interactive').first().dispatchEvent('click');await page.getByTitle('Развернуть').click();
+ await clickContour(page);await page.getByTitle('Развернуть').click();
  for(const viewport of [{width:320,height:640},{width:844,height:390},{width:768,height:1024}]){
   await page.setViewportSize(viewport);await expect(page.locator('.sheet-attribution')).toBeVisible();
   await expect.poll(async()=> (await page.locator('.sheet-scroll').boundingBox()).height).toBeGreaterThan(60);

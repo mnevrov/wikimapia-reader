@@ -41,7 +41,7 @@ test('stale disk contours remain available offline and never store the API key',
  await page.route('https://api.wikimapia.org/**',r=>r.fulfill({json:{folder:[{id:1,name:'Offline area',polygon}],found:1}}));
  await page.goto('/');await expect(page.locator('path.leaflet-interactive')).toHaveCount(1);
  await page.evaluate(async()=>{
-  const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('wikireader-areas',1);r.onsuccess=()=>resolve(r.result);r.onerror=reject;});
+  const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('wikireader-areas');r.onsuccess=()=>resolve(r.result);r.onerror=reject;});
   await new Promise((resolve,reject)=>{const tx=db.transaction('areas','readwrite');const s=tx.objectStore('areas');const r=s.getAll();r.onsuccess=()=>{for(const item of r.result){item.updated=Date.now()-300001;s.put(item);}};tx.oncomplete=resolve;tx.onabort=reject;});db.close();
  });
  await page.unroute('https://api.wikimapia.org/**');await page.route('https://api.wikimapia.org/**',r=>r.abort());await page.reload();

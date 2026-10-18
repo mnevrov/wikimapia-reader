@@ -1,47 +1,71 @@
-// Public contour data only. Never persist requests, credentials, comments or photos here.
+// Public contours only. Requests, credentials, descriptions and media are excluded.
 export const CACHE_MAX_AGE=24*60*60*1000;
 export const CACHE_MAX_BYTES=12*1024*1024;
 export const CACHE_MAX_AREAS=32;
+export class CacheCapacityError extends Error {}
+export const cachePreferences=value=>({retentionDays:[1,7,30].includes(value?.retentionDays)?value.retentionDays:1});
 export function cacheRecord(entry){
  const {bbox,state,updated}=entry??{};
  if(!Array.isArray(bbox)||bbox.length!==4||bbox.some(v=>!Number.isFinite(v))||bbox[0]>=bbox[2]||bbox[1]>=bbox[3]||bbox[0]<-180||bbox[2]>180||bbox[1]<-90||bbox[3]>90||!Number.isFinite(updated)||!Array.isArray(state?.places))return null;
- const places=state.places.filter(p=>Number.isSafeInteger(p.id)&&p.id>0&&typeof p.title==='string'&&Array.isArray(p.coords)).map(p=>({id:p.id,title:p.title,coords:p.coords.filter(c=>Array.isArray(c)&&c.length===2&&c.every(Number.isFinite)&&Math.abs(c[0])<=90&&Math.abs(c[1])<=180)}));
- const record={id:bbox.join(','),bbox:[...bbox],updated,state:{places,page:state.page,found:state.found,more:!!state.more}};
- record.bytes=new TextEncoder().encode(JSON.stringify(record)).length;
+ const places=state.places.filter(p=>p&&Number.isSafeInteger(p.id)&&p.id>0&&typeof p.title==='string'&&Array.isArray(p.coords)).map(p=>({id:p.id,title:p.title,coords:p.coords.filter(c=>Array.isArray(c)&&c.length===2&&c.every(Number.isFinite)&&Math.abs(c[0])<=90&&Math.abs(c[1])<=180)}));
+ const record={id:bbox.join(','),bbox:[...bbox],updated,pinned:entry.pinned===true,state:{places,page:Number.isSafeInteger(state.page)&&state.page>=1?state.page:1,found:Number.isSafeInteger(state.found)&&state.found>=0?state.found:null,more:!!state.more}};
+ record.state.complete=state.complete===false?false:!record.state.more&&(record.state.found!==null?places.length>=record.state.found:(state.complete===true||places.length<50));
+ record.bytes=0;
+ let bytes=new TextEncoder().encode(JSON.stringify(record)).length;
+ while(record.bytes!==bytes){record.bytes=bytes;bytes=new TextEncoder().encode(JSON.stringify(record)).length;}
  return record.bytes<=CACHE_MAX_BYTES?record:null;
 }
-export function retainedRecords(records,now=Date.now()){
- let bytes=0;
- return records.map(cacheRecord).filter(r=>r&&now-r.updated<CACHE_MAX_AGE&&r.updated<=now).sort((a,b)=>b.updated-a.updated).filter((r,i)=>{if(i>=CACHE_MAX_AREAS||bytes+r.bytes>CACHE_MAX_BYTES)return false;bytes+=r.bytes;return true;});
+export function retainedRecords(records,now=Date.now(),preferences={}){
+ const {retentionDays}=cachePreferences(preferences);let bytes=0,count=0;
+ const candidates=records.map(cacheRecord).filter(r=>r&&(r.pinned||(r.updated<=now&&now-r.updated<retentionDays*CACHE_MAX_AGE))).sort((a,b)=>Number(b.pinned)-Number(a.pinned)||b.updated-a.updated);
+ return candidates.filter(r=>{
+  if(count>=CACHE_MAX_AREAS||bytes+r.bytes>CACHE_MAX_BYTES){if(r.pinned)throw new CacheCapacityError('Недостаточно места для закрепления. Открепите другую область.');return false;}
+  bytes+=r.bytes;count++;return true;
+ });
 }
-function transactionDone(tx){return new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error??new Error('cache transaction aborted'));tx.onerror=()=>{};});}
 let connection;
 async function database(){
  if(!connection){connection=new Promise((resolve,reject)=>{
-  const request=indexedDB.open('wikireader-areas',1);
-  request.onupgradeneeded=()=>request.result.createObjectStore('areas',{keyPath:'id'});
-  request.onsuccess=()=>{const db=request.result;db.onversionchange=()=>{db.close();connection=null;};resolve(db);};
+  const request=indexedDB.open('wikireader-areas',2);let blocked=false;
+  request.onupgradeneeded=()=>{const db=request.result;if(!db.objectStoreNames.contains('areas'))db.createObjectStore('areas',{keyPath:'id'});if(!db.objectStoreNames.contains('settings'))db.createObjectStore('settings',{keyPath:'id'});};
+  request.onblocked=()=>{blocked=true;reject(new Error('cache upgrade blocked'));};
+  request.onsuccess=()=>{const db=request.result;if(blocked){db.close();return;}db.onversionchange=()=>{db.close();connection=null;};resolve(db);};
   request.onerror=()=>reject(request.error);
  });connection.catch(()=>{connection=null;});}
  return connection;
 }
 let queue=Promise.resolve();
 function serialized(work){const job=queue.then(work);queue=job.catch(()=>{});return job;}
+// Read, policy pruning, updates and clearing share one atomic transaction/queue.
+function access(mutate){return serialized(async()=>{
+ const db=await database();return new Promise((resolve,reject)=>{
+  const tx=db.transaction(['areas','settings'],'readwrite');const store=tx.objectStore('areas'),settings=tx.objectStore('settings');let rows,prefs,result,failure;
+  const finish=()=>{if(!rows||!prefs)return;try{
+   let records=retainedRecords(rows,Date.now(),prefs);
+   const changed=mutate?.(records,prefs);if(changed){records=changed.records??records;prefs=changed.preferences??prefs;result=changed.result;}
+   records=retainedRecords(records,Date.now(),prefs);
+   const ids=new Set(records.map(r=>r.id));for(const row of rows)if(!ids.has(row.id))store.delete(row.id);
+   for(const record of records){const old=rows.find(r=>r.id===record.id);if(!old||old.updated!==record.updated||old.pinned!==record.pinned||old.bytes!==record.bytes||old.state?.complete!==record.state.complete)store.put(record);}
+   settings.put({id:'preferences',...prefs});
+   const entries=records.map(r=>({...r,retentionDays:prefs.retentionDays}));
+   result={entries,preferences:prefs,count:entries.length,bytes:entries.reduce((n,r)=>n+r.bytes,0),pinnedCount:entries.filter(r=>r.pinned).length,...result};
+  }catch(e){failure=e;tx.abort();}};
+  const a=store.getAll();a.onsuccess=()=>{rows=a.result;finish();};const p=settings.get('preferences');p.onsuccess=()=>{prefs=cachePreferences(p.result);finish();};
+  tx.oncomplete=()=>resolve(result);tx.onabort=()=>reject(failure??tx.error??new Error('cache transaction aborted'));tx.onerror=()=>{};
+ });
+});}
 export const areaCache={
- read:()=>serialized(async()=>{
-  const db=await database();const tx=db.transaction('areas','readwrite');const done=transactionDone(tx);const store=tx.objectStore('areas');let kept=[];
-  const request=store.getAll();request.onsuccess=()=>{kept=retainedRecords(request.result);const ids=new Set(kept.map(r=>r.id));for(const old of request.result)if(!ids.has(old.id))store.delete(old.id);};
-  await done;return kept;
+ read:async()=> (await access()).entries,
+ snapshot:()=>access(),
+ put:entry=>access((records,prefs)=>{
+  const record=cacheRecord(entry);if(!record)return{result:{saved:false}};
+  const old=records.find(r=>r.id===record.id);record.pinned=old?.pinned??false;
+  try{const keep=retainedRecords([...records.filter(r=>r.id!==record.id),record],Date.now(),prefs);return{records:keep,result:{saved:keep.some(r=>r.id===record.id)}};}catch(e){if(e instanceof CacheCapacityError)return{result:{saved:false}};throw e;}
  }),
- put:entry=>serialized(async()=>{
-  const record=cacheRecord(entry);if(!record)return;
-  const db=await database();const tx=db.transaction('areas','readwrite');const done=transactionDone(tx);const store=tx.objectStore('areas');
-  const request=store.getAll();request.onsuccess=()=>{
-   const all=request.result.filter(r=>r.id!==record.id);const keep=retainedRecords([...all,record]);const ids=new Set(keep.map(r=>r.id));
-   for(const old of all)if(!ids.has(old.id))store.delete(old.id);
-   if(ids.has(record.id))store.put(record);
-  };
-  await done;
+ setPreferences:value=>access((records)=>({records,preferences:cachePreferences(value)})),
+ pinMany:(ids,pinned)=>access(records=>{
+  const wanted=new Set(ids);if(!wanted.size||[...wanted].some(id=>!records.some(r=>r.id===id)))throw new Error('Область ещё не сохранена на устройстве.');
+  return{records:records.map(r=>wanted.has(r.id)?{...r,pinned:!!pinned}:r)};
  }),
- clear:()=>serialized(async()=>{const db=await database();const tx=db.transaction('areas','readwrite');const done=transactionDone(tx);tx.objectStore('areas').clear();await done;})
+ clear:({includePinned=false}={})=>access(records=>({records:includePinned?[]:records.filter(r=>r.pinned)}))
 };

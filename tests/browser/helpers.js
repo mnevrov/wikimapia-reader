@@ -25,3 +25,7 @@ export async function nativeVault(page,state){
    },nativeCallback:()=> 'mock-callback'};
  });
 }
+export async function clickContour(page){
+ const p=page.locator('path.leaflet-interactive').first();await expect(p).toBeVisible();const box=await p.boundingBox();await page.mouse.click(box.x+box.width/2,box.y+box.height/2);
+ if(await page.locator('.object-chooser').isVisible())await page.locator('.object-options button').first().click();
+}

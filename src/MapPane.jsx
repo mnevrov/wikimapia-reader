@@ -3,6 +3,8 @@ import L from 'leaflet';
 import {wikimapiaCall} from './client.js';
 import {AreaLoader} from './area.js';
 import {areaCache} from './areaCache.js';
+import {areaMessage} from './mapStatus.js';
+import {hitTestPlaces} from './geometry.js';
 import {DEMO_AREA} from './demo.js';
 
 function initialView() {
@@ -12,22 +14,28 @@ function initialView() {
   } catch {}
   return {lat:55.752,lng:37.618,zoom:16};
 }
-export default function MapPane({demo,apiKey,auto,active,paused,refresh,moreRequest,focus,location,cacheEpoch,onSelect,onState,onMessage}) {
+export default function MapPane({demo,apiKey,auto,active,paused,refresh,moreRequest,focus,location,cacheEpoch,cacheView,selectedId,onCandidates,onSelect,onState,onMessage}) {
   const el=useRef(null), mapRef=useRef(null), overlayRef=useRef(null);
   const [viewport,setViewport]=useState(0);
   const [moving,setMoving]=useState(false);
   const [places,setPlaces]=useState(()=>demo?DEMO_AREA:[]);
   const blocked=useRef(false), retries=useRef(0);
   const [progress,setProgress]=useState({});
-  const currentLoader=useRef(null);
+  const currentLoader=useRef(null),pick=useRef(null),dismissPick=useRef(null);
   const loader=useMemo(()=>new AreaLoader(opts=>wikimapiaCall('box',apiKey,opts), state=>{
     if(demo)return;
     setPlaces(state.displayPlaces??state.places);setProgress(state);onState(state);
-    if(state.error){blocked.current=!state.retryable;onMessage(state.error);}
-    else if(state.loading)onMessage('Загружаем объекты…');
-    else if(state.page){if(!state.more||state.page>=3)retries.current=0;onMessage(state.places.length?'':'Здесь пока нет объектов Wikimapia');}
+    if(state.error)blocked.current=!state.retryable;
+    else if(state.page&&(!state.more||state.page>=3))retries.current=0;
+    onMessage(areaMessage(state));
   },areaCache),[demo,apiKey,cacheEpoch,onState,onMessage]);
   currentLoader.current=loader;
+  pick.current=latlng=>{
+    const map=mapRef.current;if(!map)return;
+    const matches=hitTestPlaces(places,latlng,coords=>map.latLngToContainerPoint(coords));
+    if(matches.length===1){onCandidates([]);onSelect(matches[0]);}else onCandidates(matches);
+  };
+  dismissPick.current=()=>onCandidates([]);
   useEffect(()=>{
     const v=initialView();
     const map=L.map(el.current,{zoomControl:false,attributionControl:false,inertia:false}).setView([v.lat,v.lng],v.zoom);
@@ -35,9 +43,10 @@ export default function MapPane({demo,apiKey,auto,active,paused,refresh,moreRequ
     L.control.zoom({position:'topright'}).addTo(map);
     L.control.attribution({position:'bottomleft',prefix:false}).addTo(map);
     mapRef.current=map;overlayRef.current=L.featureGroup().addTo(map);
-    map.on('movestart',()=>{setMoving(true);retries.current=0;currentLoader.current?.invalidate();});
+    map.on('click',event=>pick.current?.(event.latlng));
+    map.on('movestart',()=>{dismissPick.current?.();setMoving(true);retries.current=0;currentLoader.current?.invalidate();});
     map.on('moveend',()=>{
-      setMoving(false);
+      dismissPick.current?.();setMoving(false);
       const c=map.getCenter();
       try{localStorage.setItem('wikimapia-reader-view',JSON.stringify({lat:c.lat,lng:c.lng,zoom:map.getZoom()}));}catch{}
       setViewport(v=>v+1);
@@ -85,15 +94,20 @@ export default function MapPane({demo,apiKey,auto,active,paused,refresh,moreRequ
   useEffect(()=>{if(moreRequest&&active&&!paused)loader.more();},[moreRequest]);
   useEffect(()=>{
     const layer=overlayRef.current;if(!layer)return;layer.clearLayers();
-    for(const p of places){if(p.coords.length>=3)L.polygon(p.coords,{color:'#28c7a4',weight:2,fillColor:'#28c7a4',fillOpacity:.12}).on('click',()=>onSelect(p)).addTo(layer);}
-  },[places,onSelect]);
+    for(const p of places){if(p.id===selectedId&&focus?.length>=3)continue;if(p.coords.length>=3)L.polygon(p.coords,{color:p.id===selectedId?'#f1a23b':'#16ac8d',weight:p.id===selectedId?3:1.5,fill:p.id===selectedId,fillColor:'#f1a23b',fillOpacity:.12}).addTo(layer);}
+  },[places,selectedId,focus]);
   useEffect(()=>{
     if(focus?.length<3||!focus||!mapRef.current)return;
     const map=mapRef.current;
-    const p=L.polygon(focus,{color:'#f1a23b',weight:3,fillOpacity:.16}).addTo(map);
+    const p=L.polygon(focus,{color:'#f1a23b',weight:3,fillOpacity:.12}).addTo(map);
     map.fitBounds(focus,{maxZoom:17,paddingTopLeft:[24,88],paddingBottomRight:[32,Math.min(window.innerHeight*.52,420)]});
     return()=>p.remove();
   },[focus]);
+  useEffect(()=>{
+    if(!cacheView||!mapRef.current)return;
+    const [w,s,e,n]=cacheView.bbox;
+    mapRef.current.fitBounds([[s,w],[n,e]],{padding:[24,90],maxZoom:18});
+  },[cacheView]);
   useEffect(()=>{
     if(!location||!mapRef.current)return;
     const map=mapRef.current;

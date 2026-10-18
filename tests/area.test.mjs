@@ -79,3 +79,28 @@ test('an area evicted from memory still uses the fresh on-device cache',async()=
  for(let i=0;i<9;i++)await loader.load([2.29+i*.02,48.85,2.30+i*.02,48.86]);
  await loader.load(bbox);assert.equal(calls,9);assert.equal(loader.state.places[0].id,1);
 });
+test('fresh complete adjacent areas cover a combined viewport without another request',async()=>{
+ let calls=0;const loader=new AreaLoader(async()=>({folder:[place(++calls)],found:1}));
+ await loader.load([2.29,48.85,2.30,48.86]);await loader.load([2.30,48.85,2.31,48.86]);
+ await loader.load([2.295,48.851,2.305,48.859]);assert.equal(calls,2);assert.deepEqual(loader.state.places.map(p=>p.id),[1,2]);assert.equal(loader.state.more,false);
+});
+test('partial cached pages do not falsely complete union coverage',async()=>{
+ let calls=0;const loader=new AreaLoader(async()=>({folder:[place(++calls)],found:100}));
+ await loader.load([2.29,48.85,2.30,48.86]);await loader.load([2.30,48.85,2.31,48.86]);await loader.load([2.295,48.851,2.305,48.859]);assert.equal(calls,3);assert.equal(loader.state.more,true);
+});
+test('existing contours make subsequent loading background work',async()=>{
+ let deliver,calls=0;const loader=new AreaLoader(async()=>++calls===1?{folder:[place(1)],found:1}:new Promise(r=>deliver=r));
+ await loader.load(bbox);const job=loader.load([2.295,48.85,2.305,48.86]);assert.equal(loader.state.background,true);loader.stop();assert.equal(loader.state.loading,false);deliver({folder:[],found:0});await job;
+});
+test('pinned and 7-day retained stale contours are shown while updating',async()=>{
+ let deliver;const old={bbox,updated:Date.now()-2*86400000,retentionDays:7,pinned:true,state:{places:[{id:1,title:'Pinned',coords:[[48.85,2.29],[48.85,2.30],[48.86,2.30]]}],page:1,found:1,more:false}};
+ const loader=new AreaLoader(()=>new Promise(r=>deliver=r),()=>{},{read:async()=>[old],put:async()=>{}});const job=loader.load(bbox);await new Promise(r=>setImmediate(r));assert.equal(loader.state.background,true);assert.equal(loader.state.displayPlaces[0].id,1);deliver({folder:[place(2)],found:1});await job;
+});
+test('a stalled page with known missing objects cannot complete combined coverage',async()=>{
+ let calls=0;const loader=new AreaLoader(async opts=>{calls++;return opts.bbox[0]===2.29?{folder:opts.page===1?[place(1)]:[],found:100}:{folder:[place(2)],found:1};});
+ await loader.load(bbox);await loader.more();await loader.load([2.30,48.85,2.31,48.86]);await loader.load([2.295,48.851,2.305,48.859]);assert.equal(calls,4);
+});
+test('complete union in memory avoids another disk transaction',async()=>{
+ let reads=0;const loader=new AreaLoader(async()=>({folder:[place(1)],found:1}),()=>{},{read:async()=>{reads++;return[];},put:async()=>{}});
+ await loader.load(bbox);await loader.load([2.30,48.85,2.31,48.86]);const before=reads;await loader.load([2.295,48.851,2.305,48.859]);assert.equal(reads,before);
+});
