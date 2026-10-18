@@ -26,7 +26,7 @@ function App(){
   const [refresh,setRefresh]=useState(0),[moreRequest,setMoreRequest]=useState(0);
   const [focus,setFocus]=useState(null),[location,setLocation]=useState(null),[locating,setLocating]=useState(false);
   const [selected,setSelected]=useState(null),[details,setDetails]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
-  const [notice,setNotice]=useState('Демонстрационные объекты'),[toast,setToast]=useState('');
+  const [notice,setNotice]=useState('Открываем карту…'),[toast,setToast]=useState('');
   const [favorites,setFavorites]=useState(()=>{try{return readFavorites(localStorage.getItem('wikimapia-reader-favorites'));}catch{return[];}});
   const [query,setQuery]=useState(''),[results,setResults]=useState([]),[searchBusy,setSearchBusy]=useState(false),[searchStatus,setSearchStatus]=useState(''),[placeId,setPlaceId]=useState('55');
   const detailAbort=useRef(null),searchAbort=useRef(null),request=useRef(0),locationJob=useRef(0);

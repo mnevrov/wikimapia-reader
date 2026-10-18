@@ -26,3 +26,12 @@ test('failed removal preserves active credential and reports the failure',async(
  const state={key:'old-key',calls:[],fail:'clear'};await nativeVault(page,state);await page.goto('/');await screen(page,'Настройки');await page.getByRole('button',{name:'Удалить ключ',exact:true}).click();
  await expect(page.getByRole('alert')).toContainText('Не удалось удалить');expect(state.key).toBe('old-key');await expect(page.getByText('Ключ сохранён на устройстве',{exact:true})).toBeVisible();
 });
+test('restored real key never mounts synthetic polygons during startup',async({page})=>{
+ await nativeVault(page,{key:'restored-key',calls:[]});
+ await page.addInitScript(()=>{
+  window.syntheticPathsSeen=0;
+  new MutationObserver(records=>{for(const r of records)for(const node of r.addedNodes){if(node.nodeType===1){if(node.matches('path.leaflet-interactive'))window.syntheticPathsSeen++;window.syntheticPathsSeen+=node.querySelectorAll('path.leaflet-interactive').length;}}}).observe(document,{childList:true,subtree:true});
+ });
+ await page.goto('/');await expect(page.locator('.map-summary-heading')).toContainText('0 объектов');await expect(page.locator('.status')).toContainText('0 объектов');
+ expect(await page.evaluate(()=>window.syntheticPathsSeen)).toBe(0);
+});

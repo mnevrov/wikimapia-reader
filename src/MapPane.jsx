@@ -15,7 +15,7 @@ export default function MapPane({demo,apiKey,auto,active,paused,refresh,moreRequ
   const el=useRef(null), mapRef=useRef(null), overlayRef=useRef(null);
   const [viewport,setViewport]=useState(0);
   const [moving,setMoving]=useState(false);
-  const [places,setPlaces]=useState(DEMO_AREA);
+  const [places,setPlaces]=useState(()=>demo?DEMO_AREA:[]);
   const blocked=useRef(false);
   const currentLoader=useRef(null);
   const loader=useMemo(()=>new AreaLoader(opts=>wikimapiaCall('box',apiKey,opts), state=>{
