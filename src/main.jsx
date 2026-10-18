@@ -59,11 +59,12 @@ function App(){
     catch(e){if(token===request.current)setError(diagnosticError(e));}
     finally{if(token===request.current)setBusy(false);}
   },[demo,credentials.key,screen,selected]);
-  const active=usePlatform(()=>{if(confirmForget){setConfirmForget(false);return true;}if(screen!=='map'){setScreen('map');return true;}if(candidates.length){setCandidates([]);return true;}if(selected){dismissCard();return true;}return false;});
+  const active=usePlatform(()=>{if(screen==='settings'&&confirmForget){setConfirmForget(false);return true;}if(screen!=='map'){setScreen('map');return true;}if(candidates.length){setCandidates([]);return true;}if(selected){dismissCard();return true;}return false;});
   useEffect(()=>{const on=()=>setOnline(true),off=()=>setOnline(false);window.addEventListener('online',on);window.addEventListener('offline',off);return()=>{window.removeEventListener('online',on);window.removeEventListener('offline',off);};},[]);
   useLayoutEffect(()=>{if(screenBody.current){screenBody.current.scrollTop=positions.current[screen]??0;if(restoreFocus.current&&origin.current?.screen===screen){const o=origin.current;screenBody.current.querySelector(`[data-place-id="${o.id}"][data-source="${o.source}"]`)?.focus({preventScroll:true});restoreFocus.current=false;}}},[screen]);
   useEffect(()=>{if(!undo)return;const t=setTimeout(()=>setUndo(null),8000);return()=>clearTimeout(t);},[undo]);
   useEffect(()=>{if(!active){detailAbort.current?.abort();searchAbort.current?.abort();request.current++;if(busy)setError('Загрузка прервана. Нажмите «Повторить».');setBusy(false);setSearchBusy(false);locationJob.current++;setLocating(false);}},[active]);
+  useEffect(()=>{if(screen!=='settings')setConfirmForget(false);},[screen]);
   useEffect(()=>{if(screen!=='search'){searchAbort.current?.abort();setSearchBusy(false);}},[screen]);
   useEffect(()=>()=>{detailAbort.current?.abort();searchAbort.current?.abort();},[]);
   useEffect(()=>{if(!toast)return;const t=setTimeout(()=>setToast(''),3000);return()=>clearTimeout(t);},[toast]);
