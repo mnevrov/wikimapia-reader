@@ -1,0 +1,61 @@
+{
+  "version": "0.4.0",
+  "node": {
+    "status": "PASS",
+    "tests": 27
+  },
+  "python": {
+    "status": "PASS",
+    "tests": 3
+  },
+  "playwright": {
+    "status": "PASS",
+    "tests": 15,
+    "api": "mocked",
+    "tiles": "mocked",
+    "native_dialogs": "NOT_RUN"
+  },
+  "independent_review": {
+    "status": "PASS",
+    "fixed_findings": 3,
+    "open_p1_p2": 0,
+    "mode": "read-only"
+  },
+  "android": {
+    "status": "PASS",
+    "tasks": [
+      "clean",
+      "assembleDebug",
+      "lintDebug"
+    ],
+    "exit_code": 0
+  },
+  "device_0_4": {
+    "status": "NOT_RUN"
+  },
+  "device_0_3": {
+    "status": "USER_CONFIRMED",
+    "scope": [
+      "startup",
+      "personal key",
+      "area contours",
+      "comments"
+    ]
+  },
+  "dark_basemap": {
+    "status": "DEFERRED",
+    "reason": "CARTO currently requires separate key"
+  },
+  "apk": {
+    "file": "WikiReader-0.4.0-debug.apk",
+    "size": 4965790,
+    "sha256": "0a4b0aa42471de50d9508ba3800070a03f7c6c27b441a3d1e805da02822d2991",
+    "signature": "PASS",
+    "same_signer_as_0_3": true,
+    "assets_equal_dist": true,
+    "plugins": [
+      "com.capacitorjs.plugins.app.AppPlugin",
+      "com.capacitorjs.plugins.geolocation.GeolocationPlugin"
+    ]
+  }
+}
