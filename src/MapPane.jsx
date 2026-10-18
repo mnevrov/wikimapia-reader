@@ -31,7 +31,7 @@ export default function MapPane({demo,apiKey,auto,active,paused,refresh,moreRequ
     const map=L.map(el.current,{zoomControl:false,attributionControl:false}).setView([v.lat,v.lng],v.zoom);
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
     L.control.zoom({position:'topright'}).addTo(map);
-    L.control.attribution({position:'topright',prefix:false}).addTo(map);
+    L.control.attribution({position:'bottomleft',prefix:false}).addTo(map);
     mapRef.current=map;overlayRef.current=L.featureGroup().addTo(map);
     map.on('movestart',()=>{setMoving(true);currentLoader.current?.invalidate();});
     map.on('moveend',()=>{
@@ -47,7 +47,7 @@ export default function MapPane({demo,apiKey,auto,active,paused,refresh,moreRequ
     blocked.current=false;
     setPlaces(demo?DEMO_AREA:[]);
     onState({places:[],page:0,found:null,more:false,loading:false,error:''});
-    if(demo)onMessage('Демо · вымышленные объекты');
+    onMessage(demo?'Демо · вымышленные объекты':auto?'Остановите карту, чтобы загрузить объекты':'Нажмите обновление, чтобы загрузить область');
     return()=>loader.stop();
   },[demo,loader,onState,onMessage]);
   const loadRef=useRef(null);
@@ -75,7 +75,7 @@ export default function MapPane({demo,apiKey,auto,active,paused,refresh,moreRequ
     if(focus?.length<3||!focus||!mapRef.current)return;
     const map=mapRef.current;
     const p=L.polygon(focus,{color:'#f1a23b',weight:3,fillOpacity:.16}).addTo(map);
-    map.fitBounds(focus,{maxZoom:17,paddingTopLeft:[32,120],paddingBottomRight:[32,Math.min(window.innerHeight*.45,360)]});
+    map.fitBounds(focus,{maxZoom:17,paddingTopLeft:[24,88],paddingBottomRight:[32,Math.min(window.innerHeight*.52,420)]});
     return()=>p.remove();
   },[focus]);
   useEffect(()=>{

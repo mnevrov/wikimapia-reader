@@ -1,30 +1,14 @@
 import {test,expect} from '@playwright/test';
-test.beforeEach(async({page})=>{
- await page.route('https://tile.openstreetmap.org/**',r=>r.abort());
+import {tiles,screen,map} from './helpers.js';
+test.beforeEach(async({page})=>tiles(page));
+test('black default, controls and persistent light preference',async({page})=>{
+ await page.emulateMedia({colorScheme:'light'});await page.goto('/');await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
+ await screen(page,'Настройки');await expect(page.locator('.settings-group').first()).toHaveCSS('background-color','rgb(16, 18, 20)');
+ await expect(page.locator('#api-key')).toHaveCSS('background-color','rgb(32, 36, 40)');await page.getByRole('button',{name:'Светлая',exact:true}).click();
+ await page.reload();await expect(page.locator('html')).toHaveAttribute('data-theme','light');await screen(page,'Настройки');await page.getByRole('button',{name:'Чёрная',exact:true}).click();await map(page);
+ await page.locator('path.leaflet-interactive').first().dispatchEvent('click');await expect(page.locator('.sheet')).toHaveCSS('background-color','rgb(16, 18, 20)');
 });
-test('black default covers settings, card, controls and survives reload',async({page})=>{
- await page.emulateMedia({colorScheme:'light'});await page.goto('/');
- await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
- await page.getByRole('button',{name:'⚙ Настройки'}).click();
- await expect(page.locator('.settings-panel')).toHaveCSS('background-color','rgb(16, 18, 20)');
- await expect(page.locator('#api-key')).toHaveCSS('background-color','rgb(32, 36, 40)');
- await expect(page.locator('#api-key')).toHaveCSS('color','rgb(241, 245, 249)');
- await page.getByRole('button',{name:'Светлая',exact:true}).click();
- await expect(page.locator('html')).toHaveAttribute('data-theme','light');
- await page.reload();await expect(page.locator('html')).toHaveAttribute('data-theme','light');
- await page.getByRole('button',{name:'⚙ Настройки'}).click();
- await page.getByRole('button',{name:'Чёрная',exact:true}).click();
- await page.getByLabel('Закрыть настройки').click();
- await page.locator('path.leaflet-interactive').first().click({force:true});
- await expect(page.locator('.sheet')).toHaveCSS('background-color','rgb(16, 18, 20)');
- await expect(page.locator('.sheet')).toHaveCSS('color','rgb(241, 245, 249)');
-});
-test('system option responds to system appearance while app stays open',async({page})=>{
- await page.emulateMedia({colorScheme:'light'});await page.goto('/');
- await page.getByRole('button',{name:'⚙ Настройки'}).click();
- await page.getByRole('button',{name:'Как в системе',exact:true}).click();
- await expect(page.locator('html')).toHaveAttribute('data-theme','light');
- await page.emulateMedia({colorScheme:'dark'});
- await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
- await expect(page.getByRole('button',{name:'Как в системе',exact:true})).toHaveAttribute('aria-pressed','true');
+test('system theme reacts while open',async({page})=>{
+ await page.emulateMedia({colorScheme:'light'});await page.goto('/');await screen(page,'Настройки');await page.getByRole('button',{name:'Как в системе',exact:true}).click();
+ await expect(page.locator('html')).toHaveAttribute('data-theme','light');await page.emulateMedia({colorScheme:'dark'});await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
 });

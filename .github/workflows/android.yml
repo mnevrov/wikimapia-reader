@@ -44,7 +44,7 @@ jobs:
         run: npx playwright test
       - name: Build and lint APK
         working-directory: android
-        run: ./gradlew --no-daemon assembleDebug lintDebug
+        run: ./gradlew --no-daemon testDebugUnitTest assembleDebug lintDebug
       - name: Checksum
         working-directory: android/app/build/outputs/apk/debug
         run: sha256sum app-debug.apk > SHA256SUMS.txt
