@@ -18,3 +18,5 @@ test-results/
 probe-personal.json
 
 release-dist/
+
+apk-dist/

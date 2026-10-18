@@ -10,4 +10,5 @@ public class CoreTest {
  @Test public void throttleAndBackoff(){RequestGate g=new RequestGate();assertEquals(0,g.reserve(0));assertEquals(6000,g.reserve(0));assertEquals(12000,g.reserve(0));g.backoff(1000,60000);assertEquals(61000,g.reserve(2000));}
  @Test public void validatesBounds(){assertThrows(IllegalArgumentException.class,()->Geo.validateBox(new double[]{0,0,1,1}));assertThrows(IllegalArgumentException.class,()->Geo.validateBox(new double[]{Double.NaN,0,.01,.01}));}
  @Test public void wideSurfaceHasSeveralBoundedAreas(){Viewport v=new Viewport(55,37,16);java.util.List<double[]> boxes=v.boxes(2400,600);assertTrue(boxes.size()>1);for(double[] b:boxes)Geo.validateBox(b);assertTrue(boxes.size()<=9);}
+ @Test public void cancelledWaitDoesNotConsumeNewSlot(){RequestGate gate=new RequestGate();gate.reserve(0);for(int i=0;i<100;i++)assertEquals(6000,gate.available(1000));assertEquals(6000,gate.reserve(6000));assertEquals(12000,gate.available(6001));}
 }

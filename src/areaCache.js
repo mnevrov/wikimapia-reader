@@ -76,8 +76,8 @@ let nativeQueue=Promise.resolve();
 function nativeAccess(action,options={}){
  const task=nativeQueue.then(async()=>{
   // Legacy data is retained as a recovery copy; native marks migration atomically.
-  const legacy=(await webAreaCache.read());
-  return car.cache({action,options:{...options,legacy}});
+  const snapshot=await webAreaCache.snapshot();
+  return car.cache({action,options:{...options,legacy:snapshot.entries,legacyPreferences:snapshot.preferences}});
  });nativeQueue=task.catch(()=>{});return task;
 }
 const nativeAreaCache={

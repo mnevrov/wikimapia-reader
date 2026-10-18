@@ -18,5 +18,3 @@ public class MainActivity extends BridgeActivity {
         if (getBridge() != null) getBridge().triggerWindowJSEvent("wikireadercaropen", "{}");
     }
 }
-
-

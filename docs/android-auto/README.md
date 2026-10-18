@@ -148,3 +148,9 @@ portrait/wide, день/ночь; пересоздание surface; переза
 [AndroidX releases](https://developer.android.com/jetpack/androidx/releases/car-app),
 [DHU](https://developer.android.com/training/cars/testing/dhu),
 [OSM tiles policy](https://operations.osmfoundation.org/policies/tiles/).
+
+Полный [отчёт проверок и ограничений](CHECKS.md) различает автоматическую проверку
+и невыполненные испытания на устройстве. При движении новые viewport объединяются,
+ожидающий 6-секундный слот запрос не отменяется каждым GPS update. Ошибка/квота
+останавливает автоматические повторения до явного обновления. API-запросы исключены
+из HTTP disk cache, используемого для OSM.
