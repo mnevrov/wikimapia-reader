@@ -2,6 +2,8 @@
 set -euo pipefail
 : "${GH_TOKEN:?}"
 : "${GH_REPO:?}"
+: "${RELEASE_TARGET_SHA:?}"
+[[ "$RELEASE_TARGET_SHA" =~ ^[a-f0-9]{40}$ ]] || exit 1
 tag=${1:?tag required}
 [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
 version=${tag#v}
@@ -12,7 +14,7 @@ sha256sum --check SHA256SUMS.txt
 if gh release view "$tag" --json isDraft > existing.json 2>/dev/null; then
   draft=$(python3 -c 'import json;print(str(json.load(open("existing.json"))["isDraft"]).lower())')
 else
-  gh release create "$tag" --verify-tag --draft --title "WikiReader Next $version" --notes-file RELEASE_NOTES.md
+  gh release create "$tag" --target "$RELEASE_TARGET_SHA" --draft --title "WikiReader Next $version" --notes-file RELEASE_NOTES.md
   draft=true
 fi
 if [[ "$draft" == true ]]; then

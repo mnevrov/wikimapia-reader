@@ -6,6 +6,11 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag (vX.Y.Z); leave empty for build only. Run from main.'
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -60,18 +65,25 @@ jobs:
           if-no-files-found: error
 
       - name: Require a release commit from main
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: git merge-base --is-ancestor HEAD origin/main
-      - name: Sign and verify Next release APK
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
         env:
-          RELEASE_TAG: ${{ github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+          SOURCE_REF: ${{ github.ref }}
+        run: |
+          if [[ "$EVENT_NAME" == workflow_dispatch && "$SOURCE_REF" != refs/heads/main ]]; then
+            echo 'Manual releases must run from main'; exit 1
+          fi
+          git merge-base --is-ancestor HEAD origin/main
+      - name: Sign and verify Next release APK
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
+        env:
+          RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || inputs.release_tag }}
           NEXT_KEYSTORE_BASE64: ${{ secrets.NEXT_KEYSTORE_BASE64 }}
           NEXT_STORE_PASSWORD: ${{ secrets.NEXT_STORE_PASSWORD }}
           NEXT_KEY_PASSWORD: ${{ secrets.NEXT_KEY_PASSWORD }}
         run: bash scripts/prepare-release.sh "$RELEASE_TAG"
       - name: Retain signed release files
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: WikiReader-release-${{ github.sha }}
@@ -80,7 +92,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
     needs: verify-and-build
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -102,5 +114,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || inputs.release_tag }}
+          RELEASE_TARGET_SHA: ${{ github.sha }}
         run: bash scripts/publish-release.sh "$RELEASE_TAG"

@@ -30,7 +30,7 @@ class ReleasePublishTests(unittest.TestCase):
             (out/'RELEASE_NOTES.md').write_text('Synthetic test release')
             bin_dir=root/'bin';bin_dir.mkdir();gh=bin_dir/'gh';gh.write_text(MOCK);gh.chmod(0o700)
             calls=root/'calls'
-            env={**os.environ,'PATH':str(bin_dir)+os.pathsep+os.environ['PATH'],'GH_TOKEN':'mock','GH_REPO':'mock/repo','SCENARIO':scenario,'CALLS':str(calls)}
+            env={**os.environ,'PATH':str(bin_dir)+os.pathsep+os.environ['PATH'],'GH_TOKEN':'mock','GH_REPO':'mock/repo','RELEASE_TARGET_SHA':'0'*40,'SCENARIO':scenario,'CALLS':str(calls)}
             result=subprocess.run(['bash',str(SCRIPT),'v0.7.3'],cwd=root,env=env,capture_output=True,text=True)
             return result.returncode,calls.read_text()
 
