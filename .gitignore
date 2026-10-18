@@ -16,3 +16,5 @@ android/**/build/
 playwright-report/
 test-results/
 probe-personal.json
+
+release-dist/
