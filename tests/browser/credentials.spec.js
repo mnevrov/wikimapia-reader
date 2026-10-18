@@ -12,7 +12,7 @@ test('replace and forget persist through reload; demo keeps saved key',async({pa
  const state={key:'original-secret',calls:[]};await nativeVault(page,state);await page.goto('/');await screen(page,'Настройки');
  await page.getByRole('button',{name:'Заменить ключ'}).click();await page.locator('#api-key').fill('replacement-secret');await page.getByRole('button',{name:'Сохранить и подключить'}).click();expect(state.key).toBe('replacement-secret');
  await screen(page,'Настройки');await page.getByRole('button',{name:'Открыть деморежим'}).click();expect(state.key).toBe('replacement-secret');await page.reload();
- await screen(page,'Настройки');await page.getByRole('button',{name:'Удалить ключ',exact:true}).click();await expect(page.locator('#api-key')).toBeVisible();expect(state.key).toBeNull();await page.reload();await screen(page,'Настройки');await expect(page.getByText('Добавьте API-ключ',{exact:true})).toBeVisible();
+ await screen(page,'Настройки');await page.getByRole('button',{name:'Удалить ключ',exact:true}).click();await page.getByRole('button',{name:'Удалить с устройства',exact:true}).click();await expect(page.locator('#api-key')).toBeVisible();expect(state.key).toBeNull();await page.reload();await screen(page,'Настройки');await expect(page.getByText('Добавьте API-ключ',{exact:true})).toBeVisible();
 });
 test('failed save never claims success or changes the old credential',async({page})=>{
  const state={key:'old-key',calls:[],fail:'save'};await nativeVault(page,state);await page.goto('/');await screen(page,'Настройки');await page.getByRole('button',{name:'Заменить ключ'}).click();await page.locator('#api-key').fill('new-key');await page.getByRole('button',{name:'Сохранить и подключить'}).click();
@@ -23,7 +23,7 @@ test('unreadable vault has recovery controls; failed delete keeps saved key',asy
  await expect(page.getByRole('button',{name:'Удалить сохранённую запись'})).toBeVisible();state.fail=null;await page.getByRole('button',{name:'Удалить сохранённую запись'}).click();expect(state.key).toBeNull();
 });
 test('failed removal preserves active credential and reports the failure',async({page})=>{
- const state={key:'old-key',calls:[],fail:'clear'};await nativeVault(page,state);await page.goto('/');await screen(page,'Настройки');await page.getByRole('button',{name:'Удалить ключ',exact:true}).click();
+ const state={key:'old-key',calls:[],fail:'clear'};await nativeVault(page,state);await page.goto('/');await screen(page,'Настройки');await page.getByRole('button',{name:'Удалить ключ',exact:true}).click();await page.getByRole('button',{name:'Удалить с устройства',exact:true}).click();
  await expect(page.getByRole('alert')).toContainText('Не удалось удалить');expect(state.key).toBe('old-key');await expect(page.getByText('Ключ сохранён на устройстве',{exact:true})).toBeVisible();
 });
 test('restored real key never mounts synthetic polygons during startup',async({page})=>{
