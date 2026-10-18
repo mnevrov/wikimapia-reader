@@ -28,7 +28,12 @@ apk="WikiReader-Next-$version.apk"
 "$build_tools/zipalign" -f -P 16 4 android/app/build/outputs/apk/debug/app-debug.apk "$private_dir/aligned.apk"
 java -jar "$build_tools/lib/apksigner.jar" sign --ks "$private_dir/signing.jks" --ks-key-alias wikireader-next --ks-pass env:NEXT_STORE_PASSWORD --key-pass env:NEXT_KEY_PASSWORD --out "release-dist/$apk" "$private_dir/aligned.apk"
 java -jar "$build_tools/lib/apksigner.jar" verify --verbose --print-certs "release-dist/$apk" > "$private_dir/verify.txt"
-rg -q 'certificate SHA-256 digest: f2e7ecb97e30017f5fb43f59650c1a14b001a328b440d435f81751dd97900bba' "$private_dir/verify.txt" || { echo 'Unexpected signer; refusing incompatible update'; exit 1; }
+python3 - "$private_dir/verify.txt" <<'PYCERT'
+import pathlib,sys,re
+text=pathlib.Path(sys.argv[1]).read_text()
+certs=re.findall(r'certificate SHA-256 digest: ([a-f0-9]+)',text)
+assert certs==['f2e7ecb97e30017f5fb43f59650c1a14b001a328b440d435f81751dd97900bba'], 'Unexpected signer; refusing incompatible update'
+PYCERT
 "$build_tools/aapt" dump badging "release-dist/$apk" > "$private_dir/badging.txt"
 python3 - "$private_dir/badging.txt" "$version" "release-dist/$apk" <<'PY'
 import pathlib,sys,re,zipfile
@@ -45,5 +50,11 @@ with zipfile.ZipFile(sys.argv[3]) as signed, zipfile.ZipFile('android/app/build/
             assert signed.read(n)==raw.read(n), n
 PY
 (cd release-dist && sha256sum "$apk" > SHA256SUMS.txt)
-cp "docs/releases/$version/RELEASE_NOTES.md" release-dist/RELEASE_NOTES.md
+python3 - "$version" "release-dist/$apk" <<'PYNOTES'
+import pathlib,sys,hashlib
+v=sys.argv[1];apk=pathlib.Path(sys.argv[2])
+text=pathlib.Path(f'docs/releases/{v}/RELEASE_NOTES.md').read_text()
+text='\n'.join(line for line in text.splitlines() if not line.startswith('SHA256:'))
+pathlib.Path('release-dist/RELEASE_NOTES.md').write_text(text.rstrip()+'\n\nSHA256: '+hashlib.sha256(apk.read_bytes()).hexdigest()+'\n')
+PYNOTES
 printf 'Verified signed APK: %s\n' "$apk"
