@@ -15,7 +15,7 @@ export class AreaLoader {
     this.cache = new Map();
     this.sequence = 0;
     this.continuation = 0;
-    this.state = {places:[], displayPlaces:[], page:0, found:null, more:false, loading:false, error:'', retryable:false,background:false,draining:false,batchLimited:false,cacheIds:[]};
+    this.state = {places:[], displayPlaces:[], page:0, found:null, more:false, loading:false, error:'', failureKind:null,retryable:false,failureKind:null,background:false,draining:false,batchLimited:false,cacheIds:[]};
   }
   publish(patch) { this.state = {...this.state, ...patch}; this.notify(this.state); }
   stop() {
@@ -72,7 +72,7 @@ export class AreaLoader {
       if(isCovered(view,coverageEntries.map(e=>e.bbox))){
         this.bbox=[...view];this.cacheKey=null;
         const displayPlaces=this.visibleCached();
-        this.publish({places:displayPlaces,displayPlaces,page:1,found:null,more:false,loading:false,error:'',retryable:false,background:false,batchLimited:false,cacheIds:coverageEntries.map(e=>e.bbox.join(','))});
+        this.publish({places:displayPlaces,displayPlaces,page:1,found:null,more:false,loading:false,error:'',failureKind:null,retryable:false,background:false,batchLimited:false,cacheIds:coverageEntries.map(e=>e.bbox.join(','))});
         return;
       }
     }
@@ -117,7 +117,8 @@ export class AreaLoader {
       // A repeated/empty page must not create an endless "more" loop.
       const progress = places.length > this.state.places.length;
       const more = progress && items.length > 0 && (found !== null ? places.length < found : items.length === 50);
-      const fullyLoaded=found!==null?places.length>=found:items.length<50;
+      // Repeated/empty pages cannot prove completeness when the server reports more.
+      const fullyLoaded=found!==null?places.length>=found:(items.length<50);
       const state = {places,page,found,more,complete:fullyLoaded,loading:false,background:false,error:'',failureKind:null,retryable:false};
       const key=this.cacheKey,old=this.cache.get(key);
       const record={bbox:[...this.bbox],state,updated:Date.now(),pinned:old?.pinned??false,retentionDays:old?.retentionDays??1};
@@ -129,7 +130,6 @@ export class AreaLoader {
     } catch (error) {
       if (n !== this.sequence) return;
       // Authentication, quota and invalid payloads need deliberate user action.
-      const message=String(error?.message??'');
       const failureKind=classifyApiFailure(error, {offline:typeof navigator !== 'undefined' && navigator.onLine === false});
       const retryable=['network','timeout','unknown'].includes(failureKind);
       this.publish({loading:false,background:false,error:failureKind === 'offline'?'Нет подключения к интернету. Ранее сохранённые объекты доступны офлайн.':diagnosticError(error),failureKind,retryable});
