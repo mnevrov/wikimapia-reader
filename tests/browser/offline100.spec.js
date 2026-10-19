@@ -5,7 +5,7 @@ const details={id:55,title:'Старая башня',description:'История
 test('explicit offline save keeps description, comments and local gallery after reload',async({page})=>{
   await page.addInitScript(()=>localStorage.setItem('wikimapia-reader-auto','false'));
   await page.route('https://tile.openstreetmap.org/**',r=>r.abort());
-  await page.route('https://photos.wikimapia.org/**',r=>r.fulfill({status:200,contentType:'image/png',body:Buffer.from(photo,'base64')}));
+  await page.route('https://photos.wikimapia.org/**',r=>r.fulfill({status:200,contentType:'image/png',headers:{'Access-Control-Allow-Origin':'*'},body:Buffer.from(photo,'base64')}));
   await page.route('https://api.wikimapia.org/**',r=>r.fulfill({json:details}));
   await page.goto('/');await connect(page);await openId(page);
   await expect(page.locator('.description')).toContainText('Вторая строка');
