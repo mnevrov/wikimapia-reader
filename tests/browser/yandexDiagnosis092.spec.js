@@ -19,7 +19,7 @@ test('network/script error has precise safe diagnosis while OSM remains usable',
  await expect(card).toBeVisible();
  await expect(card).toContainText('script-load-error');
  await expect(card).toContainText('api-maps.yandex.ru');
- await expect(card).toContainText('https://');
+ await expect(card).toContainText('Адрес страницы WebView: http://127.0.0.1:5173');
  await expect(page.getByRole('button',{name:'OpenStreetMap'})).toHaveAttribute('aria-pressed','true');
  await expect(page.locator('path.leaflet-interactive').first()).toBeVisible();
  const text=await card.innerText();

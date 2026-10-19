@@ -19,7 +19,7 @@ export function useYandexUnderlay({mapRef,hostRef,selected,key,refererConfirmed,
    if(cancelled)return;
    if(!result.active){
     setActive(false);
-    report(result.reason==='sdk-unavailable'?result.failureCode||'sdk-unavailable':result.reason,{previous:result.failureCode||'',retrySeconds:result.retrySeconds||0});
+    report(result.reason==='sdk-unavailable'?result.failureCode||'sdk-unavailable':result.reason,{previous:result.reason==='retry-cooldown'?result.failureCode||'':'',retrySeconds:result.retrySeconds||0});
     return;
    }
    const map=mapRef.current,host=hostRef.current;
