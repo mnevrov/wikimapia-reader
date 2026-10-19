@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {areaMessage} from '../src/mapStatus.js';
+import {areaMessage, areaCacheLabel} from '../src/mapStatus.js';
 test('only cold load speaks; background loading is silent',()=>{
  assert.equal(areaMessage({loading:true,background:false}),'Загружаем объекты…');
  assert.equal(areaMessage({loading:true,background:true,displayPlaces:[{}]}),'');
@@ -13,4 +13,11 @@ test('cancelled first request clears the old message and errors remain visible',
 test('continuation budget is explained and errors take priority',()=>{
  assert.match(areaMessage({batchLimited:true}),/20 страниц/);
  assert.equal(areaMessage({batchLimited:true,error:'Ошибка'}),'Ошибка');
+});
+
+test('fresh, expired and incomplete cache are labeled without coordinates',()=>{
+ const at=1000000;
+ assert.equal(areaCacheLabel({page:1,places:[{}],found:1,more:false,complete:true,cacheUpdatedAt:at},at+1000),'Кэш · свежие данные');
+ assert.match(areaCacheLabel({page:1,places:[{}],found:10,more:true,cacheUpdatedAt:at},at+300001),/могут устареть.*не полностью/);
+ assert.equal(areaCacheLabel({page:0,displayPlaces:[]},at),'');
 });

@@ -162,12 +162,28 @@ export function validateResponse(result, func, expectedId) {
   }
   return result;
 }
+// Stable, non-sensitive categories for UI, diagnostics and future telemetry.
+// Never return raw server messages: Wikimapia may echo query parameters or API keys.
+export function classifyApiFailure(error, { offline = false } = {}) {
+  if (offline) return 'offline';
+  if (error instanceof ValidationError) return 'input';
+  const message = String(error?.message ?? error ?? '');
+  if (/429|limit|quota|wait|too many|исчерпан лимит/i.test(message)) return 'quota';
+  if (/401|403|invalid key|api key|ключ api|ключ.*отклон|1000/i.test(message)) return 'auth';
+  if (/неподтверждённая структура|неполные сведения|другой объект|schema|unexpected token|invalid json|json parse|json\.parse|not valid json/i.test(message)) return 'schema';
+  if (/abort|timeout|timed out|вовремя/i.test(message)) return 'timeout';
+  if (/Failed to fetch|Network request failed|network error|cors|ERR_NAME_NOT_RESOLVED|dns|connection refused|ERR_INTERNET_DISCONNECTED/i.test(message)) return 'network';
+  return 'unknown';
+}
+
 export function diagnosticError(error) {
   if (error instanceof ApiError || error instanceof ValidationError) return error.message;
-  const message = String(error?.message ?? error ?? 'Неизвестная ошибка');
-  if (/Failed to fetch|Network request failed|network error|cors|ERR_NAME_NOT_RESOLVED|dns/i.test(message)) return 'Не удалось подключиться к API: проверьте DNS, HTTPS и CORS (для браузера).';
-  if (/429|limit|quota|too many/i.test(message)) return 'Вероятно, исчерпан лимит API-запросов. Не повторяйте запросы часто.';
-  if (/401|403|invalid key|api key/i.test(message)) return 'Ключ API отклонён или нет доступа к API.';
-  if (/abort|timeout/i.test(message)) return 'Сервер не ответил вовремя. Повторите запрос позже.';
-  return 'Не удалось загрузить данные. Проверьте подключение и повторите позже.';
+  switch (classifyApiFailure(error)) {
+    case 'quota': return 'Вероятно, исчерпан лимит API-запросов. Не повторяйте запросы часто.';
+    case 'auth': return 'Ключ API отклонён или нет доступа к API.';
+    case 'schema': return 'Ответ Wikimapia API имеет неожиданный формат. Повторите запрос позже.';
+    case 'timeout': return 'Сервер не ответил вовремя. Повторите запрос позже.';
+    case 'network': return 'Не удалось подключиться к API: проверьте DNS, HTTPS и CORS (для браузера).';
+    default: return 'Не удалось загрузить данные. Проверьте подключение и повторите позже.';
+  }
 }

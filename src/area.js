@@ -1,4 +1,4 @@
-import {normalizeArea, diagnosticError, ApiError} from './api.js';
+import {normalizeArea, diagnosticError, classifyApiFailure} from './api.js';
 import {CACHE_MAX_AGE} from './areaCache.js';
 import {isCovered,contains,intersects} from './coverage.js';
 
@@ -15,7 +15,7 @@ export class AreaLoader {
     this.cache = new Map();
     this.sequence = 0;
     this.continuation = 0;
-    this.state = {places:[], displayPlaces:[], page:0, found:null, more:false, loading:false, error:'', retryable:false,background:false,draining:false,batchLimited:false,cacheIds:[]};
+    this.state = {places:[], displayPlaces:[], page:0, found:null, more:false, loading:false, error:'', failureKind:null,retryable:false,failureKind:null,background:false,draining:false,batchLimited:false,cacheIds:[],cacheUpdatedAt:null};
   }
   publish(patch) { this.state = {...this.state, ...patch}; this.notify(this.state); }
   stop() {
@@ -63,7 +63,7 @@ export class AreaLoader {
       if (entry) {
         this.bbox = [...entry.bbox];
         this.cacheKey = this.bbox.join(',');
-        this.publish({...entry.state, displayPlaces:this.visibleCached(), cacheIds:[this.cacheKey],error:'', retryable:false, loading:false,background:false,batchLimited:false});
+        this.publish({...entry.state, displayPlaces:this.visibleCached(), cacheIds:[this.cacheKey],cacheUpdatedAt:entry.updated,error:'', failureKind:null,retryable:false, loading:false,background:false,batchLimited:false});
         return;
       }
     }
@@ -72,14 +72,14 @@ export class AreaLoader {
       if(isCovered(view,coverageEntries.map(e=>e.bbox))){
         this.bbox=[...view];this.cacheKey=null;
         const displayPlaces=this.visibleCached();
-        this.publish({places:displayPlaces,displayPlaces,page:1,found:null,more:false,loading:false,error:'',retryable:false,background:false,batchLimited:false,cacheIds:coverageEntries.map(e=>e.bbox.join(','))});
+        this.publish({places:displayPlaces,displayPlaces,page:1,found:null,more:false,loading:false,error:'',failureKind:null,retryable:false,background:false,batchLimited:false,cacheIds:coverageEntries.map(e=>e.bbox.join(',')),cacheUpdatedAt:Math.min(...coverageEntries.map(e=>e.updated)),complete:true});
         return;
       }
     }
     this.bbox = [...bbox];
     this.cacheKey = bbox.join(',');
     const displayPlaces=this.visibleCached();
-    this.publish({places:[],displayPlaces,page:0,found:null,more:false,error:'',retryable:false,batchLimited:false,cacheIds:[...this.cache.values()].filter(e=>intersects(e.bbox,view)).map(e=>e.bbox.join(','))});
+    this.publish({places:[],displayPlaces,page:0,found:null,more:false,error:'',failureKind:null,retryable:false,batchLimited:false,cacheIds:[...this.cache.values()].filter(e=>intersects(e.bbox,view)).map(e=>e.bbox.join(',')),cacheUpdatedAt:null});
     await this.fetchPage(1);
   }
   async more() {
@@ -104,7 +104,7 @@ export class AreaLoader {
     const n = ++this.sequence;
     this.controller?.abort();
     this.controller = new AbortController();
-    this.publish({loading:true,background:this.state.displayPlaces.some(p=>p.coords.length>=3)||this.state.page>0,error:'',retryable:false});
+    this.publish({loading:true,background:this.state.displayPlaces.some(p=>p.coords.length>=3)||this.state.page>0,error:'',failureKind:null,retryable:false});
     try {
       const payload = await this.call({bbox:this.bbox,page,signal:this.controller.signal});
       if (n !== this.sequence) return;
@@ -117,8 +117,9 @@ export class AreaLoader {
       // A repeated/empty page must not create an endless "more" loop.
       const progress = places.length > this.state.places.length;
       const more = progress && items.length > 0 && (found !== null ? places.length < found : items.length === 50);
-      const fullyLoaded=found!==null?places.length>=found:items.length<50;
-      const state = {places,page,found,more,complete:fullyLoaded,loading:false,background:false,error:'',retryable:false};
+      // Repeated/empty pages cannot prove completeness when the server reports more.
+      const fullyLoaded=found!==null?places.length>=found:(items.length<50);
+      const state = {places,page,found,more,complete:fullyLoaded,cacheUpdatedAt:Date.now(),loading:false,background:false,error:'',failureKind:null,retryable:false};
       const key=this.cacheKey,old=this.cache.get(key);
       const record={bbox:[...this.bbox],state,updated:Date.now(),pinned:old?.pinned??false,retentionDays:old?.retentionDays??1};
       this.cache.delete(key);
@@ -129,9 +130,9 @@ export class AreaLoader {
     } catch (error) {
       if (n !== this.sequence) return;
       // Authentication, quota and invalid payloads need deliberate user action.
-      const message=String(error?.message??'');
-      const retryable=!(error instanceof ApiError) && !/401|403|429|limit|quota/i.test(message);
-      this.publish({loading:false,background:false,error:diagnosticError(error),retryable});
+      const failureKind=classifyApiFailure(error, {offline:typeof navigator !== 'undefined' && navigator.onLine === false});
+      const retryable=['network','timeout','unknown'].includes(failureKind);
+      this.publish({loading:false,background:false,error:failureKind === 'offline'?'Нет подключения к интернету. Ранее сохранённые объекты доступны офлайн.':diagnosticError(error),failureKind,retryable});
     }
   }
 }
