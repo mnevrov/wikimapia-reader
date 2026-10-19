@@ -24,6 +24,7 @@ import {YANDEX_KEY_PATTERN} from './yandexUsage.js';
 import {searchIntent} from './searchIntent.js';
 import {readFavorites,toggleFavorite as updateFavorites} from './favorites.js';
 import {offlineStore} from './offlineStore.js';
+import {nextFollowState,acceptableFix} from './gpsFollow.js';
 
 const navigation=[['map','Карта','map'],['search','Поиск','search'],['saved','Избранное','bookmark'],['settings','Настройки','settings']];
 function App(){
@@ -117,14 +118,14 @@ function App(){
       try{
         watchId=await Geolocation.watchPosition({enableHighAccuracy:false,timeout:15000,maximumAge:12000,minimumUpdateInterval:3000},(p,error)=>{
           if(cancelled)return;
-          if(error){setGpsError('GPS недоступен. Проверьте разрешение или сигнал.');return;}
+          if(error){setGpsError('Местоположение недоступно · проверьте разрешение или сигнал GPS.');return;}
           if(!p?.coords||!Number.isFinite(p.coords.latitude)||!Number.isFinite(p.coords.longitude))return;
-          if(!Number.isFinite(p.coords.accuracy)||p.coords.accuracy>250){setGpsError('Низкая точность GPS · ожидаем сигнал');return;}
+          if(!acceptableFix(p.coords)){setGpsError('Низкая точность GPS · ожидаем сигнал');return;}
           setGpsError('');
           setLocation({lat:p.coords.latitude,lng:p.coords.longitude,accuracy:p.coords.accuracy,at:Date.now()});
         });
         if(cancelled&&watchId)await Geolocation.clearWatch({id:watchId});
-      }catch{if(!cancelled){setGpsError('Нет доступа к геолокации. Разрешите определять местоположение.');setGpsFollow('off');}}
+      }catch{if(!cancelled){setGpsError('Местоположение недоступно · разрешите геолокацию.');setGpsFollow('off');}}
     };
     start();
     return()=>{cancelled=true;if(watchId)Geolocation.clearWatch({id:watchId}).catch(()=>{});};
@@ -157,8 +158,8 @@ function App(){
     finally{if(token===locationJob.current)setLocating(false);}
   };
   const toggleGps=()=>{
-    if(gpsFollow==='following'){setGpsFollow('off');setGpsError('');return;}
-    setGpsError('');setGpsFollow('following');locate();
+    if(gpsFollow==='following'){setGpsFollow(nextFollowState(gpsFollow,'tap'));setGpsError('');return;}
+    setGpsError('');setGpsFollow(nextFollowState(gpsFollow,'tap'));locate();
   };
   const saveOffline=async()=>{
     if(!details||demo||offlineBusy||!online)return;
@@ -202,7 +203,7 @@ function App(){
   if(!credentials.ready)return <Startup/>;
   return <main className={`${selected||candidates.length?'has-sheet':''} ${screen!=='map'?'has-screen':''} ${mapPanel?'has-map-panel':''} ${toast?'has-toast':''}`}>
     <div className="map-stage" inert={screen!=='map'} aria-hidden={screen!=='map'}>
-      <MapPane zoomRequest={zoomRequest} demo={demo} apiKey={apiKey} auto={auto} active={active} paused={screen!=='map'||!!selected||cacheClearing||gpsFollow==='following'} cacheEpoch={cacheEpoch} refresh={refresh} moreRequest={moreRequest} focus={focus} location={location} gpsFollowing={gpsFollow==='following'} onGpsPause={()=>setGpsFollow('paused')} cacheView={cacheView} selectedId={selected?.id} density={density} basemap={basemap} yandexKey={yandexKey} yandexReferer={yandexReferer} onBasemapFallback={fallbackBasemap} onBasemapConnected={()=>setYandexDiagnostic(null)} onVisiblePlaces={setVisiblePlaces} onCandidates={setCandidates} onSelect={onSelect} onState={acceptArea} onMessage={setNotice}/>
+      <MapPane zoomRequest={zoomRequest} demo={demo} apiKey={apiKey} auto={auto} active={active} paused={screen!=='map'||!!selected||cacheClearing||gpsFollow==='following'} cacheEpoch={cacheEpoch} refresh={refresh} moreRequest={moreRequest} focus={focus} location={location} gpsFollowing={gpsFollow==='following'} onGpsPause={()=>setGpsFollow(s=>nextFollowState(s,'manual-pan'))} cacheView={cacheView} selectedId={selected?.id} density={density} basemap={basemap} yandexKey={yandexKey} yandexReferer={yandexReferer} onBasemapFallback={fallbackBasemap} onBasemapConnected={()=>setYandexDiagnostic(null)} onVisiblePlaces={setVisiblePlaces} onCandidates={setCandidates} onSelect={onSelect} onState={acceptArea} onMessage={setNotice}/>
       {!online&&<div className="network-hint" role="status">Нет сети · доступно офлайн-чтение сохранённых карточек; карта может быть недоступна.</div>}
       <div className="map-tools" role="toolbar" aria-label="Управление картой">
         <button className="icon-btn search-launch" aria-label="Найти место" title="Найти место" aria-pressed={mapPanel==='search'} onClick={()=>setMapPanel(v=>v==='search'?null:'search')}><Icon name="search"/></button>
