@@ -164,3 +164,31 @@ main:has(.map-stack.has-yandex) .toast{
 @media (max-height:500px){
   .map-stage:has(.map-stack.has-yandex) .map-feedback{max-height:24vh;overflow:auto}
 }
+
+/* 0.9.5: Keep the SDK's top-left distribution branding separate from
+   WikiReader's already-top-right toolbar (defined above). Never style SDK UI.
+   Reserve the top-left area for official Yandex controls. */
+.map-stage:has(.map-stack.has-yandex) .network-hint{
+  top:calc(82px + var(--safe-top));
+}
+.map-stage:has(.map-stack.has-yandex) .map-feedback{
+  top:calc(82px + var(--safe-top));
+}
+.map-stage:has(.map-stack.has-yandex):has(.network-hint) .map-feedback{
+  top:calc(154px + var(--safe-top));
+}
+
+/* In compact landscape, keep every tool visible without entering the
+   bottom-right provider copyrights region. Base toolbar uses flex, so switch
+   display mode as well as columns (grid-template alone does nothing). */
+@media(max-height:500px){
+  .map-stage:has(.map-stack.has-yandex) .map-tools{
+    display:grid;
+    grid-template-columns:repeat(3,48px);
+    grid-auto-rows:48px;
+    width:max-content;
+    max-height:none;
+    overflow:visible;
+  }
+  .map-stage:has(.map-stack.has-yandex) .map-tools .icon-btn+.icon-btn{box-shadow:none}
+}
