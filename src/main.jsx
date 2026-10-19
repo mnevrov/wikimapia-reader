@@ -118,6 +118,14 @@ function App(){
   const queryOnMap=value=>{searchAbort.current?.abort();setSearchBusy(false);setQuery(value);setResults([]);setSearchStatus('');};
   const cancelMapSearch=()=>{searchAbort.current?.abort();setSearchBusy(false);setSearchStatus('Поиск отменён');};
   const showCachedArea=bbox=>{if(!credentials.key){setToast('Подключите Wikimapia для просмотра сохранённых областей');return;}closeCard();setDemo(false);setScreen('map');setCacheView({bbox:[...bbox]});};
+  const areaBusy=!!(area.loading||area.draining);
+  const areaActionLabel=areaBusy?(area.draining?'Догружаем область':'Загружаем область')
+    :area.error?(area.more?'Повторить догрузку':'Повторить загрузку')
+    :area.more?'Догрузить область':'Обновить область';
+  const areaActionTitle=areaBusy?`${areaActionLabel}: ${area.places.length}${area.found!=null?` из ${area.found}`:''} объектов`
+    :area.more?'Загрузить остальные объекты области':area.error?'Повторить запрос области':'Обновить область с сервера';
+  const refreshArea=()=>{if(demo||areaBusy||!active)return;closeCard();setRefresh(x=>x+1);};
+  const runAreaAction=()=>{if(demo||areaBusy||!active)return;if(area.more)setMoreRequest(x=>x+1);else refreshArea();};
   if(!credentials.ready)return <Startup/>;
   return <main className={`${selected||candidates.length?'has-sheet':''} ${screen!=='map'?'has-screen':''} ${mapPanel?'has-map-panel':''} ${toast?'has-toast':''}`}>
     <div className="map-stage" inert={screen!=='map'} aria-hidden={screen!=='map'}>
@@ -129,10 +137,9 @@ function App(){
         <button className="icon-btn" aria-label="Приблизить карту" title="Приблизить карту" onClick={()=>setZoomRequest(v=>({delta:1,seq:(v?.seq??0)+1}))}><Icon name="plus"/></button>
         <button className="icon-btn" aria-label="Отдалить карту" title="Отдалить карту" onClick={()=>setZoomRequest(v=>({delta:-1,seq:(v?.seq??0)+1}))}><Icon name="minus"/></button>
         <button className="icon-btn" title="Моё местоположение" aria-label="Моё местоположение" disabled={locating} onClick={locate}><Icon name="locate"/></button>
-        {!demo&&<button aria-label="Загрузить область" title={area.loading?(area.background?"Обновление в фоне":"Загрузка объектов"):"Обновить область"} aria-busy={!!area.loading} className={`icon-btn ${area.loading?'is-loading':''}`} disabled={area.loading||area.draining||!active} onClick={()=>{closeCard();setRefresh(x=>x+1);}}><Icon name="refresh"/></button>}
-        {!demo&&area.more&&(!auto||area.page>=3||area.error||area.draining)&&<button className={`icon-btn area-more ${area.draining?'is-loading':''}`} aria-label={area.draining?`Догружаем: ${area.places.length}${area.found!=null?` из ${area.found}`:" объектов"}`:"Догрузить область"} title={area.draining?`Догружаем: ${area.places.length}${area.found!=null?` из ${area.found}`:" объектов"}`:"Догрузить область"} disabled={area.loading||area.draining} aria-busy={!!area.draining} onClick={()=>setMoreRequest(x=>x+1)}><Icon name={area.draining?'refresh':'download'}/></button>}
+        {!demo&&<button className={`icon-btn area-action ${areaBusy?'is-loading':''} ${area.error?'has-error':''} ${area.more&&!areaBusy&&!area.error?'can-continue':''}`} aria-label={areaActionLabel} title={areaActionTitle} aria-busy={areaBusy} disabled={areaBusy||!active} onClick={runAreaAction}><Icon name={areaBusy||area.error||!area.more?'refresh':'download'}/></button>}
       </div>
-      <Motion open={!!mapPanel&&!selected&&!candidates.length} identity={mapPanel} kind="discovery"><MapDiscover mode={mapPanel} demo={demo} query={query} onQuery={queryOnMap} onSearch={search} results={results} searchBusy={searchBusy} searchStatus={searchStatus} visiblePlaces={visiblePlaces} area={area} notice={notice} density={density} onDensity={setDensity} onSelect={onSelect} onCancelSearch={cancelMapSearch} onSettings={()=>navigate('settings')} onClose={closeMapPanel}/></Motion>
+      <Motion open={!!mapPanel&&!selected&&!candidates.length} identity={mapPanel} kind="discovery"><MapDiscover mode={mapPanel} demo={demo} query={query} onQuery={queryOnMap} onSearch={search} results={results} searchBusy={searchBusy} searchStatus={searchStatus} visiblePlaces={visiblePlaces} area={area} notice={notice} density={density} onDensity={setDensity} onSelect={onSelect} onRefreshArea={refreshArea} onCancelSearch={cancelMapSearch} onSettings={()=>navigate('settings')} onClose={closeMapPanel}/></Motion>
       {!selected&&!candidates.length&&notice&&<div className="map-feedback"><div className="status" role="status" aria-live="polite">{notice}</div>{demo&&<button className="connect-action" onClick={()=>navigate('settings')}>Подключить Wikimapia <Icon name="arrow" size={18}/></button>}</div>}
       <span className="sr-only" role="status" aria-live="polite">{area.draining?`Догружаем: ${area.places.length}${area.found!=null?` из ${area.found}`:" объектов"}`:''}</span>
       <Motion open={candidates.length>0} identity={candidates.map(p=>p.id).join(',')} kind="chooser"><ObjectChooser places={candidates} onPick={onSelect} onClose={()=>setCandidates([])}/></Motion>
