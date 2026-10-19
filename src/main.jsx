@@ -118,7 +118,7 @@ function App(){
       try{
         watchId=await Geolocation.watchPosition({enableHighAccuracy:false,timeout:15000,maximumAge:12000,minimumUpdateInterval:3000},(p,error)=>{
           if(cancelled)return;
-          if(error){setGpsError('Местоположение недоступно · проверьте разрешение или сигнал GPS.');return;}
+          if(error){setGpsError('Местоположение недоступно · проверьте разрешение или сигнал GPS.');if(error.code===1||/permission|denied|разрешен/i.test(String(error.message||'')))setGpsFollow('off');return;}
           if(!p?.coords||!Number.isFinite(p.coords.latitude)||!Number.isFinite(p.coords.longitude))return;
           if(!acceptableFix(p.coords)){setGpsError('Низкая точность GPS · ожидаем сигнал');return;}
           setGpsError('');
@@ -170,7 +170,7 @@ function App(){
       setOfflineInfo({status:result.status,missing:result.missing,savedAt:Date.now()});
       setOfflineEpoch(v=>v+1);
       setToast(result.missing?'Описание сохранено, часть фотографий недоступна':'Объект сохранён для офлайн-чтения');
-    }catch(e){setToast(e.message||'Не удалось сохранить объект');}
+    }catch(e){setOfflineInfo({status:'error',missing:0});setToast(e.message||'Не удалось сохранить объект');}
     finally{if(offlineAbort.current===controller)offlineAbort.current=null;setOfflineBusy(false);setOfflineEpoch(v=>v+1);}
   };
   const removeOffline=async id=>{
