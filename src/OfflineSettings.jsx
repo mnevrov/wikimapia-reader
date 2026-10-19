@@ -16,7 +16,7 @@ export default function OfflineSettings({epoch,onChange}){
     <p className="helper">Здесь хранятся только выбранные карточки Wikimapia, отдельно от кэша контуров и настроек подключения. Подложка карты не сохраняется.</p>
     {error&&<p role="alert" className="error">{error}</p>}
     {snapshot&&<>
-      <div className="cache-stats"><strong>{size(snapshot.bytes)} из {snapshot.preferences.limitMB} МБ</strong><span>{snapshot.count} объектов · Текст: {size(snapshot.textBytes)} · Фото: {size(snapshot.mediaBytes)}</span></div>
+      <div className="offline-stats"><strong>{size(snapshot.bytes)} из {snapshot.preferences.limitMB} МБ</strong><span>{snapshot.count} объектов · Текст: {size(snapshot.textBytes)} · Фото: {size(snapshot.mediaBytes)}</span></div>
       <label className="cache-retention" htmlFor="offline-limit">Лимит сохранённых объектов
         <select id="offline-limit" value={snapshot.preferences.limitMB} disabled={busy} onChange={e=>action(()=>offlineStore.setPreferences({...snapshot.preferences,limitMB:Number(e.target.value)}))}>
           {[25,50,100,250,500].map(x=><option key={x} value={x}>{x} МБ</option>)}
