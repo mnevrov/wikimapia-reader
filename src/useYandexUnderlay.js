@@ -29,7 +29,10 @@ export function useYandexUnderlay({mapRef,hostRef,selected,key,refererConfirmed,
     const theme=document.documentElement.dataset.theme==='light'?'light':'dark';
     const ymap=new sdk.YMap(host,{
      location:{center:[c.lng,c.lat],zoom:map.getZoom()},
-     theme,behaviors:[],zoomRounding:'smooth'
+     theme,behaviors:[],zoomRounding:'smooth',
+     // Place Yandex's own legal blocks in separate corners using public SDK options.
+     // Never restyle, duplicate or hide the official controls.
+     distributionPosition:'top right',copyrightsPosition:'bottom right'
     });
     // Set both scheme and map palettes: an independent layer can otherwise
     // retain the original colors after the application theme changes.

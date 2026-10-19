@@ -8,11 +8,13 @@ test('Yandex SDK legal controls are not restyled; map notices do not cover lower
  await page.route('https://api-maps.yandex.ru/v3/**',r=>r.fulfill({status:200,contentType:'text/javascript',body:`
    window.ymaps3={ready:Promise.resolve(),
     YMap:class{
-      constructor(host){
+      constructor(host,options){
         this.host=host;
+        host.dataset.distributionPosition=options.distributionPosition;
+        host.dataset.copyrightsPosition=options.copyrightsPosition;
         const legal=document.createElement('div');
         legal.className='mock-yandex-legal';
-        legal.style.cssText='position:absolute;bottom:8px;left:8px;z-index:1';
+        legal.style.cssText='position:absolute;top:8px;right:8px;z-index:1';
         const link=document.createElement('a');
         link.href='https://yandex.ru/legal/maps_termsofuse/';
         link.textContent='Условия Яндекс Карт';
@@ -21,7 +23,11 @@ test('Yandex SDK legal controls are not restyled; map notices do not cover lower
         button.textContent='Открыть в Картах';
         button.className='mock-yandex-button';
         legal.append(button);
-        host.append(legal);
+        const copyrights=document.createElement('div');
+        copyrights.className='mock-yandex-copyrights';
+        copyrights.style.cssText='position:absolute;bottom:8px;right:8px;width:160px;height:32px;display:grid;place-items:center;z-index:1';
+        copyrights.textContent='© Яндекс';
+        host.append(legal,copyrights);
       }
       addChild(){return this;}
       update(){}
@@ -37,6 +43,8 @@ test('Yandex SDK legal controls are not restyled; map notices do not cover lower
  await page.getByRole('button',{name:'Яндекс Карты'}).click();
  await map(page);
  await expect(page.locator('.map-stack.has-yandex')).toBeVisible();
+ await expect(page.locator('.yandex-underlay')).toHaveAttribute('data-distribution-position','top right');
+ await expect(page.locator('.yandex-underlay')).toHaveAttribute('data-copyrights-position','bottom right');
  const styles=await page.evaluate(()=>{
   const legal=document.querySelector('.mock-yandex-legal');
   const button=legal.querySelector('button'),link=legal.querySelector('a');
@@ -66,10 +74,27 @@ test('Yandex SDK legal controls are not restyled; map notices do not cover lower
  });
  const bounds=await page.evaluate(()=>{
   const legal=document.querySelector('.mock-yandex-legal').getBoundingClientRect();
+  const copyrights=document.querySelector('.mock-yandex-copyrights').getBoundingClientRect();
   const notice=document.querySelector('.map-stage>.map-feedback').getBoundingClientRect();
-  return{noticeAbove:notice.bottom<legal.top,noticeTop:notice.top,legalTop:legal.top};
+  const tools=document.querySelector('.map-tools').getBoundingClientRect();
+  const overlaps=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
+  return{noticeVsLogo:overlaps(notice,legal),toolsVsCopy:overlaps(tools,copyrights),logoVsCopy:overlaps(legal,copyrights),copyGap:copyrights.top-tools.bottom};
  });
- expect(bounds.noticeAbove).toBe(true);
+ expect(bounds.noticeVsLogo).toBe(false);
+ expect(bounds.toolsVsCopy).toBe(false);
+ expect(bounds.logoVsCopy).toBe(false);
+ expect(bounds.copyGap).toBeGreaterThanOrEqual(16);
+ // Landscape should retain the same clearance without off-screen controls.
+ await page.setViewportSize({width:844,height:390});
+ const landscape=await page.evaluate(()=>{
+  const a=document.querySelector('.map-tools').getBoundingClientRect();
+  const b=document.querySelector('.mock-yandex-copyrights').getBoundingClientRect();
+  return {top:a.top,bottom:a.bottom,copyTop:b.top,columns:getComputedStyle(document.querySelector('.map-tools')).gridTemplateColumns};
+ });
+ expect(landscape.bottom).toBeLessThan(landscape.copyTop-16);
+ expect(landscape.top).toBeGreaterThanOrEqual(60);
+ expect(landscape.columns.split(' ').length).toBe(2);
+ await page.setViewportSize({width:390,height:844});
  await screen(page,'Настройки');
  await page.getByRole('button',{name:'OpenStreetMap'}).click();
  await map(page);

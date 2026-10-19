@@ -164,3 +164,28 @@ main:has(.map-stack.has-yandex) .toast{
 @media (max-height:500px){
   .map-stage:has(.map-stack.has-yandex) .map-feedback{max-height:24vh;overflow:auto}
 }
+
+/* 0.9.5: leave the official Yandex copyright corner unobstructed.
+   Move only WikiReader controls; never style or hide SDK-owned branding. */
+.map-stage:has(.map-stack.has-yandex) .map-tools{
+  bottom:88px;
+}
+/* SDK logo is at top-right; keep app notices below it. */
+.map-stage:has(.map-stack.has-yandex) .network-hint{
+  top:calc(82px + var(--safe-top));
+}
+.map-stage:has(.map-stack.has-yandex) .map-feedback{
+  top:calc(82px + var(--safe-top));
+}
+.map-stage:has(.map-stack.has-yandex):has(.network-hint) .map-feedback{
+  top:calc(154px + var(--safe-top));
+}
+/* Short landscape displays: two columns keep tools away from legal controls. */
+@media(max-height:500px){
+  .map-stage:has(.map-stack.has-yandex) .map-tools{
+    grid-template-columns:repeat(2,48px);
+    gap:8px;
+    right:12px;
+    bottom:72px;
+  }
+}
