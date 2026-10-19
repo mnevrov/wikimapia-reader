@@ -86,3 +86,34 @@ main::before,main::after{content:'';position:fixed;left:0;right:0;z-index:2000;b
 @media(min-width:700px){.discovery-panel{right:auto;left:16px;width:min(430px,calc(100% - 106px));bottom:calc(var(--nav-height) + var(--safe-bottom) + 14px);max-height:70dvh}}
 @media(max-height:500px){.discovery-panel{left:12px;right:auto;bottom:calc(var(--nav-height) + var(--safe-bottom) + 6px);width:min(420px,48vw);max-height:calc(100dvh - var(--nav-height) - var(--safe-bottom) - 18px);padding:8px 12px}.discovery-header h2{font-size:16px}.discovery-search{margin-top:2px}}
 @media(prefers-reduced-motion:reduce){.discovery-panel{scroll-behavior:auto}}
+
+/* 0.9: large-text reader and swipe/pinch gallery. Both are fixed portals, not new pages. */
+.reading-actions{display:flex;justify-content:flex-end;padding:12px 0 0}
+.reading-actions .secondary{min-height:44px;font-size:12px;gap:7px}
+.photo-open{display:block;width:100%;border:0;padding:0;margin:0;background:transparent;border-radius:12px;overflow:hidden}
+.photo-open img{display:block;width:100%;aspect-ratio:1.15;object-fit:cover}
+.viewer-overlay{position:fixed;inset:0;z-index:3000;display:flex;flex-direction:column;background:var(--app-bg);color:var(--text);overscroll-behavior:contain;animation:viewer-arrive 220ms cubic-bezier(.2,.8,.2,1)}
+.viewer-topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0;min-height:calc(60px + var(--safe-top));padding:calc(8px + var(--safe-top)) 14px 8px;border-bottom:1px solid var(--border);background:var(--surface)}
+.viewer-topbar strong{font-size:14px;font-weight:650}
+.viewer-topbar .icon-btn{width:44px;height:44px;min-width:44px;background:transparent}
+.reader-font-tools{display:flex;align-items:center;gap:4px}
+.reader-font-tools button{font-size:15px;font-weight:700}
+.reader-scroll{min-height:0;flex:1;overflow:auto;padding:26px clamp(20px,5vw,56px) calc(56px + var(--safe-bottom));overscroll-behavior:contain;scrollbar-width:thin}
+.reader-scroll>*{max-width:760px;margin-inline:auto}
+.reader-kicker{font-size:12px;color:var(--accent-text);letter-spacing:.03em;text-transform:uppercase;margin-bottom:10px}
+.reader-scroll h1{font-size:clamp(25px,5vw,36px);line-height:1.25;letter-spacing:-.025em;font-weight:700;overflow-wrap:anywhere;margin-bottom:28px}
+.reader-text{line-height:1.85;letter-spacing:.005em;overflow-wrap:anywhere;word-break:normal}
+.reader-text p{white-space:pre-wrap;margin:0 0 1.45em}
+.gallery-view{background:#070809;color:#fff}
+.gallery-topbar{background:#101112;border-color:#272a2c}
+.gallery-stage{min-height:0;flex:1;display:grid;place-items:center;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
+.gallery-stage img{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;pointer-events:none;will-change:transform;transform-origin:center center}
+.gallery-nav{position:absolute;inset-inline:12px;top:50%;transform:translateY(-50%);pointer-events:none;display:flex;align-items:center;justify-content:space-between}
+.gallery-nav button{pointer-events:auto;display:grid;place-items:center;background:#14181bd9;color:#fff;border:1px solid #3a4144;border-radius:50%;width:48px;height:48px}
+.gallery-zoom-button{font-size:14px;font-weight:700;color:#fff}
+.gallery-caption{min-height:calc(64px + var(--safe-bottom));padding:12px 20px calc(12px + var(--safe-bottom));display:flex;justify-content:space-between;align-items:center;gap:16px;color:#dce2e5;font-size:12px;background:#101112}
+.gallery-caption span{min-width:0;overflow-wrap:anywhere}
+.gallery-caption a{color:#81e7cf;white-space:nowrap;display:flex;align-items:center;gap:6px}
+@keyframes viewer-arrive{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@media(max-height:500px){.viewer-topbar{min-height:48px;padding-block:4px}.reader-scroll{padding-top:14px}.reader-scroll h1{margin-bottom:18px}.gallery-caption{min-height:42px;padding-top:4px;padding-bottom:calc(4px + var(--safe-bottom))}}
+@media(prefers-reduced-motion:reduce){.viewer-overlay{animation:none}.gallery-stage img{will-change:auto}}
