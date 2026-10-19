@@ -31,7 +31,7 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
         <span><strong>Ограничение HTTP Referer настроено</strong><small>Обязательное условие для работы ключа JS API. Для Android WebView проверьте адрес источника запросов. Не используйте ключ без ограничения.</small></span>
         <input id="yandex-referer" type="checkbox" checked={yandexReferer} onChange={e=>setYandexReferer(e.target.checked)}/>
       </label>
-      <p className="helper">Ключ JS API хранится в настройках данного устройства, не попадает в GitHub и не используется без выбора Яндекса. Обычные просмотры карты бесплатны; геокодирование, панорамы и поиск Яндекса не вызываются. <a href="https://yandex.ru/maps-api/docs/js-api/limit.html" target="_blank" rel="noopener noreferrer">Настройка ключа <Icon name="external" size={14}/></a></p>
+      <p className="helper">Ключ JS API хранится в настройках данного устройства, не попадает в GitHub и не используется без выбора Яндекса. Обычные просмотры карты бесплатны; геокодирование, панорамы и поиск Яндекса не вызываются. <a href="https://yandex.ru/maps-api/docs/js-api/limit.html" target="_blank" rel="noopener noreferrer">Настройка ключа <Icon name="external" size={14}/></a> · <a href="https://yandex.ru/legal/maps_termsofuse/" target="_blank" rel="noopener noreferrer">Условия Яндекс Карт</a></p>
       <button className="text-button" type="button" disabled={!yandexKey} onClick={()=>{setBasemap('osm');setYandexKey('');setYandexReferer(false);}}>Удалить ключ карты с устройства</button>
     </section>
     <CacheSettings epoch={cacheEpoch} busy={cacheClearing} currentIds={currentAreaIds} demo={demo} onAction={onCacheAction} onShowArea={onShowArea}/>
