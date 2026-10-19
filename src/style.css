@@ -205,3 +205,8 @@ main:has(.map-stack.has-yandex) .toast{
 .map-stage:has(.map-stack.has-yandex) .map-feedback,
 .map-stage:has(.map-stack.has-yandex) .network-hint{left:12px;right:80px;max-width:calc(100% - 96px)}
 @media(max-height:500px){.offline-card-status{font-size:10px}.offline-settings .cache-stats{padding:8px}}
+
+.offline-stats{display:flex;flex-direction:column;gap:3px;padding:12px 14px;background:var(--control-bg);border-radius:12px;margin-bottom:16px}
+.offline-stats strong{font-size:16px}.offline-stats span{font-size:12px;color:var(--muted)}
+.offline-card-action[aria-busy=true] svg{animation:map-refresh 1.2s linear infinite}
+@media(prefers-reduced-motion:reduce){.offline-card-action[aria-busy=true] svg{animation:none}}
