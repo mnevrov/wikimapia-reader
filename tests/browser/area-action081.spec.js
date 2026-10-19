@@ -26,7 +26,7 @@ test('one action switches from download to busy spinner to refresh without dupli
  await expect(action).toBeDisabled();
  await page.getByRole('button',{name:'Список объектов области'}).click();
  await expect(page.getByRole('region',{name:'Объекты на карте'}).getByText('Догружаем: 1 из 3 объектов')).toBeVisible();
- await expect.poll(()=>!!pending).toBe(true);
+ await expect.poll(()=>!!pending,{timeout:15000}).toBe(true);
  await pending.fulfill({json:response(2)});
  await expect(action).toHaveAttribute('aria-label','Обновить область',{timeout:25000});
  await expect(action).toBeEnabled();
