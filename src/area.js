@@ -15,7 +15,7 @@ export class AreaLoader {
     this.cache = new Map();
     this.sequence = 0;
     this.continuation = 0;
-    this.state = {places:[], displayPlaces:[], page:0, found:null, more:false, loading:false, error:'', failureKind:null,retryable:false,failureKind:null,background:false,draining:false,batchLimited:false,cacheIds:[]};
+    this.state = {places:[], displayPlaces:[], page:0, found:null, more:false, loading:false, error:'', failureKind:null,retryable:false,failureKind:null,background:false,draining:false,batchLimited:false,cacheIds:[],cacheUpdatedAt:null};
   }
   publish(patch) { this.state = {...this.state, ...patch}; this.notify(this.state); }
   stop() {
@@ -63,7 +63,7 @@ export class AreaLoader {
       if (entry) {
         this.bbox = [...entry.bbox];
         this.cacheKey = this.bbox.join(',');
-        this.publish({...entry.state, displayPlaces:this.visibleCached(), cacheIds:[this.cacheKey],error:'', failureKind:null,retryable:false, loading:false,background:false,batchLimited:false});
+        this.publish({...entry.state, displayPlaces:this.visibleCached(), cacheIds:[this.cacheKey],cacheUpdatedAt:entry.updated,error:'', failureKind:null,retryable:false, loading:false,background:false,batchLimited:false});
         return;
       }
     }
@@ -72,14 +72,14 @@ export class AreaLoader {
       if(isCovered(view,coverageEntries.map(e=>e.bbox))){
         this.bbox=[...view];this.cacheKey=null;
         const displayPlaces=this.visibleCached();
-        this.publish({places:displayPlaces,displayPlaces,page:1,found:null,more:false,loading:false,error:'',failureKind:null,retryable:false,background:false,batchLimited:false,cacheIds:coverageEntries.map(e=>e.bbox.join(','))});
+        this.publish({places:displayPlaces,displayPlaces,page:1,found:null,more:false,loading:false,error:'',failureKind:null,retryable:false,background:false,batchLimited:false,cacheIds:coverageEntries.map(e=>e.bbox.join(',')),cacheUpdatedAt:Math.min(...coverageEntries.map(e=>e.updated)),complete:true});
         return;
       }
     }
     this.bbox = [...bbox];
     this.cacheKey = bbox.join(',');
     const displayPlaces=this.visibleCached();
-    this.publish({places:[],displayPlaces,page:0,found:null,more:false,error:'',failureKind:null,retryable:false,batchLimited:false,cacheIds:[...this.cache.values()].filter(e=>intersects(e.bbox,view)).map(e=>e.bbox.join(','))});
+    this.publish({places:[],displayPlaces,page:0,found:null,more:false,error:'',failureKind:null,retryable:false,batchLimited:false,cacheIds:[...this.cache.values()].filter(e=>intersects(e.bbox,view)).map(e=>e.bbox.join(',')),cacheUpdatedAt:null});
     await this.fetchPage(1);
   }
   async more() {
@@ -119,7 +119,7 @@ export class AreaLoader {
       const more = progress && items.length > 0 && (found !== null ? places.length < found : items.length === 50);
       // Repeated/empty pages cannot prove completeness when the server reports more.
       const fullyLoaded=found!==null?places.length>=found:(items.length<50);
-      const state = {places,page,found,more,complete:fullyLoaded,loading:false,background:false,error:'',failureKind:null,retryable:false};
+      const state = {places,page,found,more,complete:fullyLoaded,cacheUpdatedAt:Date.now(),loading:false,background:false,error:'',failureKind:null,retryable:false};
       const key=this.cacheKey,old=this.cache.get(key);
       const record={bbox:[...this.bbox],state,updated:Date.now(),pinned:old?.pinned??false,retentionDays:old?.retentionDays??1};
       this.cache.delete(key);
