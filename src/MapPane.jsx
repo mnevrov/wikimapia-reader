@@ -7,6 +7,7 @@ import {areaMessage} from './mapStatus.js';
 import {hitTestPlaces} from './geometry.js';
 import {DEMO_AREA} from './demo.js';
 import {visibleInMap,contourStyle} from './mapPresentation.js';
+import {useYandexUnderlay} from './useYandexUnderlay.js';
 
 function initialView() {
   try {
@@ -15,8 +16,8 @@ function initialView() {
   } catch {}
   return {lat:55.752,lng:37.618,zoom:16};
 }
-export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refresh,moreRequest,focus,location,cacheEpoch,cacheView,selectedId,density,onVisiblePlaces,onCandidates,onSelect,onState,onMessage}) {
-  const el=useRef(null), mapRef=useRef(null), overlayRef=useRef(null), polygonsRef=useRef(new Map());
+export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refresh,moreRequest,focus,location,cacheEpoch,cacheView,selectedId,density,basemap,yandexKey,yandexReferer,onBasemapFallback,onVisiblePlaces,onCandidates,onSelect,onState,onMessage}) {
+  const el=useRef(null), mapRef=useRef(null), overlayRef=useRef(null), polygonsRef=useRef(new Map()),tileRef=useRef(null),yandexHost=useRef(null);
   const [viewport,setViewport]=useState(0);
   const [moving,setMoving]=useState(false);
   const [places,setPlaces]=useState(()=>demo?DEMO_AREA:[]);
@@ -40,7 +41,7 @@ export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refr
   useEffect(()=>{
     const v=initialView();
     const map=L.map(el.current,{zoomControl:false,attributionControl:false,inertia:false}).setView([v.lat,v.lng],v.zoom);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
+    tileRef.current=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
 
     L.control.attribution({position:'bottomleft',prefix:false}).addTo(map);
     mapRef.current=map;overlayRef.current=L.featureGroup().addTo(map);setViewport(v=>v+1);
@@ -53,7 +54,7 @@ export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refr
       setViewport(v=>v+1);
     });
     const observer=new ResizeObserver(()=>map.invalidateSize());observer.observe(el.current);
-    return()=>{observer.disconnect();polygonsRef.current.clear();map.remove();mapRef.current=null;};
+    return()=>{observer.disconnect();polygonsRef.current.clear();map.remove();mapRef.current=null;tileRef.current=null;};
   },[]);
   useEffect(()=>{
     blocked.current=false;
@@ -142,5 +143,20 @@ export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refr
     const circle=L.circle([location.lat,location.lng],{radius:Math.min(location.accuracy,1000),color:'#2d86ff',weight:1,fillOpacity:.08}).addTo(map);
     return()=>{marker.remove();circle.remove();};
   },[location]);
-  return <div className="map" ref={el} aria-label="Карта"/>;
+  const yandexActive=useYandexUnderlay({
+    mapRef,hostRef:yandexHost,selected:basemap==='yandex',
+    key:yandexKey,refererConfirmed:yandexReferer,
+    onUnavailable:onBasemapFallback
+  });
+  useEffect(()=>{
+    const map=mapRef.current,tile=tileRef.current;
+    if(!map||!tile)return;
+    if(yandexActive&&map.hasLayer(tile))map.removeLayer(tile);
+    if(!yandexActive&&!map.hasLayer(tile))tile.addTo(map).bringToBack();
+  },[yandexActive]);
+  return <div className={`map-stack ${yandexActive?'has-yandex':''}`}>
+    <div className="yandex-underlay" ref={yandexHost} aria-hidden="true"/>
+    <div className="map" ref={el} aria-label="Карта"/>
+    {yandexActive&&<a className="yandex-provider-link" href="https://yandex.ru/maps/" target="_blank" rel="noopener noreferrer" aria-label="Открыть Яндекс Карты">© Яндекс Карты ↗</a>}
+  </div>;
 }

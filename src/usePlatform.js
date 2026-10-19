@@ -12,12 +12,20 @@ export function usePlatform(onBack) {
       if(disposed)await sub.remove();else subscriptions.push(sub);
     };
     const visibility=()=>setActive(!document.hidden);
-    const escape=e=>{if(e.key==='Escape')handler.current();};
+    const back=()=>{
+      // Full-screen reader/gallery owns Back before the underlying card.
+      if(document.querySelector('[data-viewer-overlay]')){
+        document.dispatchEvent(new Event('wikireader-dismiss-overlay'));
+        return true;
+      }
+      return handler.current();
+    };
+    const escape=e=>{if(e.key==='Escape')back();};
     document.addEventListener('visibilitychange',visibility);
     document.addEventListener('keydown',escape);
     if(Capacitor.isNativePlatform()){
       add('appStateChange',({isActive})=>setActive(isActive));
-      add('backButton',()=>{if(!handler.current())App.minimizeApp();});
+      add('backButton',()=>{if(!back())App.minimizeApp();});
     }
     return()=>{disposed=true;for(const s of subscriptions)s.remove();document.removeEventListener('visibilitychange',visibility);document.removeEventListener('keydown',escape);};
   },[]);
