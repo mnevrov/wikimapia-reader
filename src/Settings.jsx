@@ -5,9 +5,15 @@ import CacheSettings from './CacheSettings.jsx';
 import OfflineSettings from './OfflineSettings.jsx';
 import {YANDEX_KEY_PATTERN} from './yandexUsage.js';
 import {yandexDiagnosticReport} from './yandexDiagnosis.js';
+import {diagnosticSnapshot,clearDiagnostics} from './apiDiagnostics.js';
 export default function Settings({confirmForget,setConfirmForget,credentials,onCacheAction,onShowArea,cacheEpoch,currentAreaIds,cacheClearing,offlineEpoch,onOfflineChange,theme,setTheme,auto,setAuto,density,setDensity,basemap,setBasemap,yandexKey,setYandexKey,yandexReferer,setYandexReferer,yandexDiagnostic,onApply,onForget,demo,onDemo,onReal}){
   const [editing,setEditing]=useState(false),[draft,setDraft]=useState('');
   const [reportStatus,setReportStatus]=useState('');
+  const [apiReportStatus,setApiReportStatus]=useState('');
+  const copyApiReport=async()=>{
+    try { await navigator.clipboard.writeText(JSON.stringify(diagnosticSnapshot(),null,2)); setApiReportStatus('Обезличенная статистика скопирована'); }
+    catch { setApiReportStatus('Буфер обмена недоступен; копирование отменено'); }
+  };
   const copyYandexReport=async()=>{
     const report=yandexDiagnosticReport(yandexDiagnostic);
     if(!report)return;
@@ -55,10 +61,19 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
       <p className="helper">Ключ JS API хранится в настройках данного устройства, не попадает в GitHub и не используется без выбора Яндекса. Обычные просмотры карты бесплатны; геокодирование, панорамы и поиск Яндекса не вызываются. <a href="https://yandex.ru/maps-api/docs/js-api/limit.html" target="_blank" rel="noopener noreferrer">Настройка ключа <Icon name="external" size={14}/></a> · <a href="https://yandex.ru/legal/maps_termsofuse/" target="_blank" rel="noopener noreferrer">Условия Яндекс Карт</a></p>
       <button className="text-button" type="button" disabled={!yandexKey} onClick={()=>{setBasemap('osm');setYandexKey('');setYandexReferer(false);}}>Удалить ключ карты с устройства</button>
     </section>
+    <section className="settings-group" aria-label="Диагностика API Wikimapia">
+      <h2>Диагностика Wikimapia</h2>
+      <p className="helper">Локальная статистика за текущий запуск: число запросов, время ответа, категории ошибок и полнота загрузки. Ключи, координаты, ID объектов и тексты ответов не собираются. Ничего не отправляется автоматически.</p>
+      <div className="split-actions">
+        <button className="secondary" type="button" onClick={copyApiReport}>Скопировать статистику</button>
+        <button className="text-button" type="button" onClick={()=>{clearDiagnostics();setApiReportStatus('Статистика очищена');}}>Очистить</button>
+      </div>
+      {apiReportStatus&&<p className="helper" role="status">{apiReportStatus}</p>}
+    </section>
     <CacheSettings epoch={cacheEpoch} busy={cacheClearing} currentIds={currentAreaIds} demo={demo} onAction={onCacheAction} onShowArea={onShowArea}/>
     <OfflineSettings epoch={offlineEpoch} onChange={onOfflineChange}/>
     <fieldset className="settings-group theme-choice"><legend>Оформление</legend><div>{[['dark','Чёрная'],['light','Светлая'],['system','Как в системе']].map(([value,label])=><button key={value} aria-pressed={theme===value} onClick={()=>setTheme(value)}>{label}</button>)}</div></fieldset>
     <section className="settings-group"><h2>Демонстрация</h2><p className="helper">Вымышленные объекты для знакомства с карточками. Сохранённый ключ не удаляется.</p><button className="secondary" disabled={credentials.busy} onClick={demo&&credentials.key?onReal:onDemo}>{demo&&credentials.key?'Вернуться к реальным данным':'Открыть деморежим'}</button></section>
-    <p className="about">WikiReader 0.10.0 · Неофициальный клиент<br/>Данные © участники Wikimapia</p>
+    <p className="about">WikiReader 0.11.1 · Неофициальный клиент<br/>Данные © участники Wikimapia</p>
   </div>;
 }
