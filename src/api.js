@@ -143,29 +143,33 @@ function photoUrl(candidate) {
   if (url.hostname === 'photos.wikimapia.org') url.protocol = 'https:';
   return url.protocol === 'https:' ? url.href : null;
 }
-export class ApiError extends Error {}
+export class ApiError extends Error {
+  constructor(message, kind = 'unknown') { super(message); this.kind = kind; }
+}
 export function validateResponse(result, func, expectedId) {
   if (result?.debug || result?.error || result?.error_message) {
     const detail = result.debug ?? result.error ?? result.error_message;
-    const text = typeof detail === 'object' ? String(detail.message ?? detail.code ?? '') : String(detail);
-    if (/limit|quota|wait|too many/i.test(text)) throw new ApiError('Исчерпан лимит API. Подождите перед следующим запросом.');
-    if (/key|auth|1000/i.test(text)) throw new ApiError('Ключ API отклонён. Проверьте личный ключ.');
+    const text = typeof detail === 'object' ? `${String(detail.code ?? '')} ${String(detail.message ?? '')}` : String(detail);
+    if (/limit|quota|wait|too many/i.test(text)) throw new ApiError('Исчерпан лимит API. Подождите перед следующим запросом.', 'quota');
+    if (/key|auth|1000/i.test(text)) throw new ApiError('Ключ API отклонён. Проверьте личный ключ.', 'auth');
     throw new ApiError('Wikimapia API отклонил запрос.');
   }
-  if (!result || typeof result !== 'object' || Array.isArray(result)) throw new ApiError('Неподтверждённая структура ответа API (в том числе пустой массив).');
+  if (!result || typeof result !== 'object' || Array.isArray(result)) throw new ApiError('Неподтверждённая структура ответа API (в том числе пустой массив).', 'schema');
   if (func === 'place.getbyarea' || func === 'box' || func === 'search') {
-    if (!Array.isArray(func === 'place.getbyarea' ? result.places : result.folder)) throw new ApiError('Неподтверждённая структура списка объектов API.');
+    if (!Array.isArray(func === 'place.getbyarea' ? result.places : result.folder)) throw new ApiError('Неподтверждённая структура списка объектов API.', 'schema');
   } else {
     const place = result.place ?? result;
     const id = Number(place.id ?? place.main?.id);
-    if (id !== Number(expectedId) || !(place.title ?? place.main?.title)) throw new ApiError('API вернул другой объект или неполные сведения.');
+    if (id !== Number(expectedId) || !(place.title ?? place.main?.title)) throw new ApiError('API вернул другой объект или неполные сведения.', 'schema');
   }
   return result;
 }
 // Stable, non-sensitive categories for UI, diagnostics and future telemetry.
 // Never return raw server messages: Wikimapia may echo query parameters or API keys.
 export function classifyApiFailure(error, { offline = false } = {}) {
+  if (error?.name === 'AbortError') return 'cancelled';
   if (offline) return 'offline';
+  if (error instanceof ApiError) return ['quota','auth','schema'].includes(error.kind) ? error.kind : 'api';
   if (error instanceof ValidationError) return 'input';
   const message = String(error?.message ?? error ?? '');
   if (/429|limit|quota|wait|too many|исчерпан лимит/i.test(message)) return 'quota';

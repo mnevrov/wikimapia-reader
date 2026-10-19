@@ -21,3 +21,8 @@ test('fresh, expired and incomplete cache are labeled without coordinates',()=>{
  assert.match(areaCacheLabel({page:1,places:[{}],found:10,more:true,cacheUpdatedAt:at},at+300001),/могут устареть.*не полностью/);
  assert.equal(areaCacheLabel({page:0,displayPlaces:[]},at),'');
 });
+
+test('fresh network data is not presented as cache',()=>{
+ assert.equal(areaCacheLabel({page:1,places:[{}],found:1,complete:true,dataSource:'network',cacheUpdatedAt:1000},1001),'Данные с сервера');
+ assert.match(areaCacheLabel({page:0,displayPlaces:[{}],complete:false,dataSource:'cache',cacheUpdatedAt:1000},400000),/могут устареть.*не полностью/);
+});

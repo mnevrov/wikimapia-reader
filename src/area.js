@@ -1,6 +1,7 @@
 import {normalizeArea, diagnosticError, classifyApiFailure} from './api.js';
 import {CACHE_MAX_AGE} from './areaCache.js';
 import {isCovered,contains,intersects} from './coverage.js';
+import {recordCoverage} from './apiDiagnostics.js';
 
 const CACHE_AGE = 5 * 60 * 1000;
 const complete=e=>e.state.complete??(!e.state.more&&(e.state.found!=null?e.state.places.length>=e.state.found:e.state.places.length<50));
@@ -15,7 +16,7 @@ export class AreaLoader {
     this.cache = new Map();
     this.sequence = 0;
     this.continuation = 0;
-    this.state = {places:[], displayPlaces:[], page:0, found:null, more:false, loading:false, error:'', failureKind:null,retryable:false,failureKind:null,background:false,draining:false,batchLimited:false,cacheIds:[],cacheUpdatedAt:null};
+    this.state = {places:[], displayPlaces:[], page:0, found:null, more:false, loading:false, error:'',failureKind:null,retryable:false,background:false,draining:false,batchLimited:false,cacheIds:[],cacheUpdatedAt:null,dataSource:null,complete:false};
   }
   publish(patch) { this.state = {...this.state, ...patch}; this.notify(this.state); }
   stop() {
@@ -63,7 +64,7 @@ export class AreaLoader {
       if (entry) {
         this.bbox = [...entry.bbox];
         this.cacheKey = this.bbox.join(',');
-        this.publish({...entry.state, displayPlaces:this.visibleCached(), cacheIds:[this.cacheKey],cacheUpdatedAt:entry.updated,error:'', failureKind:null,retryable:false, loading:false,background:false,batchLimited:false});
+        this.publish({...entry.state, displayPlaces:this.visibleCached(), cacheIds:[this.cacheKey],cacheUpdatedAt:entry.updated,dataSource:'cache',error:'', failureKind:null,retryable:false, loading:false,background:false,batchLimited:false});
         return;
       }
     }
@@ -72,14 +73,16 @@ export class AreaLoader {
       if(isCovered(view,coverageEntries.map(e=>e.bbox))){
         this.bbox=[...view];this.cacheKey=null;
         const displayPlaces=this.visibleCached();
-        this.publish({places:displayPlaces,displayPlaces,page:1,found:null,more:false,loading:false,error:'',failureKind:null,retryable:false,background:false,batchLimited:false,cacheIds:coverageEntries.map(e=>e.bbox.join(',')),cacheUpdatedAt:Math.min(...coverageEntries.map(e=>e.updated)),complete:true});
+        this.publish({places:displayPlaces,displayPlaces,page:1,found:null,more:false,loading:false,error:'',failureKind:null,retryable:false,background:false,batchLimited:false,cacheIds:coverageEntries.map(e=>e.bbox.join(',')),cacheUpdatedAt:Math.min(...coverageEntries.map(e=>e.updated)),dataSource:'cache',complete:true});
         return;
       }
     }
     this.bbox = [...bbox];
     this.cacheKey = bbox.join(',');
     const displayPlaces=this.visibleCached();
-    this.publish({places:[],displayPlaces,page:0,found:null,more:false,error:'',failureKind:null,retryable:false,batchLimited:false,cacheIds:[...this.cache.values()].filter(e=>intersects(e.bbox,view)).map(e=>e.bbox.join(',')),cacheUpdatedAt:null});
+    const visibleEntries=[...this.cache.values()].filter(e=>intersects(e.bbox,view));
+    const lastCachedAt=visibleEntries.length?Math.max(...visibleEntries.map(e=>e.updated)):null;
+    this.publish({places:[],displayPlaces,page:0,found:null,more:false,complete:false,dataSource:lastCachedAt==null?null:'cache',error:'',failureKind:null,retryable:false,batchLimited:false,cacheIds:[...this.cache.values()].filter(e=>intersects(e.bbox,view)).map(e=>e.bbox.join(',')),cacheUpdatedAt:lastCachedAt});
     await this.fetchPage(1);
   }
   async more() {
@@ -119,7 +122,8 @@ export class AreaLoader {
       const more = progress && items.length > 0 && (found !== null ? places.length < found : items.length === 50);
       // Repeated/empty pages cannot prove completeness when the server reports more.
       const fullyLoaded=found!==null?places.length>=found:(items.length<50);
-      const state = {places,page,found,more,complete:fullyLoaded,cacheUpdatedAt:Date.now(),loading:false,background:false,error:'',failureKind:null,retryable:false};
+      recordCoverage(places.length,found,fullyLoaded);
+      const state = {places,page,found,more,complete:fullyLoaded,dataSource:'network',cacheUpdatedAt:Date.now(),loading:false,background:false,error:'',failureKind:null,retryable:false};
       const key=this.cacheKey,old=this.cache.get(key);
       const record={bbox:[...this.bbox],state,updated:Date.now(),pinned:old?.pinned??false,retentionDays:old?.retentionDays??1};
       this.cache.delete(key);
