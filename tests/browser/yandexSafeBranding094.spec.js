@@ -1,5 +1,5 @@
 import {test,expect} from '@playwright/test';
-import {tiles,screen,map} from './helpers.js';
+import {tiles,screen,map,clickContour} from './helpers.js';
 
 // Regression: SDK copyright elements keep their own native appearance.
 // WikiReader must not change their size/opacity/position or duplicate branding.
@@ -74,4 +74,12 @@ test('Yandex SDK legal controls are not restyled; map notices do not cover lower
  await page.getByRole('button',{name:'OpenStreetMap'}).click();
  await map(page);
  await expect(page.locator('.leaflet-control-attribution')).toBeVisible();
+});
+
+test('scoped CSS resets do not override touch handling of the details sheet',async({page})=>{
+ await tiles(page);
+ await page.goto('/');
+ await clickContour(page);
+ await expect(page.locator('.sheet')).toBeVisible();
+ await expect(page.locator('.handle')).toHaveCSS('touch-action','none');
 });
