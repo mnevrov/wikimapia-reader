@@ -157,7 +157,7 @@ export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refr
       if(!followMovement(map.distance([previous.lat,previous.lng],point),Date.now()-previous.at,radius))return;
     }
     const currentZoom=map.getZoom();
-    map.setView(point,Math.max(16,currentZoom),{animate:!reduceMotion,duration:.55});
+    map.setView(point,Math.max(17,currentZoom),{animate:!reduceMotion,duration:.55});
     lastFollow.current={lat:location.lat,lng:location.lng,at:Date.now()};
   },[location,gpsFollowing]);
   const yandexActive=useYandexUnderlay({
