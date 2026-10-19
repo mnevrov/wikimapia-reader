@@ -16,7 +16,7 @@ function initialView() {
   } catch {}
   return {lat:55.752,lng:37.618,zoom:16};
 }
-export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refresh,moreRequest,focus,location,cacheEpoch,cacheView,selectedId,density,basemap,yandexKey,yandexReferer,onBasemapFallback,onVisiblePlaces,onCandidates,onSelect,onState,onMessage}) {
+export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refresh,moreRequest,focus,location,cacheEpoch,cacheView,selectedId,density,basemap,yandexKey,yandexReferer,onBasemapFallback,onBasemapConnected,onVisiblePlaces,onCandidates,onSelect,onState,onMessage}) {
   const el=useRef(null), mapRef=useRef(null), overlayRef=useRef(null), polygonsRef=useRef(new Map()),tileRef=useRef(null),yandexHost=useRef(null);
   const [viewport,setViewport]=useState(0);
   const [moving,setMoving]=useState(false);
@@ -146,7 +146,7 @@ export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refr
   const yandexActive=useYandexUnderlay({
     mapRef,hostRef:yandexHost,selected:basemap==='yandex',
     key:yandexKey,refererConfirmed:yandexReferer,
-    onUnavailable:onBasemapFallback
+    onUnavailable:onBasemapFallback,onConnected:onBasemapConnected
   });
   useEffect(()=>{
     const map=mapRef.current,tile=tileRef.current;
