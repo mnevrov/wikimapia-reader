@@ -93,7 +93,7 @@ test('Yandex SDK legal controls are not restyled; map notices do not cover lower
  });
  expect(landscape.bottom).toBeLessThan(landscape.copyTop-16);
  expect(landscape.top).toBeGreaterThanOrEqual(60);
- expect(landscape.columns.split(' ').length).toBe(2);
+ expect(landscape.columns.split(' ').length).toBe(3);
  await page.setViewportSize({width:390,height:844});
  await screen(page,'Настройки');
  await page.getByRole('button',{name:'OpenStreetMap'}).click();
