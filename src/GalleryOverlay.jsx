@@ -64,7 +64,7 @@ export default function GalleryOverlay({photos,initialIndex=0,title,onClose}){
    <span aria-live="polite">{index+1} из {photos.length}</span>
    <button className="icon-btn gallery-zoom-button" aria-label={zoom>1?'Сбросить масштаб':'Увеличить фото'} onClick={toggleZoom}>{zoom>1?'1×':'2×'}</button>
   </header>
-  <div className="gallery-stage" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp} onDoubleClick={toggleZoom}>
+  <div className="gallery-stage" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={e=>{pointers.current.delete(e.pointerId);gesture.current=null;}} onDoubleClick={toggleZoom}>
    <img src={photo?.src} alt={`Фото ${index+1}: ${title}`} draggable="false" style={{transform:`translate(${offset.x}px,${offset.y}px) scale(${zoom})`}}/>
   </div>
   {photos.length>1&&<nav className="gallery-nav" aria-label="Переключение фотографий">
