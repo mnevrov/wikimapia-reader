@@ -65,6 +65,7 @@ test('Yandex request error safely restores OSM without retry storm',async({page}
  await configure(page);
  await page.getByRole('button',{name:'Яндекс · тёмная карта'}).click();
  await map(page);
+ await expect.poll(()=>loads).toBe(1);
  await expect(page.locator('.map-stack')).not.toHaveClass(/has-yandex/);
  await screen(page,'Настройки');
  await expect(page.getByRole('button',{name:'OpenStreetMap'})).toHaveAttribute('aria-pressed','true');
