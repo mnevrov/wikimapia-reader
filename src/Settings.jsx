@@ -3,8 +3,18 @@ import Icon from './Icon.jsx';
 import Motion from './Motion.jsx';
 import CacheSettings from './CacheSettings.jsx';
 import {YANDEX_KEY_PATTERN} from './yandexUsage.js';
-export default function Settings({confirmForget,setConfirmForget,credentials,onCacheAction,onShowArea,cacheEpoch,currentAreaIds,cacheClearing,theme,setTheme,auto,setAuto,density,setDensity,basemap,setBasemap,yandexKey,setYandexKey,yandexReferer,setYandexReferer,onApply,onForget,demo,onDemo,onReal}){
+import {yandexDiagnosticReport} from './yandexDiagnosis.js';
+export default function Settings({confirmForget,setConfirmForget,credentials,onCacheAction,onShowArea,cacheEpoch,currentAreaIds,cacheClearing,theme,setTheme,auto,setAuto,density,setDensity,basemap,setBasemap,yandexKey,setYandexKey,yandexReferer,setYandexReferer,yandexDiagnostic,onApply,onForget,demo,onDemo,onReal}){
   const [editing,setEditing]=useState(false),[draft,setDraft]=useState('');
+  const [reportStatus,setReportStatus]=useState('');
+  const copyYandexReport=async()=>{
+    const report=yandexDiagnosticReport(yandexDiagnostic);
+    if(!report)return;
+    try{
+      await navigator.clipboard.writeText(report);
+      setReportStatus('Диагностика скопирована без API-ключа');
+    }catch{setReportStatus('Не удалось скопировать автоматически. Сделайте скриншот блока диагностики.');}
+  };
   useEffect(()=>{setEditing(false);setDraft('');setConfirmForget(false);},[credentials.key]);
   const submit=async e=>{e.preventDefault();if(await onApply(draft)){setDraft('');setEditing(false);}};
   return <div className="settings-panel screen-body">
@@ -31,12 +41,22 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
         <span><strong>Ограничение HTTP Referer настроено</strong><small>Обязательное условие для работы ключа JS API. Для Android WebView проверьте адрес источника запросов. Не используйте ключ без ограничения.</small></span>
         <input id="yandex-referer" type="checkbox" checked={yandexReferer} onChange={e=>setYandexReferer(e.target.checked)}/>
       </label>
+      {yandexDiagnostic&&<div className="yandex-diagnostic" role="status" aria-label="Диагностика подключения Яндекс Карт">
+        <strong>Ошибка Яндекс Карт: {yandexDiagnostic.code}</strong>
+        <p>{yandexDiagnostic.title}. {yandexDiagnostic.help}</p>
+        {yandexDiagnostic.previous&&<p>Предыдущий сбой: <code>{yandexDiagnostic.previous}</code></p>}
+        {yandexDiagnostic.retrySeconds>0&&<p>Повтор доступен примерно через {yandexDiagnostic.retrySeconds} с.</p>}
+        <p>Адрес страницы WebView: <code>{yandexDiagnostic.origin}</code></p>
+        <p>Сеть: {yandexDiagnostic.online?'Android сообщает, что подключение есть':'Android сообщает об отсутствии подключения'}. Адрес страницы не подтверждает фактический заголовок HTTP Referer.</p>
+        <button className="secondary" type="button" onClick={copyYandexReport}>Скопировать диагностику</button>
+        {reportStatus&&<p>{reportStatus}</p>}
+      </div>}
       <p className="helper">Ключ JS API хранится в настройках данного устройства, не попадает в GitHub и не используется без выбора Яндекса. Обычные просмотры карты бесплатны; геокодирование, панорамы и поиск Яндекса не вызываются. <a href="https://yandex.ru/maps-api/docs/js-api/limit.html" target="_blank" rel="noopener noreferrer">Настройка ключа <Icon name="external" size={14}/></a> · <a href="https://yandex.ru/legal/maps_termsofuse/" target="_blank" rel="noopener noreferrer">Условия Яндекс Карт</a></p>
       <button className="text-button" type="button" disabled={!yandexKey} onClick={()=>{setBasemap('osm');setYandexKey('');setYandexReferer(false);}}>Удалить ключ карты с устройства</button>
     </section>
     <CacheSettings epoch={cacheEpoch} busy={cacheClearing} currentIds={currentAreaIds} demo={demo} onAction={onCacheAction} onShowArea={onShowArea}/>
     <fieldset className="settings-group theme-choice"><legend>Оформление</legend><div>{[['dark','Чёрная'],['light','Светлая'],['system','Как в системе']].map(([value,label])=><button key={value} aria-pressed={theme===value} onClick={()=>setTheme(value)}>{label}</button>)}</div></fieldset>
     <section className="settings-group"><h2>Демонстрация</h2><p className="helper">Вымышленные объекты для знакомства с карточками. Сохранённый ключ не удаляется.</p><button className="secondary" disabled={credentials.busy} onClick={demo&&credentials.key?onReal:onDemo}>{demo&&credentials.key?'Вернуться к реальным данным':'Открыть деморежим'}</button></section>
-    <p className="about">WikiReader 0.9.1 · Неофициальный клиент<br/>Данные © участники Wikimapia</p>
+    <p className="about">WikiReader 0.9.2 · Неофициальный клиент<br/>Данные © участники Wikimapia</p>
   </div>;
 }

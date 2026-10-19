@@ -4,6 +4,9 @@
 export const YANDEX_JS_API_URL='https://api-maps.yandex.ru/v3/';
 export const YANDEX_TERMS_URL='https://yandex.ru/legal/maps_termsofuse';
 export const YANDEX_KEY_PATTERN=/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
+export class YandexSdkError extends Error{
+ constructor(code){super(code);this.name='YandexSdkError';this.code=code;}
+}
 
 export function yandexEnablement({selected=false,key='',refererConfigured=false,publiclyAccessible=false}={}){
  if(!selected)return {allowed:false,reason:'not-selected'};
@@ -14,7 +17,7 @@ export function yandexEnablement({selected=false,key='',refererConfigured=false,
 }
 
 export function createYandexApiLoader(loadSdk,{now=()=>Date.now(),retryDelayMs=60_000}={}){
- let activeKey=null,promise=null,failedAt=null;
+ let activeKey=null,promise=null,failedAt=null,lastFailure='sdk-unavailable';
  return function request(config){
   const decision=yandexEnablement(config);
   if(!decision.allowed)return Promise.resolve({active:false,reason:decision.reason,api:null});
@@ -24,15 +27,17 @@ export function createYandexApiLoader(loadSdk,{now=()=>Date.now(),retryDelayMs=6
   if(activeKey&&activeKey!==key)return Promise.resolve({active:false,reason:'reload-required',api:null});
   if(promise)return promise;
   if(failedAt!==null&&now()-failedAt<retryDelayMs){
-   return Promise.resolve({active:false,reason:'retry-cooldown',api:null});
+   return Promise.resolve({active:false,reason:'retry-cooldown',failureCode:lastFailure,retrySeconds:Math.ceil((retryDelayMs-(now()-failedAt))/1000),api:null});
   }
   activeKey=key;
   promise=Promise.resolve().then(()=>loadSdk(key)).then(api=>{
-   if(!api)throw Error('SDK unavailable');
+   if(!api)throw new YandexSdkError('sdk-global-missing');
    return {active:true,reason:'ready',api};
-  }).catch(()=>{
+  }).catch(error=>{
    failedAt=now();promise=null;
-   return {active:false,reason:'sdk-unavailable',api:null};
+   // Do not propagate raw third-party errors: messages can contain the key.
+   lastFailure=error instanceof YandexSdkError?error.code:'sdk-unavailable';
+   return {active:false,reason:'sdk-unavailable',failureCode:lastFailure,api:null};
   });
   return promise;
  };
@@ -40,10 +45,13 @@ export function createYandexApiLoader(loadSdk,{now=()=>Date.now(),retryDelayMs=6
 
 export function injectYandexJsApi(key){
  if(typeof document==='undefined'||typeof window==='undefined'){
-  return Promise.reject(Error('Yandex maps require a browser WebView'));
+  return Promise.reject(new YandexSdkError('webview-required'));
  }
  return new Promise((resolve,reject)=>{
-  if(window.ymaps3){window.ymaps3.ready.then(()=>resolve(window.ymaps3),reject);return;}
+  if(window.ymaps3){
+   Promise.resolve(window.ymaps3.ready).then(()=>resolve(window.ymaps3),()=>reject(new YandexSdkError('sdk-ready-error')));
+   return;
+  }
   const script=document.createElement('script');
   const url=new URL(YANDEX_JS_API_URL);
   url.searchParams.set('apikey',key);
@@ -56,13 +64,17 @@ export function injectYandexJsApi(key){
    script.onload=null;script.onerror=null;
    if(error){script.remove();reject(error);}else resolve(api);
   };
-  const timeout=setTimeout(()=>complete(Error('Yandex SDK timed out')),14000);
+  const timeout=setTimeout(()=>complete(new YandexSdkError('script-timeout')),14000);
   script.async=true;
   // Browser sends the actual application origin as Referer. Do not spoof it.
   script.referrerPolicy='strict-origin-when-cross-origin';
   script.src=url.toString();
-  script.onload=()=>window.ymaps3?.ready?.then(()=>complete(null,window.ymaps3),e=>complete(e))??complete(Error('SDK unavailable'));
-  script.onerror=()=>complete(Error('SDK unavailable'));
+  script.onload=()=>{
+   const sdk=window.ymaps3;
+   if(!sdk||!sdk.ready){complete(new YandexSdkError('sdk-global-missing'));return;}
+   Promise.resolve(sdk.ready).then(()=>complete(null,sdk),()=>complete(new YandexSdkError('sdk-ready-error')));
+  };
+  script.onerror=()=>complete(new YandexSdkError('script-load-error'));
   document.head.appendChild(script);
  });
 }

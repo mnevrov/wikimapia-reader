@@ -1,11 +1,17 @@
 import {useEffect,useRef,useState} from 'react';
 import {requestYandexJsApi} from './yandexUsage.js';
+import {yandexErrorInfo} from './yandexDiagnosis.js';
 
 // Leaflet remains the gesture/geometry owner. YMap paints only the underlay.
 // This avoids a second hit-test engine and preserves Wikimapia caching/selection.
-export function useYandexUnderlay({mapRef,hostRef,selected,key,refererConfirmed,onUnavailable}){
+export function useYandexUnderlay({mapRef,hostRef,selected,key,refererConfirmed,onUnavailable,onConnected}){
  const instance=useRef(null),schemeLayer=useRef(null),appliedTheme=useRef(null),raf=useRef(0),[active,setActive]=useState(false);
  const warn=useRef(onUnavailable);warn.current=onUnavailable;
+ const connected=useRef(onConnected);connected.current=onConnected;
+ const report=(code,details={})=>{
+  const info=yandexErrorInfo(code,{origin:window.location.origin,online:navigator.onLine,...details});
+  warn.current?.(`${info.title}. ${info.help}`,info);
+ };
  useEffect(()=>{
   if(!selected||!key||!refererConfirmed){setActive(false);return;}
   let cancelled=false;
@@ -13,11 +19,11 @@ export function useYandexUnderlay({mapRef,hostRef,selected,key,refererConfirmed,
    if(cancelled)return;
    if(!result.active){
     setActive(false);
-    warn.current?.(result.reason==='sdk-unavailable'?'Яндекс Карты недоступны. Возвращена карта OSM.':'Не удалось подключить Яндекс. Проверьте ключ и HTTP Referer.');
+    report(result.reason==='sdk-unavailable'?result.failureCode||'sdk-unavailable':result.reason,{previous:result.failureCode||'',retrySeconds:result.retrySeconds||0});
     return;
    }
    const map=mapRef.current,host=hostRef.current;
-   if(!map||!host)return;
+   if(!map||!host){report('map-host-missing');return;}
    try{
     const sdk=result.api,c=map.getCenter();
     const theme=document.documentElement.dataset.theme==='light'?'light':'dark';
@@ -31,9 +37,10 @@ export function useYandexUnderlay({mapRef,hostRef,selected,key,refererConfirmed,
     ymap.addChild(scheme);
     if(cancelled){ymap.destroy?.();return;}
     instance.current=ymap;schemeLayer.current=scheme;appliedTheme.current=theme;setActive(true);
+    connected.current?.();
    }catch{
     setActive(false);
-    warn.current?.('Не удалось создать тёмную карту Яндекса. Возвращена OSM.');
+    report('sdk-map-error');
    }
   });
   return()=>{
@@ -76,7 +83,7 @@ export function useYandexUnderlay({mapRef,hostRef,selected,key,refererConfirmed,
     scheme.update({theme});
     appliedTheme.current=theme;
    }catch{
-    warn.current?.('Не удалось переключить тему Яндекс Карт. Возвращена OSM.');
+    report('sdk-style-error');
    }
   };
   // Pick up any change made while the SDK is loading; follow system theme too.
