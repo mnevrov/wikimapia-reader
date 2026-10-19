@@ -6,6 +6,7 @@ import {areaCache} from './areaCache.js';
 import {areaMessage} from './mapStatus.js';
 import {hitTestPlaces} from './geometry.js';
 import {DEMO_AREA} from './demo.js';
+import {visibleInMap,contourStyle} from './mapPresentation.js';
 
 function initialView() {
   try {
@@ -14,8 +15,8 @@ function initialView() {
   } catch {}
   return {lat:55.752,lng:37.618,zoom:16};
 }
-export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refresh,moreRequest,focus,location,cacheEpoch,cacheView,selectedId,onCandidates,onSelect,onState,onMessage}) {
-  const el=useRef(null), mapRef=useRef(null), overlayRef=useRef(null);
+export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refresh,moreRequest,focus,location,cacheEpoch,cacheView,selectedId,density,onVisiblePlaces,onCandidates,onSelect,onState,onMessage}) {
+  const el=useRef(null), mapRef=useRef(null), overlayRef=useRef(null), polygonsRef=useRef(new Map());
   const [viewport,setViewport]=useState(0);
   const [moving,setMoving]=useState(false);
   const [places,setPlaces]=useState(()=>demo?DEMO_AREA:[]);
@@ -42,7 +43,7 @@ export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refr
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
 
     L.control.attribution({position:'bottomleft',prefix:false}).addTo(map);
-    mapRef.current=map;overlayRef.current=L.featureGroup().addTo(map);
+    mapRef.current=map;overlayRef.current=L.featureGroup().addTo(map);setViewport(v=>v+1);
     map.on('click',event=>pick.current?.(event.latlng));
     map.on('movestart',()=>{dismissPick.current?.();setMoving(true);retries.current=0;currentLoader.current?.invalidate();});
     map.on('moveend',()=>{
@@ -52,7 +53,7 @@ export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refr
       setViewport(v=>v+1);
     });
     const observer=new ResizeObserver(()=>map.invalidateSize());observer.observe(el.current);
-    return()=>{observer.disconnect();map.remove();mapRef.current=null;};
+    return()=>{observer.disconnect();polygonsRef.current.clear();map.remove();mapRef.current=null;};
   },[]);
   useEffect(()=>{
     blocked.current=false;
@@ -92,10 +93,34 @@ export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refr
   },[auto,active,paused,moving,progress,loader]);
   useEffect(()=>{if(refresh){blocked.current=false;retries.current=0;loadRef.current(true);}},[refresh]);
   useEffect(()=>{if(moreRequest&&active&&!paused)loader.remaining();},[moreRequest]);
+  // Reconcile only visible polygon layers. Avoid clearLayers() on each API page.
   useEffect(()=>{
-    const layer=overlayRef.current;if(!layer)return;layer.clearLayers();
-    for(const p of places){if(p.id===selectedId&&focus?.length>=3)continue;if(p.coords.length>=3)L.polygon(p.coords,{color:p.id===selectedId?'#f1a23b':'#16ac8d',weight:p.id===selectedId?3:1.5,fill:p.id===selectedId,fillColor:'#f1a23b',fillOpacity:.12}).addTo(layer);}
-  },[places,selectedId,focus]);
+    const map=mapRef.current,layer=overlayRef.current;if(!map||!layer)return;
+    const view=map.getBounds();
+    const bounds=[view.getWest(),view.getSouth(),view.getEast(),view.getNorth()];
+    const visible=visibleInMap(places,bounds);
+    onVisiblePlaces(visible);
+    const desired=new Set();
+    const styleZoom=map.getZoom();
+    for(const p of visible){
+      if(p.id===selectedId&&focus?.length>=3)continue;
+      desired.add(p.id);
+      const style=contourStyle(density,visible.length,styleZoom,p.id===selectedId);
+      const current=polygonsRef.current.get(p.id);
+      if(current){
+        // A renewed response can replace geometry without replacing the layer object.
+        if(current.coords!==p.coords){current.layer.setLatLngs(p.coords);current.coords=p.coords;}
+        const key=JSON.stringify(style);
+        if(current.styleSignature!==key){current.layer.setStyle(style);current.styleSignature=key;}
+      }else{
+        const polygon=L.polygon(p.coords,style).addTo(layer);
+        polygonsRef.current.set(p.id,{layer:polygon,coords:p.coords,styleSignature:JSON.stringify(style)});
+      }
+    }
+    for(const [id,record] of polygonsRef.current){
+      if(!desired.has(id)){layer.removeLayer(record.layer);polygonsRef.current.delete(id);}
+    }
+  },[places,selectedId,focus,viewport,density,onVisiblePlaces]);
   useEffect(()=>{
     if(focus?.length<3||!focus||!mapRef.current)return;
     const map=mapRef.current;

@@ -15,8 +15,9 @@ on:
 permissions:
   contents: read
 
+# Keep a release dispatch separate from the push run which schedules it.
 concurrency:
-  group: android-${{ github.ref }}
+  group: android-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag != '' && format('release-{0}', inputs.release_tag) || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -117,3 +118,60 @@ jobs:
           RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || inputs.release_tag }}
           RELEASE_TARGET_SHA: ${{ github.sha }}
         run: bash scripts/publish-release.sh "$RELEASE_TAG"
+
+  # The GitHub connector may merge code but cannot create tags or dispatch workflows.
+  # Queue a release only when main receives a *new* app version, after its CI succeeds.
+  # A workflow_dispatch event from GITHUB_TOKEN is allowed to start another workflow.
+  dispatch-version-release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: verify-and-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Determine version increase
+        id: version
+        env:
+          PREVIOUS_MAIN_SHA: ${{ github.event.before }}
+        run: |
+          python3 - <<'PY'
+          import json,os,pathlib,re,subprocess
+          previous=os.environ['PREVIOUS_MAIN_SHA']
+          if not re.fullmatch('[a-f0-9]{40}',previous) or previous=='0'*40:
+              raise SystemExit('Previous main commit is unavailable; refuse automatic release')
+          current=json.loads(pathlib.Path('package.json').read_text())['version']
+          old=json.loads(subprocess.check_output(['git','show',f'{previous}:package.json'],text=True))['version']
+          semver=r'\d+\.\d+\.\d+'
+          assert re.fullmatch(semver,current) and re.fullmatch(semver,old), 'Invalid release version'
+          if tuple(map(int,current.split('.')))<=tuple(map(int,old.split('.'))):
+              print(f'No version increase: {old} -> {current}')
+              raise SystemExit(0)
+          assert pathlib.Path(f'docs/releases/{current}/RELEASE_NOTES.md').is_file(), 'Release notes missing'
+          lock=json.loads(pathlib.Path('package-lock.json').read_text())
+          assert lock['version']==current and lock['packages']['']['version']==current, 'Lock version mismatch'
+          gradle=pathlib.Path('android/app/build.gradle').read_text()
+          assert re.search(r'versionName\s+"'+re.escape(current)+r'"',gradle), 'Android version mismatch'
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out: out.write(f'tag=v{current}\n')
+          print(f'New version verified: {old} -> {current}')
+          PY
+      - name: Dispatch signing and publishing workflow
+        if: steps.version.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if gh release view "$TAG" --json isDraft --jq '.isDraft' > release-status.txt 2>/dev/null; then
+            if [[ "$(cat release-status.txt)" == false ]]; then
+              echo "Release $TAG is already published; nothing to dispatch"
+              exit 0
+            fi
+          fi
+          gh workflow run android.yml --ref main --field release_tag="$TAG"
+          echo "Queued signing and publishing for $TAG"
