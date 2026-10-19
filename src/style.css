@@ -132,7 +132,6 @@ main::before,main::after{content:'';position:fixed;left:0;right:0;z-index:2000;b
 .yandex-confirm>span{flex:1}.yandex-settings .helper a{display:inline;white-space:normal}
 
 /* Provider attribution remains clickable above the transparent Leaflet interaction pane. */
-.yandex-provider-link{position:absolute;z-index:650;left:10px;bottom:12px;max-width:calc(100% - 100px);display:inline-flex;align-items:center;min-height:30px;padding:4px 8px;border:1px solid #3c4648;background:#0c1115e8;color:#eaf6f4;font-size:11px;border-radius:9px;text-decoration:none;box-shadow:0 1px 6px #0006}
 .yandex-provider-link:focus-visible{outline:2px solid var(--accent)}
 
 /* 0.9.2: safe Yandex API failure report; no URLs containing API keys. */

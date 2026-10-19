@@ -157,6 +157,5 @@ export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refr
   return <div className={`map-stack ${yandexActive?'has-yandex':''}`}>
     <div className="yandex-underlay" ref={yandexHost} aria-hidden="true"/>
     <div className="map" ref={el} aria-label="Карта"/>
-    {yandexActive&&<a className="yandex-provider-link" href="https://yandex.ru/maps/" target="_blank" rel="noopener noreferrer" aria-label="Открыть Яндекс Карты">© Яндекс Карты ↗</a>}
   </div>;
 }
