@@ -16,7 +16,9 @@ test('one action switches from download to busy spinner to refresh without dupli
  await start(page,(route,n)=>n===2?(pending=route):route.fulfill({json:response(n)}));
  const action=page.locator('.map-tools .area-action');
  await expect(action).toHaveCount(1);
- await expect(action).toHaveAttribute('aria-label','Догрузить область');
+ await expect(action).toHaveAttribute('aria-label','Обновить область');
+ await action.click();
+ await expect(action).toHaveAttribute('aria-label','Догрузить область',{timeout:20000});
  await expect(action.locator('svg path')).toHaveAttribute('d',/M12 3v12/);
  await action.click();
  await expect(action).toHaveAttribute('aria-label','Догружаем область');
@@ -36,7 +38,9 @@ test('the object panel keeps forced refresh even when continuation is available'
  const pages=[];
  await start(page,(route,n)=>{pages.push(n);return route.fulfill({json:response(n,4)});});
  const action=page.locator('.map-tools .area-action');
- await expect(action).toHaveAttribute('aria-label','Догрузить область');
+ await expect(action).toHaveAttribute('aria-label','Обновить область');
+ await action.click();
+ await expect(action).toHaveAttribute('aria-label','Догрузить область',{timeout:20000});
  await page.getByRole('button',{name:'Список объектов области'}).click();
  await page.getByRole('button',{name:'Обновить область с сервера'}).click();
  await expect.poll(()=>pages.length,{timeout:25000}).toBe(2);
@@ -51,7 +55,9 @@ test('a failed next page becomes retryable without discarding loaded objects',as
    return route.fulfill({json:response(n)});
  });
  const action=page.locator('.map-tools .area-action');
- await expect(action).toHaveAttribute('aria-label','Догрузить область');
+ await expect(action).toHaveAttribute('aria-label','Обновить область');
+ await action.click();
+ await expect(action).toHaveAttribute('aria-label','Догрузить область',{timeout:20000});
  await action.click();
  await expect(action).toHaveAttribute('aria-label','Повторить догрузку',{timeout:25000});
  await expect(action).toHaveClass(/has-error/);
