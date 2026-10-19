@@ -142,6 +142,7 @@ export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refr
     mapRef.current.fitBounds([[s,w],[n,e]],{padding:[24,90],maxZoom:18});
   },[cacheView]);
   useEffect(()=>{if(zoomRequest&&mapRef.current)mapRef.current.setZoom(Math.max(2,Math.min(19,mapRef.current.getZoom()+zoomRequest.delta)));},[zoomRequest]);
+  useEffect(()=>{if(!gpsFollowing)lastFollow.current=null;},[gpsFollowing]);
   useEffect(()=>{
     if(!location||!mapRef.current)return;
     const map=mapRef.current,point=[location.lat,location.lng];
