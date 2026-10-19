@@ -35,7 +35,7 @@ export default function MapDiscover({mode,demo,query,onQuery,onSearch,results,se
           <span aria-live="polite">Видно: {visiblePlaces.length}</span>
         </div>
         <p className="discovery-status" role="status">{demo?'Демонстрационные объекты':areaStatus}</p>
-        {!demo&&<button className="text-button discovery-refresh" disabled={area.loading||area.draining} onClick={onRefreshArea}><Icon name="refresh" size={16}/>Обновить область с сервера</button>
+        {!demo&&<button className="text-button discovery-refresh" disabled={area.loading||area.draining} onClick={onRefreshArea}><Icon name="refresh" size={16}/>Обновить область с сервера</button>}
         {shown.length?
           <ul className="discovery-results">{shown.map(place=><li key={place.id}><button onClick={()=>onSelect(place)}><span><strong>{place.title}</strong><small>#{place.id}</small></span><Icon name="arrow" size={18}/></button></li>)}</ul>:
           <p className="discovery-empty">В этой части карты пока нет загруженных контуров. Приблизьте карту или дождитесь загрузки.</p>}
