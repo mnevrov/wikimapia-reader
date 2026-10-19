@@ -1,7 +1,7 @@
 // Memory-only, allowlisted diagnostics: never store URLs, request options,
 // credentials, coordinates, object IDs, response bodies or raw error messages.
 const METHODS = ['box','place.getbyarea','place.getbyid','search'];
-const FAILURES = ['offline','auth','quota','schema','timeout','network','input','unknown'];
+const FAILURES = ['offline','auth','quota','schema','api','timeout','network','input','unknown'];
 const empty = () => ({requests:0,success:0,errors:Object.fromEntries(FAILURES.map(k=>[k,0])),latencyTotalMs:0});
 let methods = Object.fromEntries(METHODS.map(k=>[k,empty()]));
 let coverage = {complete:0,partial:0,unknown:0};
