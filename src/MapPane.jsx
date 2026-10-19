@@ -8,6 +8,7 @@ import {hitTestPlaces} from './geometry.js';
 import {DEMO_AREA} from './demo.js';
 import {visibleInMap,contourStyle} from './mapPresentation.js';
 import {useYandexUnderlay} from './useYandexUnderlay.js';
+import {followMovement} from './gpsFollow.js';
 
 function initialView() {
   try {
@@ -153,8 +154,7 @@ export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refr
     if(!gpsFollowing)return;
     const previous=lastFollow.current;
     if(previous){
-      if(map.distance([previous.lat,previous.lng],point)<Math.max(15,radius*.4))return;
-      if(Date.now()-previous.at<3000)return;
+      if(!followMovement(map.distance([previous.lat,previous.lng],point),Date.now()-previous.at,radius))return;
     }
     const currentZoom=map.getZoom();
     map.setView(point,Math.max(16,currentZoom),{animate:!reduceMotion,duration:.55});
