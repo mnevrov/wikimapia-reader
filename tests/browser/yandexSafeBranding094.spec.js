@@ -14,7 +14,7 @@ test('Yandex SDK legal controls are not restyled; map notices do not cover lower
         host.dataset.copyrightsPosition=options.copyrightsPosition;
         const legal=document.createElement('div');
         legal.className='mock-yandex-legal';
-        legal.style.cssText='position:absolute;top:8px;right:8px;z-index:1';
+        legal.style.cssText='position:absolute;top:8px;left:8px;z-index:1';
         const link=document.createElement('a');
         link.href='https://yandex.ru/legal/maps_termsofuse/';
         link.textContent='Условия Яндекс Карт';
@@ -43,7 +43,7 @@ test('Yandex SDK legal controls are not restyled; map notices do not cover lower
  await page.getByRole('button',{name:'Яндекс Карты'}).click();
  await map(page);
  await expect(page.locator('.map-stack.has-yandex')).toBeVisible();
- await expect(page.locator('.yandex-underlay')).toHaveAttribute('data-distribution-position','top right');
+ await expect(page.locator('.yandex-underlay')).toHaveAttribute('data-distribution-position','top left');
  await expect(page.locator('.yandex-underlay')).toHaveAttribute('data-copyrights-position','bottom right');
  const styles=await page.evaluate(()=>{
   const legal=document.querySelector('.mock-yandex-legal');
@@ -78,10 +78,12 @@ test('Yandex SDK legal controls are not restyled; map notices do not cover lower
   const notice=document.querySelector('.map-stage>.map-feedback').getBoundingClientRect();
   const tools=document.querySelector('.map-tools').getBoundingClientRect();
   const overlaps=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
-  return{noticeVsLogo:overlaps(notice,legal),toolsVsCopy:overlaps(tools,copyrights),logoVsCopy:overlaps(legal,copyrights),copyGap:copyrights.top-tools.bottom};
+  return{noticeVsLogo:overlaps(notice,legal),toolsVsCopy:overlaps(tools,copyrights),toolsVsLogo:overlaps(tools,legal),logoVsCopy:overlaps(legal,copyrights),toolsTop:tools.top,copyGap:copyrights.top-tools.bottom};
  });
  expect(bounds.noticeVsLogo).toBe(false);
  expect(bounds.toolsVsCopy).toBe(false);
+ expect(bounds.toolsVsLogo).toBe(false);
+ expect(bounds.toolsTop).toBeGreaterThanOrEqual(8);
  expect(bounds.logoVsCopy).toBe(false);
  expect(bounds.copyGap).toBeGreaterThanOrEqual(16);
  // Landscape should retain the same clearance without off-screen controls.
@@ -92,8 +94,9 @@ test('Yandex SDK legal controls are not restyled; map notices do not cover lower
   return {top:a.top,bottom:a.bottom,copyTop:b.top,columns:getComputedStyle(document.querySelector('.map-tools')).gridTemplateColumns};
  });
  expect(landscape.bottom).toBeLessThan(landscape.copyTop-16);
- expect(landscape.top).toBeGreaterThanOrEqual(60);
- expect(landscape.columns.split(' ').length).toBe(3);
+ expect(landscape.top).toBeGreaterThanOrEqual(8);
+ expect(landscape.top).toBeLessThan(60);
+ expect(landscape.columns.split(' ').length).toBe(1);
  await page.setViewportSize({width:390,height:844});
  await screen(page,'Настройки');
  await page.getByRole('button',{name:'OpenStreetMap'}).click();
