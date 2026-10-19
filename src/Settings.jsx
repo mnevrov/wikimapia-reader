@@ -2,9 +2,10 @@ import React,{useEffect,useState} from 'react';
 import Icon from './Icon.jsx';
 import Motion from './Motion.jsx';
 import CacheSettings from './CacheSettings.jsx';
+import OfflineSettings from './OfflineSettings.jsx';
 import {YANDEX_KEY_PATTERN} from './yandexUsage.js';
 import {yandexDiagnosticReport} from './yandexDiagnosis.js';
-export default function Settings({confirmForget,setConfirmForget,credentials,onCacheAction,onShowArea,cacheEpoch,currentAreaIds,cacheClearing,theme,setTheme,auto,setAuto,density,setDensity,basemap,setBasemap,yandexKey,setYandexKey,yandexReferer,setYandexReferer,yandexDiagnostic,onApply,onForget,demo,onDemo,onReal}){
+export default function Settings({confirmForget,setConfirmForget,credentials,onCacheAction,onShowArea,cacheEpoch,currentAreaIds,cacheClearing,offlineEpoch,onOfflineChange,theme,setTheme,auto,setAuto,density,setDensity,basemap,setBasemap,yandexKey,setYandexKey,yandexReferer,setYandexReferer,yandexDiagnostic,onApply,onForget,demo,onDemo,onReal}){
   const [editing,setEditing]=useState(false),[draft,setDraft]=useState('');
   const [reportStatus,setReportStatus]=useState('');
   const copyYandexReport=async()=>{
@@ -55,8 +56,9 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
       <button className="text-button" type="button" disabled={!yandexKey} onClick={()=>{setBasemap('osm');setYandexKey('');setYandexReferer(false);}}>Удалить ключ карты с устройства</button>
     </section>
     <CacheSettings epoch={cacheEpoch} busy={cacheClearing} currentIds={currentAreaIds} demo={demo} onAction={onCacheAction} onShowArea={onShowArea}/>
+    <OfflineSettings epoch={offlineEpoch} onChange={onOfflineChange}/>
     <fieldset className="settings-group theme-choice"><legend>Оформление</legend><div>{[['dark','Чёрная'],['light','Светлая'],['system','Как в системе']].map(([value,label])=><button key={value} aria-pressed={theme===value} onClick={()=>setTheme(value)}>{label}</button>)}</div></fieldset>
     <section className="settings-group"><h2>Демонстрация</h2><p className="helper">Вымышленные объекты для знакомства с карточками. Сохранённый ключ не удаляется.</p><button className="secondary" disabled={credentials.busy} onClick={demo&&credentials.key?onReal:onDemo}>{demo&&credentials.key?'Вернуться к реальным данным':'Открыть деморежим'}</button></section>
-    <p className="about">WikiReader 0.9.4 · Неофициальный клиент<br/>Данные © участники Wikimapia</p>
+    <p className="about">WikiReader 0.10.0 · Неофициальный клиент<br/>Данные © участники Wikimapia</p>
   </div>;
 }

@@ -192,3 +192,21 @@ main:has(.map-stack.has-yandex) .toast{
   }
   .map-stage:has(.map-stack.has-yandex) .map-tools .icon-btn+.icon-btn{box-shadow:none}
 }
+
+/* 0.10: compact controls; Yandex's legal UI is never hidden, moved or restyled. */
+.gps-control[aria-pressed=true]{color:var(--accent-text)!important;background:var(--control-bg)!important}
+.gps-control.gps-paused{color:var(--muted)!important;outline:1px dashed var(--border)}
+.offline-card-action{background:transparent;color:var(--accent-text);flex-shrink:0}
+.offline-card-action.is-saved{color:var(--accent-text)}
+.offline-card-status{margin:0;padding:2px 0 0;font-size:11px;color:var(--muted);line-height:1.4}
+.offline-list{margin-bottom:24px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+.offline-list .saved-list{margin-bottom:12px}
+/* Keep application-owned banners away from the official top-left Yandex button. */
+.map-stage:has(.map-stack.has-yandex) .map-feedback,
+.map-stage:has(.map-stack.has-yandex) .network-hint{left:12px;right:80px;max-width:calc(100% - 96px)}
+@media(max-height:500px){.offline-card-status{font-size:10px}.offline-settings .cache-stats{padding:8px}}
+
+.offline-stats{display:flex;flex-direction:column;gap:3px;padding:12px 14px;background:var(--control-bg);border-radius:12px;margin-bottom:16px}
+.offline-stats strong{font-size:16px}.offline-stats span{font-size:12px;color:var(--muted)}
+.offline-card-action[aria-busy=true] svg{animation:map-refresh 1.2s linear infinite}
+@media(prefers-reduced-motion:reduce){.offline-card-action[aria-busy=true] svg{animation:none}}
