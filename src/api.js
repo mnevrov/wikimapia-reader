@@ -169,7 +169,7 @@ export function validateResponse(result, func, expectedId) {
 export function classifyApiFailure(error, { offline = false } = {}) {
   if (error?.name === 'AbortError') return 'cancelled';
   if (offline) return 'offline';
-  if (error instanceof ApiError && ['quota','auth','schema'].includes(error.kind)) return error.kind;
+  if (error instanceof ApiError) return ['quota','auth','schema'].includes(error.kind) ? error.kind : 'api';
   if (error instanceof ValidationError) return 'input';
   const message = String(error?.message ?? error ?? '');
   if (/429|limit|quota|wait|too many|исчерпан лимит/i.test(message)) return 'quota';
