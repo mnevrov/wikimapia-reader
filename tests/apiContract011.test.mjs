@@ -39,3 +39,8 @@ test('memory-only diagnostics emit only fixed method/category keys and numeric a
  clearDiagnostics();
  assert.equal(diagnosticSnapshot().requests.box.total,0);
 });
+
+test('unrecognized API error code is not treated like transient network failure',()=>{
+ try {validateResponse({debug:{code:4050,message:'Access policy'}},'box');assert.fail('expected');
+ }catch(e){assert.equal(classifyApiFailure(e),'api');}
+});
