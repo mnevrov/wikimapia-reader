@@ -91,12 +91,16 @@ test('Yandex SDK legal controls are not restyled; map notices do not cover lower
  const landscape=await page.evaluate(()=>{
   const a=document.querySelector('.map-tools').getBoundingClientRect();
   const b=document.querySelector('.mock-yandex-copyrights').getBoundingClientRect();
-  return {top:a.top,bottom:a.bottom,copyTop:b.top,columns:getComputedStyle(document.querySelector('.map-tools')).gridTemplateColumns};
+  const logo=document.querySelector('.mock-yandex-legal').getBoundingClientRect();
+  const overlaps=(x,y)=>x.left<y.right&&x.right>y.left&&x.top<y.bottom&&x.bottom>y.top;
+  return {top:a.top,bottom:a.bottom,copyTop:b.top,overlapLogo:overlaps(a,logo),overlapCopyright:overlaps(a,b),columns:getComputedStyle(document.querySelector('.map-tools')).gridTemplateColumns};
  });
  expect(landscape.bottom).toBeLessThan(landscape.copyTop-16);
+ expect(landscape.overlapLogo).toBe(false);
+ expect(landscape.overlapCopyright).toBe(false);
  expect(landscape.top).toBeGreaterThanOrEqual(8);
  expect(landscape.top).toBeLessThan(60);
- expect(landscape.columns.split(' ').length).toBe(1);
+ expect(landscape.columns.split(' ').length).toBe(3);
  await page.setViewportSize({width:390,height:844});
  await screen(page,'Настройки');
  await page.getByRole('button',{name:'OpenStreetMap'}).click();
