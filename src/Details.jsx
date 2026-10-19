@@ -5,7 +5,7 @@ import ReadingOverlay from './ReadingOverlay.jsx';
 import GalleryOverlay from './GalleryOverlay.jsx';
 import {hapticTap} from './readerModel.js';
 const dateFormat=new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'long',year:'numeric'});
-export default function Details({data,busy,error,onClose,onRetry,favorites,toggleFavorite,returnLabel,onReturn}){
+export default function Details({data,busy,error,onClose,onRetry,favorites,toggleFavorite,returnLabel,onReturn,basemap='osm'}){
   const [tab,setTab]=useState('description'),[expanded,setExpanded]=useState(false);
   const [reading,setReading]=useState(false),[galleryIndex,setGalleryIndex]=useState(null),[touchStart,setTouchStart]=useState(null);
   const scroll=useRef(null),root=useRef(null);
@@ -37,7 +37,7 @@ export default function Details({data,busy,error,onClose,onRetry,favorites,toggl
       </div>
       <div className="sheet-footer"><button className={`save-place ${saved?'is-saved':''}`} aria-label={saved?'Убрать из избранного':'Сохранить'} aria-pressed={saved} onClick={()=>toggleFavorite(data.id)}><Icon name="bookmark"/><span>{saved?'Сохранено':'Сохранить'}</span></button><button className="icon-btn expand-button" title={expanded?'Свернуть':'Развернуть'} aria-label={expanded?'Свернуть':'Развернуть'} onClick={()=>setExpanded(v=>!v)}><Icon name="expand"/></button><a className="external-link" href={data.url} target="_blank" rel="noopener noreferrer">Wikimapia<Icon name="external" size={18}/></a></div>
     </>}
-    <div className="sheet-attribution">Карта © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap contributors</a></div>
+    <div className="sheet-attribution">{basemap==='yandex'?<>Подложка © <a href="https://yandex.ru/maps/" target="_blank" rel="noopener noreferrer">Яндекс Карты</a></>:<>Карта © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap contributors</a></>}</div>
     {reading&&<ReadingOverlay title={data?.title} description={data?.description} onClose={()=>setReading(false)}/>}
     {galleryIndex!==null&&data?.photos?.length>0&&<GalleryOverlay title={data.title} photos={data.photos} initialIndex={galleryIndex} onClose={()=>setGalleryIndex(null)}/>}
   </section>;

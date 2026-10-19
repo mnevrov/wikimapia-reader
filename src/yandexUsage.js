@@ -48,11 +48,21 @@ export function injectYandexJsApi(key){
   const url=new URL(YANDEX_JS_API_URL);
   url.searchParams.set('apikey',key);
   url.searchParams.set('lang','ru_RU');
+  let finished=false;
+  const complete=(error,api)=>{
+   if(finished)return;
+   finished=true;
+   clearTimeout(timeout);
+   script.onload=null;script.onerror=null;
+   if(error){script.remove();reject(error);}else resolve(api);
+  };
+  const timeout=setTimeout(()=>complete(Error('Yandex SDK timed out')),14000);
   script.async=true;
+  // Browser sends the actual application origin as Referer. Do not spoof it.
   script.referrerPolicy='strict-origin-when-cross-origin';
   script.src=url.toString();
-  script.onload=()=>window.ymaps3?.ready?.then(()=>resolve(window.ymaps3),reject)??reject(Error('SDK unavailable'));
-  script.onerror=()=>reject(Error('SDK unavailable'));
+  script.onload=()=>window.ymaps3?.ready?.then(()=>complete(null,window.ymaps3),e=>complete(e))??complete(Error('SDK unavailable'));
+  script.onerror=()=>complete(Error('SDK unavailable'));
   document.head.appendChild(script);
  });
 }
