@@ -22,9 +22,9 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
       <h2>Подложка карты</h2>
       <div className="basemap-choice" role="group" aria-label="Источник карты">
         <button type="button" aria-pressed={basemap==='osm'} onClick={()=>setBasemap('osm')}>OpenStreetMap</button>
-        <button type="button" aria-pressed={basemap==='yandex'} disabled={!YANDEX_KEY_PATTERN.test(yandexKey)||!yandexReferer} onClick={()=>setBasemap('yandex')}>Яндекс · тёмная карта</button>
+        <button type="button" aria-pressed={basemap==='yandex'} disabled={!YANDEX_KEY_PATTERN.test(yandexKey)||!yandexReferer} onClick={()=>setBasemap('yandex')}>Яндекс Карты</button>
       </div>
-      <p className="helper">Тёмная карта Яндекса включается только по вашему выбору. Объекты, поиск и карточки по-прежнему загружаются из Wikimapia. При ошибке вернётся OpenStreetMap.</p>
+      <p className="helper">Цвет карты Яндекса автоматически следует оформлению приложения: чёрная тема — ночная карта, светлая — дневная, «Как в системе» — по системной теме. Объекты, поиск и карточки загружаются из Wikimapia. При ошибке вернётся OpenStreetMap.</p>
       <label htmlFor="yandex-api-key">Ключ Яндекс JavaScript API 3.0</label>
       <input id="yandex-api-key" type="password" autoComplete="off" spellCheck="false" autoCapitalize="none" maxLength={64} value={yandexKey} placeholder="Вставьте ключ JS API" onChange={e=>setYandexKey(e.target.value.trim())}/>
       <label className="setting-row yandex-confirm" htmlFor="yandex-referer">
@@ -37,6 +37,6 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
     <CacheSettings epoch={cacheEpoch} busy={cacheClearing} currentIds={currentAreaIds} demo={demo} onAction={onCacheAction} onShowArea={onShowArea}/>
     <fieldset className="settings-group theme-choice"><legend>Оформление</legend><div>{[['dark','Чёрная'],['light','Светлая'],['system','Как в системе']].map(([value,label])=><button key={value} aria-pressed={theme===value} onClick={()=>setTheme(value)}>{label}</button>)}</div></fieldset>
     <section className="settings-group"><h2>Демонстрация</h2><p className="helper">Вымышленные объекты для знакомства с карточками. Сохранённый ключ не удаляется.</p><button className="secondary" disabled={credentials.busy} onClick={demo&&credentials.key?onReal:onDemo}>{demo&&credentials.key?'Вернуться к реальным данным':'Открыть деморежим'}</button></section>
-    <p className="about">WikiReader 0.9.0 · Неофициальный клиент<br/>Данные © участники Wikimapia</p>
+    <p className="about">WikiReader 0.9.1 · Неофициальный клиент<br/>Данные © участники Wikimapia</p>
   </div>;
 }

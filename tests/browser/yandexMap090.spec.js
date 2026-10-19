@@ -31,17 +31,21 @@ test('mock Yandex dark underlay keeps Leaflet polygons and uses one SDK load',as
      update(props){if(props.theme)this.host.dataset.mockTheme=props.theme;this.config={...this.config,...props};}
      destroy(){this.host.removeAttribute('data-mock-yandex');}
     },
-    YMapDefaultSchemeLayer:class{}
+    YMapDefaultSchemeLayer:class{
+     constructor(config){this.config=config;document.querySelector('.yandex-underlay').dataset.mockSchemeTheme=config.theme;}
+     update(props){if(props.theme)document.querySelector('.yandex-underlay').dataset.mockSchemeTheme=props.theme;this.config={...this.config,...props};}
+    }
    };
   `});
  });
  await page.goto('/');
  await configure(page);
- await page.getByRole('button',{name:'Яндекс · тёмная карта'}).click();
+ await page.getByRole('button',{name:'Яндекс Карты'}).click();
  await map(page);
  await expect(page.locator('.map-stack.has-yandex')).toBeVisible();
  await expect(page.locator('.yandex-underlay')).toHaveAttribute('data-mock-yandex','loaded');
  await expect(page.locator('.yandex-underlay')).toHaveAttribute('data-mock-theme','dark');
+ await expect(page.locator('.yandex-underlay')).toHaveAttribute('data-mock-scheme-theme','dark');
  await expect(page.locator('path.leaflet-interactive').first()).toBeVisible();
  await clickContour(page);
  await expect(page.locator('.sheet')).toBeVisible();
@@ -52,6 +56,7 @@ test('mock Yandex dark underlay keeps Leaflet polygons and uses one SDK load',as
  await page.getByRole('button',{name:'Светлая',exact:true}).click();
  await map(page);
  await expect(page.locator('.yandex-underlay')).toHaveAttribute('data-mock-theme','light');
+ await expect(page.locator('.yandex-underlay')).toHaveAttribute('data-mock-scheme-theme','light');
  await screen(page,'Настройки');
  await page.getByRole('button',{name:'OpenStreetMap'}).click();
  await map(page);
@@ -63,7 +68,7 @@ test('Yandex request error safely restores OSM without retry storm',async({page}
  await page.route('https://api-maps.yandex.ru/v3/**',r=>{loads++;return r.abort('failed');});
  await page.goto('/');
  await configure(page);
- await page.getByRole('button',{name:'Яндекс · тёмная карта'}).click();
+ await page.getByRole('button',{name:'Яндекс Карты'}).click();
  await map(page);
  await expect.poll(()=>loads).toBe(1);
  await expect(page.locator('.map-stack')).not.toHaveClass(/has-yandex/);
