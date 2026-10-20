@@ -3,20 +3,26 @@ import { buildRequest, validateResponse, classifyApiFailure } from './api.js';
 import {recordApiMetric} from './apiDiagnostics.js';
 
 let nextRequestAt = 0;
-export async function wikimapiaCall(func, key, opts = {}) {
-  const url = buildRequest(func, key, opts);
-  opts.signal?.throwIfAborted();
+
+// Shared explicit rate gate for normal requests and opt-in transport diagnostics.
+// Tokens are reserved only when a request is about to start, not during input validation.
+export async function waitForApiSlot(signal) {
+  signal?.throwIfAborted();
   while (Date.now() < nextRequestAt) {
     const wait = nextRequestAt - Date.now();
     await new Promise((resolve,reject)=>{
-    const done=()=>{opts.signal?.removeEventListener('abort',abort);resolve();};
-    const timer=setTimeout(done,wait);
-    const abort=()=>{clearTimeout(timer);opts.signal?.removeEventListener('abort',abort);reject(new DOMException('Aborted','AbortError'));};
-    opts.signal?.addEventListener('abort',abort,{once:true});
-  });
-    opts.signal?.throwIfAborted();
+      const done=()=>{signal?.removeEventListener('abort',abort);resolve();};
+      const timer=setTimeout(done,wait);
+      const abort=()=>{clearTimeout(timer);signal?.removeEventListener('abort',abort);reject(new DOMException('Aborted','AbortError'));};
+      signal?.addEventListener('abort',abort,{once:true});
+    });
+    signal?.throwIfAborted();
   }
   nextRequestAt = Date.now() + 6000;
+}
+export async function wikimapiaCall(func, key, opts = {}) {
+  const url = buildRequest(func, key, opts);
+  await waitForApiSlot(opts.signal);
   let result;
   const startedAt = Date.now();
   try {
