@@ -17,7 +17,7 @@ function initialView() {
   } catch {}
   return {lat:55.752,lng:37.618,zoom:16};
 }
-export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refresh,moreRequest,focus,location,gpsFollowing=false,onGpsPause,cacheEpoch,cacheView,mapTarget,selectedId,density,basemap,yandexKey,yandexReferer,onBasemapFallback,onBasemapConnected,onVisiblePlaces,onCandidates,onSelect,onState,onMessage}) {
+export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refresh,moreRequest,focus,location,recenterLocation,gpsFollowing=false,onGpsPause,cacheEpoch,cacheView,mapTarget,selectedId,density,basemap,yandexKey,yandexReferer,onBasemapFallback,onBasemapConnected,onVisiblePlaces,onCandidates,onSelect,onState,onMessage}) {
   const el=useRef(null), mapRef=useRef(null), overlayRef=useRef(null), polygonsRef=useRef(new Map()),tileRef=useRef(null),yandexHost=useRef(null);
   const [viewport,setViewport]=useState(0);
   const [moving,setMoving]=useState(false);
@@ -147,6 +147,12 @@ export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refr
     mapRef.current.fitBounds([[s,w],[n,e]],{padding:[24,90],maxZoom:18});
   },[cacheView]);
   useEffect(()=>{if(zoomRequest&&mapRef.current)mapRef.current.setZoom(Math.max(2,Math.min(19,mapRef.current.getZoom()+zoomRequest.delta)));},[zoomRequest]);
+  // Explicit one-shot nearby request: center once, without enabling GPS tracking.
+  useEffect(()=>{
+    const map=mapRef.current;
+    if(!map||!recenterLocation||![recenterLocation.lat,recenterLocation.lng].every(Number.isFinite))return;
+    map.setView([recenterLocation.lat,recenterLocation.lng],Math.max(16,map.getZoom()),{animate:!reduceMotion,duration:.5});
+  },[recenterLocation]);
   useEffect(()=>{if(!gpsFollowing)lastFollow.current=null;},[gpsFollowing]);
   useEffect(()=>{
     if(!location||!mapRef.current)return;
