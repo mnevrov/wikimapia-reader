@@ -7,6 +7,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(AppearancePlugin.class);
+        registerPlugin(WikiReaderSitePlugin.class);
         registerPlugin(CredentialsVaultPlugin.class);
         registerPlugin(WikiReaderTransferPlugin.class);
         super.onCreate(savedInstanceState);

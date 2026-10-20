@@ -142,3 +142,6 @@ test('failure kinds stay distinct and quota/auth errors require deliberate retry
  assert.equal(network.state.failureKind,'network');
  assert.equal(network.state.retryable,true);
 });
+test('site area explicit partial completeness survives fewer than 50 objects',async()=>{
+ const loader=new AreaLoader(async()=>({folder:[place(1)],found:null,more:false,complete:false,source:'site'}));await loader.load(bbox);assert.equal(loader.state.complete,false);assert.equal(loader.state.source,'site');assert.equal(loader.state.more,false);
+});

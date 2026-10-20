@@ -119,11 +119,11 @@ export class AreaLoader {
       const found = payload.found != null && Number.isSafeInteger(rawFound) && rawFound >= 0 ? rawFound : null;
       // A repeated/empty page must not create an endless "more" loop.
       const progress = places.length > this.state.places.length;
-      const more = progress && items.length > 0 && (found !== null ? places.length < found : items.length === 50);
+      const more = progress && items.length > 0 && (typeof payload.more==='boolean'?payload.more:(found !== null ? places.length < found : items.length === 50));
       // Repeated/empty pages cannot prove completeness when the server reports more.
-      const fullyLoaded=found!==null?places.length>=found:(items.length<50);
+      const fullyLoaded=typeof payload.complete==='boolean'?payload.complete:(found!==null?places.length>=found:(items.length<50));
       recordCoverage(places.length,found,fullyLoaded);
-      const state = {places,page,found,more,complete:fullyLoaded,dataSource:'network',cacheUpdatedAt:Date.now(),loading:false,background:false,error:'',failureKind:null,retryable:false};
+      const state = {places,page,found,more,source:payload.source??'api',complete:fullyLoaded,dataSource:'network',cacheUpdatedAt:Date.now(),loading:false,background:false,error:'',failureKind:null,retryable:false};
       const key=this.cacheKey,old=this.cache.get(key);
       const record={bbox:[...this.bbox],state,updated:Date.now(),pinned:old?.pinned??false,retentionDays:old?.retentionDays??1};
       this.cache.delete(key);

@@ -32,7 +32,7 @@ export default function MapDiscover({mode,demo,query,onQuery,onSearch,results,se
         </form>
         <p className="discovery-status" role="status">{searchStatus||'Поиск выполняется рядом с центром карты.'}</p>
         {searchBusy&&<button className="text-button" onClick={onCancelSearch}>Отменить поиск</button>}
-        <ul className="discovery-results">{results.map(place=><li key={place.id}><button onClick={()=>onSelect(place)}><span><strong>{place.title}</strong><small>Wikimapia · #{place.id}</small></span><Icon name="arrow" size={18}/></button></li>)}</ul>
+        <ul className="discovery-results">{results.map(place=><li key={place.id}><button onClick={()=>onSelect(place)}><span><strong>{place.title}</strong><small>{place.searchLocation?'Место на карте · сайт Wikimapia':`Wikimapia · #${place.id}`}</small></span><Icon name="arrow" size={18}/></button></li>)}</ul>
       </>:
       <div className="discovery-scroll">
         <div className="discovery-controls">
