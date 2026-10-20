@@ -9,7 +9,7 @@ export default function SavedLibrary({offlineEntries,favorites,history,historyEn
   const recent=filterLibrary(history,savedQuery);
   const populated=offlineEntries.length+favorites.length+history.length>0;
   return <div className="screen-body" aria-label="Библиотека" ref={scrollRef}>
-    {populated&&<label className="saved-filter" htmlFor="saved-library-search">Найти в сохранённом и истории
+    {populated&&<label className="saved-filter" htmlFor="saved-library-search">Найти в избранном, офлайн-карточках и истории
       <input id="saved-library-search" type="search" value={savedQuery} onChange={e=>onQuery(e.target.value)} placeholder="Название, текст офлайн-карточки или ID"/>
     </label>}
     {!!offline.length&&<section className="offline-list"><p className="section-caption">Для чтения без сети · {offline.length}</p>
