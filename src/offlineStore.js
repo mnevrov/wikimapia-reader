@@ -175,6 +175,29 @@ export const offlineStore={
   clear:()=>serialize(async()=>transaction(['objects','media'],'readwrite',tx=>{
     tx.objectStore('objects').clear();tx.objectStore('media').clear();
   })),
+  importRows:rows=>serialize(async()=>{
+    if(!Array.isArray(rows)||rows.length>5000)throw new Error('Некорректная резервная копия');
+    const current=await state();
+    const existing=new Set(current.rows.map(row=>row.id));
+    const pending=[],seen=new Set(),now=Date.now();
+    for(const item of rows){
+      if(!validId(item?.id)||typeof item.title!=='string'||typeof item.description!=='string'||
+        item.title.length>1000||item.description.length>400000||!Array.isArray(item.comments)||item.comments.length>500||
+        !Number.isSafeInteger(item.savedAt)||item.savedAt<1577836800000||item.savedAt>now+86400000)
+        throw new Error('Некорректная офлайн-карточка');
+      if(existing.has(item.id)||seen.has(item.id))continue;
+      seen.add(item.id);
+      // Imported text stays readable offline. Media are intentionally not included.
+      const row=savedRow({id:item.id,title:item.title,description:item.description,comments:item.comments,photos:[]},item.savedAt);
+      pending.push(row);
+    }
+    const extra=pending.reduce((sum,row)=>sum+row.textBytes,0);
+    if(current.bytes+extra>current.limitBytes)throw quotaError();
+    if(pending.length)await transaction(['objects'],'readwrite',tx=>{
+      for(const row of pending)tx.objectStore('objects').add(row);
+    });
+    return {added:pending.length,skipped:rows.length-pending.length};
+  }),
   setPreferences:p=>serialize(async()=>{
     const preferences=offlinePreferences(p);
     const s=await state();

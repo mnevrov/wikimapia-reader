@@ -27,6 +27,8 @@ import {offlineStore} from './offlineStore.js';
 import {nextFollowState,acceptableFix} from './gpsFollow.js';
 import {HISTORY_KEY,HISTORY_ENABLED_KEY,readHistory,recordHistory} from './readingHistory.js';
 import SavedLibrary from './SavedLibrary.jsx';
+import {buildBackup} from './libraryBackup.js';
+import {saveLibraryText,nativeShareUrl} from './nativeTransfer.js';
 
 const navigation=[['map','Карта','map'],['search','Поиск','search'],['saved','Избранное','bookmark'],['settings','Настройки','settings']];
 function App(){
@@ -47,6 +49,8 @@ function App(){
   const demo=demoMode??!credentials.key;
   const [auto,setAutoState]=useState(()=>{try{return localStorage.getItem('wikimapia-reader-auto')!=='false';}catch{return true;}});
   const [mapPanel,setMapPanel]=useState(null),[visiblePlaces,setVisiblePlaces]=useState([]);
+  const [listQuery,setListQuery]=useState(''),[listFilter,setListFilter]=useState('all'),[listSort,setListSort]=useState('title');
+  const [mapTarget,setMapTarget]=useState(null),[highlightedId,setHighlightedId]=useState(null);
   const [density,setDensityState]=useState(()=>{try{return validDensity(localStorage.getItem('wikimapia-reader-density'));}catch{return 'auto';}});
   const [basemap,setBasemapState]=useState(()=>{try{return localStorage.getItem('wikireader-basemap')==='yandex'?'yandex':'osm';}catch{return 'osm';}});
   const [yandexKey,setYandexKeyState]=useState(()=>{try{return localStorage.getItem('wikireader-yandex-js-key')||'';}catch{return '';}});
@@ -70,6 +74,7 @@ function App(){
   const changeCache=async(action,message)=>{setCacheClearing(true);try{const result=await action();setCacheEpoch(x=>x+1);setToast(message);return result;}catch(e){setToast(e instanceof CacheCapacityError?e.message:'Не удалось изменить кэш. Попробуйте ещё раз.');return null;}finally{setCacheClearing(false);}};
   const [refresh,setRefresh]=useState(0),[moreRequest,setMoreRequest]=useState(0),[zoomRequest,setZoomRequest]=useState(null);
   const [focus,setFocus]=useState(null),[location,setLocation]=useState(null),[locating,setLocating]=useState(false);
+  const [recenterLocation,setRecenterLocation]=useState(null);
    const [gpsFollow,setGpsFollow]=useState('off'),[gpsError,setGpsError]=useState('');
    const [offlineEpoch,setOfflineEpoch]=useState(0),[offlineEntries,setOfflineEntries]=useState([]),[offlineInfo,setOfflineInfo]=useState(null),[offlineBusy,setOfflineBusy]=useState(false);
    const offlineUrls=useRef([]),offlineAbort=useRef(null);
@@ -158,12 +163,13 @@ function App(){
     if(!undo)return;const next=[...favorites];if(!next.some(x=>x.id===undo.place.id&&x.source===undo.place.source))next.splice(Math.min(undo.index,next.length),0,undo.place);
     try{localStorage.setItem('wikimapia-reader-favorites',JSON.stringify(next));setFavorites(next);setUndo(null);}catch{setToast('Не удалось вернуть место');}
   };
-  const locate=async()=>{
+  const locate=async(centerMap=false)=>{
     if(locating)return;const token=++locationJob.current;setLocating(true);setNotice('Определяем местоположение…');
-    try{const p=await Geolocation.getCurrentPosition({enableHighAccuracy:false,timeout:12000,maximumAge:60000});if(token!==locationJob.current)return;closeCard();setLocation({lat:p.coords.latitude,lng:p.coords.longitude,accuracy:p.coords.accuracy});setNotice('Местоположение определено');}
+    try{const p=await Geolocation.getCurrentPosition({enableHighAccuracy:false,timeout:12000,maximumAge:60000});if(token!==locationJob.current)return;closeCard();setLocation({lat:p.coords.latitude,lng:p.coords.longitude,accuracy:p.coords.accuracy});if(centerMap)setRecenterLocation({lat:p.coords.latitude,lng:p.coords.longitude,seq:Date.now()});setNotice('Местоположение определено');}
     catch{if(token===locationJob.current)setNotice('Местоположение недоступно. Проверьте разрешение и геопозицию.');}
     finally{if(token===locationJob.current)setLocating(false);}
   };
+  const findNearby=()=>{setListSort('distance');locate(true);};
   const toggleGps=()=>{
     if(gpsFollow==='following'){setGpsFollow(nextFollowState(gpsFollow,'tap'));setGpsError('');return;}
     setGpsError('');setGpsFollow(nextFollowState(gpsFollow,'tap'));locate();
@@ -196,6 +202,47 @@ function App(){
   const openId=()=>{const id=Number(placeId);if(!Number.isSafeInteger(id)||id<1){setSearchStatus('Неверный ID объекта');return;}onSelect({id,title:`Объект #${id}`});};
   const navigate=next=>{rememberScreen();setCandidates([]);setMapPanel(null);setScreen(next);};
   const closeMapPanel=()=>{searchAbort.current?.abort();setSearchBusy(false);setMapPanel(null);};
+  // Only geometry already held by the application is used to locate an object.
+  const showOnMap=place=>{
+    const id=Number(place?.id);
+    const geometry=selected?.id===id&&focus?.length>=3?focus:visiblePlaces.find(p=>p.id===id)?.coords;
+    if(!Array.isArray(geometry)||geometry.length<3){setToast('Контур не загружен. Найдите объект на карте.');return;}
+    closeCard();setScreen('map');setMapPanel(null);setHighlightedId(id);
+    setMapTarget({id,coords:geometry,seq:Date.now()});
+  };
+  const sharePlace=async place=>{
+    const id=Number(place?.id);
+    if(!Number.isSafeInteger(id)||id<=0)return;
+    if(demo||selected?.source==='demo'||place?.source==='demo'){setToast('Демонстрационные объекты нельзя передавать как реальные');return;}
+    const url='https://wikimapia.org/'+id+'/';
+    try{
+      if(await nativeShareUrl(url))return;
+      if(typeof navigator.share==='function'){await navigator.share({title:String(place.title||'Wikimapia'),url});return;}
+      await navigator.clipboard.writeText(url);setToast('Ссылка на объект скопирована');
+    }catch(e){if(e?.name!=='AbortError')setToast('Не удалось поделиться ссылкой');}
+  };
+  const exportLibrary=async()=>{
+    const snapshot=await offlineStore.snapshot();
+    const content=JSON.stringify(buildBackup({favorites,history,offline:snapshot.entries}),null,2);
+    if(new TextEncoder().encode(content).byteLength>10*1048576)throw new Error('Библиотека слишком большая для резервной копии (максимум 10 МБ).');
+    if(await saveLibraryText(content)){setToast('Резервная копия сохранена');return;}
+    const url=URL.createObjectURL(new Blob([content],{type:'application/json'}));
+    const link=document.createElement('a');link.href=url;link.download='wikireader-library-'+new Date().toISOString().slice(0,10)+'.json';
+    document.body.appendChild(link);link.click();link.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),60000);
+    setToast('Резервная копия подготовлена к сохранению');
+  };
+  const importLibrary=async backup=>{
+    const result=await offlineStore.importRows(backup.offline);
+    const favoriteMap=new Map([...backup.favorites,...favorites].map(item=>[item.source+':'+item.id,item]));
+    const nextFavorites=[...favoriteMap.values()];
+    const nextHistory=historyEnabled?readHistory(JSON.stringify([...history,...backup.history])):history;
+    localStorage.setItem('wikimapia-reader-favorites',JSON.stringify(nextFavorites));
+    if(historyEnabled)localStorage.setItem(HISTORY_KEY,JSON.stringify(nextHistory));
+    setFavorites(nextFavorites);if(historyEnabled)setHistory(nextHistory);
+    setOfflineEpoch(v=>v+1);
+    return {offline:result.added,favorites:nextFavorites.length-favorites.length,history:nextHistory.length-history.length};
+  };
   const queryOnMap=value=>{searchAbort.current?.abort();setSearchBusy(false);setQuery(value);setResults([]);setSearchStatus('');};
   const cancelMapSearch=()=>{searchAbort.current?.abort();setSearchBusy(false);setSearchStatus('Поиск отменён');};
   const showCachedArea=bbox=>{if(!credentials.key){setToast('Подключите Wikimapia для просмотра сохранённых областей');return;}closeCard();setDemo(false);setScreen('map');setCacheView({bbox:[...bbox]});};
@@ -210,7 +257,7 @@ function App(){
   if(!credentials.ready)return <Startup/>;
   return <main className={`${selected||candidates.length?'has-sheet':''} ${screen!=='map'?'has-screen':''} ${mapPanel?'has-map-panel':''} ${toast?'has-toast':''}`}>
     <div className="map-stage" inert={screen!=='map'} aria-hidden={screen!=='map'}>
-      <MapPane zoomRequest={zoomRequest} demo={demo} apiKey={apiKey} auto={auto} active={active} paused={screen!=='map'||!!selected||cacheClearing||gpsFollow==='following'} cacheEpoch={cacheEpoch} refresh={refresh} moreRequest={moreRequest} focus={focus} location={location} gpsFollowing={gpsFollow==='following'} onGpsPause={()=>setGpsFollow(s=>nextFollowState(s,'manual-pan'))} cacheView={cacheView} selectedId={selected?.id} density={density} basemap={basemap} yandexKey={yandexKey} yandexReferer={yandexReferer} onBasemapFallback={fallbackBasemap} onBasemapConnected={()=>setYandexDiagnostic(null)} onVisiblePlaces={setVisiblePlaces} onCandidates={setCandidates} onSelect={onSelect} onState={acceptArea} onMessage={setNotice}/>
+      <MapPane zoomRequest={zoomRequest} demo={demo} apiKey={apiKey} auto={auto} active={active} paused={screen!=='map'||!!selected||cacheClearing||gpsFollow==='following'} cacheEpoch={cacheEpoch} refresh={refresh} moreRequest={moreRequest} focus={focus} location={location} recenterLocation={recenterLocation} gpsFollowing={gpsFollow==='following'} onGpsPause={()=>setGpsFollow(s=>nextFollowState(s,'manual-pan'))} cacheView={cacheView} mapTarget={mapTarget} selectedId={selected?.id??highlightedId} density={density} basemap={basemap} yandexKey={yandexKey} yandexReferer={yandexReferer} onBasemapFallback={fallbackBasemap} onBasemapConnected={()=>setYandexDiagnostic(null)} onVisiblePlaces={setVisiblePlaces} onCandidates={setCandidates} onSelect={onSelect} onState={acceptArea} onMessage={setNotice}/>
       {!online&&<div className="network-hint" role="status">Нет подключения · доступно офлайн-чтение сохранённых карточек; карта может быть недоступна.</div>}
       <div className="map-tools" role="toolbar" aria-label="Управление картой">
         <button className="icon-btn search-launch" aria-label="Найти место" title="Найти место" aria-pressed={mapPanel==='search'} onClick={()=>setMapPanel(v=>v==='search'?null:'search')}><Icon name="search"/></button>
@@ -220,18 +267,18 @@ function App(){
         <button className={'icon-btn gps-control gps-'+gpsFollow} title={gpsFollow==='off'?'Следовать за GPS':gpsFollow==='paused'?'Возобновить GPS Follow':'Выключить GPS Follow'} aria-label="Моё местоположение" aria-pressed={gpsFollow==='following'} onClick={toggleGps}><Icon name="locate"/></button>
         {!demo&&<button className={`icon-btn area-action ${areaBusy?'is-loading':''} ${area.error?'has-error':''} ${area.more&&!areaBusy&&!area.error?'can-continue':''}`} aria-label={areaActionLabel} title={areaActionTitle} aria-busy={areaBusy} disabled={areaBusy||!active} onClick={runAreaAction}><Icon name={areaBusy||area.error||!area.more?'refresh':'download'}/></button>}
       </div>
-      <Motion open={!!mapPanel&&!selected&&!candidates.length} identity={mapPanel} kind="discovery"><MapDiscover mode={mapPanel} demo={demo} query={query} onQuery={queryOnMap} onSearch={search} results={results} searchBusy={searchBusy} searchStatus={searchStatus} visiblePlaces={visiblePlaces} area={area} notice={notice} density={density} onDensity={setDensity} onSelect={onSelect} onRefreshArea={refreshArea} onCancelSearch={cancelMapSearch} onSettings={()=>navigate('settings')} onClose={closeMapPanel}/></Motion>
+      <Motion open={!!mapPanel&&!selected&&!candidates.length} identity={mapPanel} kind="discovery"><MapDiscover mode={mapPanel} demo={demo} query={query} onQuery={queryOnMap} onSearch={search} results={results} searchBusy={searchBusy} searchStatus={searchStatus} visiblePlaces={visiblePlaces} area={area} notice={notice} density={density} onDensity={setDensity} onSelect={onSelect} sort={listSort} onSort={setListSort} filter={listFilter} onFilter={setListFilter} listQuery={listQuery} onListQuery={setListQuery} favorites={favorites} offlineEntries={offlineEntries} location={location} onLocate={findNearby} onShowOnMap={showOnMap} highlightedId={highlightedId} onRefreshArea={refreshArea} onCancelSearch={cancelMapSearch} onSettings={()=>navigate('settings')} onClose={closeMapPanel}/></Motion>
       {!selected&&!candidates.length&&(gpsError||notice)&&<div className="map-feedback"><div className="status" role="status" aria-live="polite">{gpsError|| (gpsFollow==='paused'?'GPS Follow приостановлен · нажмите кнопку геолокации для возобновления':notice)}</div>{demo&&<button className="connect-action" onClick={()=>navigate('settings')}>Подключить Wikimapia <Icon name="arrow" size={18}/></button>}</div>}
       <span className="sr-only" role="status" aria-live="polite">{area.draining?`Догружаем: ${area.places.length}${area.found!=null?` из ${area.found}`:" объектов"}`:''}</span>
       <Motion open={candidates.length>0} identity={candidates.map(p=>p.id).join(',')} kind="chooser"><ObjectChooser places={candidates} onPick={onSelect} onClose={()=>setCandidates([])}/></Motion>
-      <Motion open={!!selected||busy||!!error} identity={selected?.id} kind="sheet"><Details returnLabel={returnTo==='search'||origin.current?.panel==='search'?'К результатам поиска':returnTo==='saved'?'К избранному':origin.current?.panel==='list'?'К объектам области':null} onReturn={dismissCard} data={details||(selected?{id:selected.id,title:selected.title}:null)} busy={busy} error={error} onClose={dismissCard} onRetry={()=>selected&&onSelect(selected)} basemap={basemap} favorites={favorites.filter(x=>x.source===(demo?'demo':'wikimapia')).map(x=>x.id)} toggleFavorite={toggleFavorite} offlineInfo={offlineInfo} offlineBusy={offlineBusy} onSaveOffline={saveOffline} onRemoveOffline={()=>removeOffline(selected?.id)} offlineAvailable={!demo&&online}/></Motion>
+      <Motion open={!!selected||busy||!!error} identity={selected?.id} kind="sheet"><Details returnLabel={returnTo==='search'||origin.current?.panel==='search'?'К результатам поиска':returnTo==='saved'?'К избранному':origin.current?.panel==='list'?'К объектам области':null} onReturn={dismissCard} data={details||(selected?{id:selected.id,title:selected.title}:null)} busy={busy} error={error} onClose={dismissCard} onRetry={()=>selected&&onSelect(selected)} basemap={basemap} favorites={favorites.filter(x=>x.source===(demo?'demo':'wikimapia')).map(x=>x.id)} toggleFavorite={toggleFavorite} offlineInfo={offlineInfo} offlineBusy={offlineBusy} onSaveOffline={saveOffline} onRemoveOffline={()=>removeOffline(selected?.id)} offlineAvailable={!demo&&online} shareAvailable={!demo&&selected?.source!=='demo'} onShowOnMap={()=>showOnMap(details||selected)} onShare={()=>sharePlace(details||selected)}/></Motion>
     </div>
     <Motion open={screen!=='map'} identity={screen} kind="screen"><section className="app-screen" aria-label={navigation.find(x=>x[0]===screen)[1]}>
       <header className="screen-header"><button className="icon-btn" aria-label="Вернуться на карту" onClick={()=>setScreen('map')}><Icon name="back"/></button><div><p>WikiReader</p><h1>{navigation.find(x=>x[0]===screen)[1]}</h1></div></header>
       {screen==='settings'&&<Settings confirmForget={confirmForget} setConfirmForget={setConfirmForget} credentials={credentials} onCacheAction={changeCache} onShowArea={showCachedArea} cacheEpoch={cacheEpoch} currentAreaIds={currentAreaIds} cacheClearing={cacheClearing} offlineEpoch={offlineEpoch} onOfflineChange={()=>setOfflineEpoch(v=>v+1)} theme={theme} setTheme={setTheme} auto={auto} setAuto={setAuto} density={density} setDensity={setDensity} basemap={basemap} setBasemap={setBasemap} yandexKey={yandexKey} setYandexKey={setYandexKey} yandexReferer={yandexReferer} setYandexReferer={setYandexReferer} yandexDiagnostic={yandexDiagnostic} onApply={applyKey} onForget={forgetKey} demo={demo} onDemo={()=>{resetRequests();setDemo(true);setScreen('map');}} onReal={()=>{resetRequests();setDemo(false);setScreen('map');}}/>}
       {!online&&<div className="screen-network" role="status">Нет сети. Доступны сохранённые офлайн-карточки, избранное и контуры; новая загрузка требует сети.</div>}
       {screen==='search'&&<div className="screen-body search-page" ref={screenBody}>{demo?<div className="empty-state"><Icon name="search" size={36}/><h2>Найдите нужное место</h2><p>Подключите Wikimapia, чтобы искать по названию или открывать объекты по ID.</p><button className="primary" onClick={()=>setScreen('settings')}>Добавить API-ключ</button></div>:<><form className="search-form" onSubmit={search}><label htmlFor="place-query">Название, ID или ссылка Wikimapia</label><div className="search-input"><Icon name="search"/><input id="place-query" type="search" value={query} maxLength={200} onChange={e=>{searchAbort.current?.abort();setSearchBusy(false);setQuery(e.target.value);setResults([]);setSearchStatus('');}} enterKeyHint="search" placeholder="Место или ссылка на объект"/><button className="primary" disabled={searchBusy||!query.trim()}>Найти</button></div></form><div className="search-actions">{query&&<button className="text-button" onClick={()=>{searchAbort.current?.abort();setQuery('');setResults([]);setSearchStatus('');setSearchBusy(false);document.getElementById('place-query')?.focus();}}>Очистить поиск</button>}{searchBusy&&<button className="text-button" onClick={()=>{searchAbort.current?.abort();setSearchBusy(false);setSearchStatus('Поиск отменён');}}>Отменить поиск</button>}</div><p className="search-feedback" role="status">{searchStatus||'Поиск по объектам Wikimapia рядом с текущей картой'}</p><ul className="search-results">{results.map(p=><li key={p.id}><button data-place-id={p.id} data-source="wikimapia" onClick={()=>onSelect(p)}><span><strong>{p.title}</strong><small>Wikimapia · #{p.id}</small></span><Icon name="arrow" size={18}/></button></li>)}</ul><Disclosure className="id-disclosure" title="Открыть объект по ID"><div className="open-id"><label htmlFor="place-id">Число из ссылки Wikimapia</label><input id="place-id" type="number" min="1" value={placeId} onChange={e=>setPlaceId(e.target.value)}/><button className="secondary" onClick={openId}>Открыть по ID</button></div></Disclosure></>}</div>}
-      {screen==='saved'&&<SavedLibrary offlineEntries={offlineEntries} favorites={favorites} history={history} historyEnabled={historyEnabled} savedQuery={savedQuery} onQuery={setSavedQuery} scrollRef={screenBody} onSelect={onSelect} onRemoveOffline={removeOffline} onRemoveFavorite={removeFavorite} onClearHistory={()=>setHistory([])} onRemoveHistory={id=>setHistory(items=>items.filter(p=>p.id!==id))} onToggleHistory={toggleHistory} onGoMap={()=>setScreen('map')}/>}
+      {screen==='saved'&&<SavedLibrary offlineEntries={offlineEntries} favorites={favorites} history={history} historyEnabled={historyEnabled} savedQuery={savedQuery} onQuery={setSavedQuery} scrollRef={screenBody} onSelect={onSelect} onRemoveOffline={removeOffline} onRemoveFavorite={removeFavorite} onClearHistory={()=>setHistory([])} onRemoveHistory={id=>setHistory(items=>items.filter(p=>p.id!==id))} onToggleHistory={toggleHistory} onGoMap={()=>setScreen('map')} onExportLibrary={exportLibrary} onImportLibrary={importLibrary}/>}
     </section></Motion>
     <nav className="bottom-nav" aria-label="Основная навигация">{navigation.map(([id,label,icon])=><button key={id} aria-current={screen===id?'page':undefined} onClick={()=>navigate(id)}><Icon name={icon}/><span>{label}</span></button>)}</nav>
     <Motion open={!!undo} identity={undo?`${undo.place.source}:${undo.place.id}`:''} kind="toast"><div className="undo-toast" role="status"><span>Место удалено из избранного</span><button className="text-button" onClick={undoRemove}>Вернуть</button></div></Motion>
