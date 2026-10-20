@@ -94,7 +94,7 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
         <button className="secondary" type="button" disabled={transportBusy} onClick={startTransportProbe}>{transportBusy?'Проверяем соединение…':'Проверить два HTTP-транспорта'}</button>
         {transportProgress&&<p className="helper" role="status">{transportProgress}</p>}
         {transportReport&&<div className="transport-results">
-          {transportReport.results.map(item=><p key={item.transport}><strong>{item.transport==='android_native'?'Android HTTP':'WebView'}:</strong> {item.outcome}, {item.durationMs} мс{item.httpStatus!==null?`, HTTP ${item.httpStatus}`:''}{item.objects!==null?`, объектов ${item.objects}, контуров ${item.polygons}`:''}</p>)}
+          {transportReport.results.map(item=><p key={item.transport}><strong>{item.transport==='android_native'?'Android HTTP':'WebView'}:</strong> {item.outcome}{item.reason?` (${item.reason})`:''}, {item.durationMs} мс{item.httpStatus!==null?`, HTTP ${item.httpStatus}`:''}{item.contentCategory?`, ответ: ${item.contentCategory}`:''}{item.objects!==null?`, объектов ${item.objects}, контуров ${item.polygons}`:''}</p>)}
           <button className="secondary" type="button" onClick={copyTransportReport}>Скопировать результат проверки</button>
         </div>}
       </div>}
