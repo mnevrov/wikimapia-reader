@@ -1,6 +1,9 @@
 import {test,expect} from '@playwright/test';
 import {tiles} from './helpers.js';
 
+// Geometry assertions must inspect the final position, not the 140 ms entrance transform.
+test.use({reducedMotion:'reduce'});
+
 test('persistent map status stays in lower-left safe zone on portrait and landscape OSM',async({page})=>{
  await tiles(page);await page.setViewportSize({width:390,height:844});await page.goto('/');
  const feedback=page.locator('.map-stage .map-feedback').first();await expect(feedback).toBeVisible();
