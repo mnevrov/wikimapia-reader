@@ -1,4 +1,5 @@
 import React,{useEffect,useState} from 'react';
+import appPackage from '../package.json';
 import Icon from './Icon.jsx';
 import Motion from './Motion.jsx';
 import CacheSettings from './CacheSettings.jsx';
@@ -74,6 +75,6 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
     <OfflineSettings epoch={offlineEpoch} onChange={onOfflineChange}/>
     <fieldset className="settings-group theme-choice"><legend>Оформление</legend><div>{[['dark','Чёрная'],['light','Светлая'],['system','Как в системе']].map(([value,label])=><button key={value} aria-pressed={theme===value} onClick={()=>setTheme(value)}>{label}</button>)}</div></fieldset>
     <section className="settings-group"><h2>Демонстрация</h2><p className="helper">Вымышленные объекты для знакомства с карточками. Сохранённый ключ не удаляется.</p><button className="secondary" disabled={credentials.busy} onClick={demo&&credentials.key?onReal:onDemo}>{demo&&credentials.key?'Вернуться к реальным данным':'Открыть деморежим'}</button></section>
-    <p className="about">WikiReader 0.11.1 · Неофициальный клиент<br/>Данные © участники Wikimapia</p>
+    <p className="about">WikiReader {appPackage.version} · Неофициальный клиент<br/>Данные © участники Wikimapia</p>
   </div>;
 }
