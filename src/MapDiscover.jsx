@@ -39,7 +39,9 @@ export default function MapDiscover({mode,demo,query,onQuery,onSearch,results,se
           <label htmlFor="map-density">Контуры<select id="map-density" value={density} onChange={e=>onDensity(e.target.value)}><option value="auto">Авто</option><option value="detailed">Подробно</option><option value="calm">Спокойно</option></select></label>
           <span aria-live="polite">Видно: {visiblePlaces.length}</span>
         </div>
-        <div className="discover-filters">
+        <details className="discover-options">
+          <summary>Поиск, фильтры и сортировка</summary>
+          <div className="discover-filters">
           <label htmlFor="discover-query">Поиск среди загруженных объектов<input id="discover-query" type="search" value={listQuery} onChange={e=>onListQuery(e.target.value)} placeholder="Название или ID"/></label>
           <div className="discover-selects">
             <label htmlFor="discover-filter">Показывать<select id="discover-filter" value={filter} onChange={e=>onFilter(e.target.value)}><option value="all">Все</option><option value="favorite">Избранное</option><option value="offline">Сохранено офлайн</option></select></label>
@@ -48,7 +50,8 @@ export default function MapDiscover({mode,demo,query,onQuery,onSearch,results,se
           <button className="secondary discover-nearby" onClick={onLocate}><Icon name="locate" size={17}/>Рядом со мной</button>
           {sort==='distance'&&location&&<p className="discovery-status">Расстояние приблизительное, до центра границ контура.</p>}
           {!location&&<p className="discovery-status">Для расстояний разрешите геолокацию нажатием «Рядом со мной».</p>}
-        </div>
+          </div>
+        </details>
         <p className="discovery-status" role="status">{demo?'Демонстрационные объекты':areaStatus}</p>
         {!demo&&cacheLabel&&<p className="discovery-status" aria-label="Состояние данных области">{cacheLabel}</p>}
         {!demo&&<button className="text-button discovery-refresh" disabled={area.loading||area.draining} onClick={onRefreshArea}><Icon name="refresh" size={16}/>Обновить область с сервера</button>}
