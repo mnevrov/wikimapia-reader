@@ -17,7 +17,7 @@ test('HTTP 200 HTML, unparseable text, array root and missing folder are disting
  assert.equal(safeAreaResponseSummary({status:200,data:{places:[]}}).reason,'missing_folder');
 });
 test('server-reported auth, quota and unknown rejection never return raw text',()=>{
- const secret='SUPER_SECRET_KEY';
+ const secret='SENSITIVE_TOKEN_9XY3';
  const examples=[
    [{debug:{code:1000,message:'key rejected '+secret}},'auth'],
    [{error:'quota limit reached '+secret},'quota'],
