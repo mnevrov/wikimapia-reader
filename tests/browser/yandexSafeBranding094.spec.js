@@ -75,12 +75,14 @@ test('Yandex SDK legal controls are not restyled; map notices do not cover lower
  const bounds=await page.evaluate(()=>{
   const legal=document.querySelector('.mock-yandex-legal').getBoundingClientRect();
   const copyrights=document.querySelector('.mock-yandex-copyrights').getBoundingClientRect();
+  const stage=document.querySelector('.map-stage').getBoundingClientRect();
   const notice=document.querySelector('.map-stage>.map-feedback').getBoundingClientRect();
   const tools=document.querySelector('.map-tools').getBoundingClientRect();
   const overlaps=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
-  return{noticeVsLogo:overlaps(notice,legal),toolsVsCopy:overlaps(tools,copyrights),toolsVsLogo:overlaps(tools,legal),logoVsCopy:overlaps(legal,copyrights),toolsTop:tools.top,copyGap:copyrights.top-tools.bottom};
+  return{noticeVsLogo:overlaps(notice,legal),toolsVsCopy:overlaps(tools,copyrights),toolsVsLogo:overlaps(tools,legal),logoVsCopy:overlaps(legal,copyrights),toolsTop:tools.top,copyGap:copyrights.top-tools.bottom,noticeBottomGap:stage.bottom-notice.bottom};
  });
  expect(bounds.noticeVsLogo).toBe(false);
+ expect(bounds.noticeBottomGap).toBeGreaterThanOrEqual(76);
  expect(bounds.toolsVsCopy).toBe(false);
  expect(bounds.toolsVsLogo).toBe(false);
  expect(bounds.toolsTop).toBeGreaterThanOrEqual(8);
