@@ -74,6 +74,7 @@ function App(){
   const changeCache=async(action,message)=>{setCacheClearing(true);try{const result=await action();setCacheEpoch(x=>x+1);setToast(message);return result;}catch(e){setToast(e instanceof CacheCapacityError?e.message:'Не удалось изменить кэш. Попробуйте ещё раз.');return null;}finally{setCacheClearing(false);}};
   const [refresh,setRefresh]=useState(0),[moreRequest,setMoreRequest]=useState(0),[zoomRequest,setZoomRequest]=useState(null);
   const [focus,setFocus]=useState(null),[location,setLocation]=useState(null),[locating,setLocating]=useState(false);
+  const [recenterLocation,setRecenterLocation]=useState(null);
    const [gpsFollow,setGpsFollow]=useState('off'),[gpsError,setGpsError]=useState('');
    const [offlineEpoch,setOfflineEpoch]=useState(0),[offlineEntries,setOfflineEntries]=useState([]),[offlineInfo,setOfflineInfo]=useState(null),[offlineBusy,setOfflineBusy]=useState(false);
    const offlineUrls=useRef([]),offlineAbort=useRef(null);
@@ -162,13 +163,13 @@ function App(){
     if(!undo)return;const next=[...favorites];if(!next.some(x=>x.id===undo.place.id&&x.source===undo.place.source))next.splice(Math.min(undo.index,next.length),0,undo.place);
     try{localStorage.setItem('wikimapia-reader-favorites',JSON.stringify(next));setFavorites(next);setUndo(null);}catch{setToast('Не удалось вернуть место');}
   };
-  const locate=async()=>{
+  const locate=async(centerMap=false)=>{
     if(locating)return;const token=++locationJob.current;setLocating(true);setNotice('Определяем местоположение…');
-    try{const p=await Geolocation.getCurrentPosition({enableHighAccuracy:false,timeout:12000,maximumAge:60000});if(token!==locationJob.current)return;closeCard();setLocation({lat:p.coords.latitude,lng:p.coords.longitude,accuracy:p.coords.accuracy});setNotice('Местоположение определено');}
+    try{const p=await Geolocation.getCurrentPosition({enableHighAccuracy:false,timeout:12000,maximumAge:60000});if(token!==locationJob.current)return;closeCard();setLocation({lat:p.coords.latitude,lng:p.coords.longitude,accuracy:p.coords.accuracy});if(centerMap)setRecenterLocation({lat:p.coords.latitude,lng:p.coords.longitude,seq:Date.now()});setNotice('Местоположение определено');}
     catch{if(token===locationJob.current)setNotice('Местоположение недоступно. Проверьте разрешение и геопозицию.');}
     finally{if(token===locationJob.current)setLocating(false);}
   };
-  const findNearby=()=>{setListSort('distance');locate();};
+  const findNearby=()=>{setListSort('distance');locate(true);};
   const toggleGps=()=>{
     if(gpsFollow==='following'){setGpsFollow(nextFollowState(gpsFollow,'tap'));setGpsError('');return;}
     setGpsError('');setGpsFollow(nextFollowState(gpsFollow,'tap'));locate();
@@ -254,7 +255,7 @@ function App(){
   if(!credentials.ready)return <Startup/>;
   return <main className={`${selected||candidates.length?'has-sheet':''} ${screen!=='map'?'has-screen':''} ${mapPanel?'has-map-panel':''} ${toast?'has-toast':''}`}>
     <div className="map-stage" inert={screen!=='map'} aria-hidden={screen!=='map'}>
-      <MapPane zoomRequest={zoomRequest} demo={demo} apiKey={apiKey} auto={auto} active={active} paused={screen!=='map'||!!selected||cacheClearing||gpsFollow==='following'} cacheEpoch={cacheEpoch} refresh={refresh} moreRequest={moreRequest} focus={focus} location={location} gpsFollowing={gpsFollow==='following'} onGpsPause={()=>setGpsFollow(s=>nextFollowState(s,'manual-pan'))} cacheView={cacheView} mapTarget={mapTarget} selectedId={selected?.id??highlightedId} density={density} basemap={basemap} yandexKey={yandexKey} yandexReferer={yandexReferer} onBasemapFallback={fallbackBasemap} onBasemapConnected={()=>setYandexDiagnostic(null)} onVisiblePlaces={setVisiblePlaces} onCandidates={setCandidates} onSelect={onSelect} onState={acceptArea} onMessage={setNotice}/>
+      <MapPane zoomRequest={zoomRequest} demo={demo} apiKey={apiKey} auto={auto} active={active} paused={screen!=='map'||!!selected||cacheClearing||gpsFollow==='following'} cacheEpoch={cacheEpoch} refresh={refresh} moreRequest={moreRequest} focus={focus} location={location} recenterLocation={recenterLocation} gpsFollowing={gpsFollow==='following'} onGpsPause={()=>setGpsFollow(s=>nextFollowState(s,'manual-pan'))} cacheView={cacheView} mapTarget={mapTarget} selectedId={selected?.id??highlightedId} density={density} basemap={basemap} yandexKey={yandexKey} yandexReferer={yandexReferer} onBasemapFallback={fallbackBasemap} onBasemapConnected={()=>setYandexDiagnostic(null)} onVisiblePlaces={setVisiblePlaces} onCandidates={setCandidates} onSelect={onSelect} onState={acceptArea} onMessage={setNotice}/>
       {!online&&<div className="network-hint" role="status">Нет подключения · доступно офлайн-чтение сохранённых карточек; карта может быть недоступна.</div>}
       <div className="map-tools" role="toolbar" aria-label="Управление картой">
         <button className="icon-btn search-launch" aria-label="Найти место" title="Найти место" aria-pressed={mapPanel==='search'} onClick={()=>setMapPanel(v=>v==='search'?null:'search')}><Icon name="search"/></button>
