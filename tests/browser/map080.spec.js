@@ -8,6 +8,7 @@ test('visible area list stays on the map and restores after opening an object',a
  const panel=page.getByRole('region',{name:'Объекты на карте'});
  await expect(panel).toBeVisible();
  await expect.poll(()=>panel.locator('.discovery-scroll').evaluate(el=>el.clientHeight)).toBeGreaterThan(150);
+ await expect.poll(()=>panel.locator('.discovery-place-list strong').first().evaluate(el=>el.getBoundingClientRect().width)).toBeGreaterThan(100);
  await expect(panel.getByText('Демонстрационный квартал')).toBeVisible();
  await panel.getByRole('button',{name:/Демонстрационный квартал/}).click();
  await expect(page.locator('.sheet h2')).toHaveText('Демонстрационный квартал');
