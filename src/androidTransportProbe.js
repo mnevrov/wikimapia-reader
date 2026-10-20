@@ -25,7 +25,7 @@ function outcome(transport, durationMs, httpStatus, result, objects=null, polygo
 function parseResponse(response,transport,durationMs) {
   const safe=safeAreaResponseSummary(response);
   return {...outcome(transport,durationMs,safe.httpStatus,safe.outcome,safe.objects,safe.polygons),
-    reason:safe.reason,contentCategory:safe.contentCategory};
+    reason:safe.reason,apiCode:safe.apiCode,contentCategory:safe.contentCategory};
 }
 
 function networkOutcome(error,transport,durationMs,timedOut) {
@@ -67,15 +67,24 @@ export async function compareAndroidTransports(key,onProgress=()=>{}) {
     schema:1,kind:'manual-android-transport-test',
     testedAtUtc:new Date().toISOString(),
     apiMethod:'box',sample:'fixed_public_test_area',
-    requestCount:2,containsKey:false,containsUrl:false,
+    requestCount:0,containsKey:false,containsUrl:false,
     results:[]
   };
   onProgress('Проверка Android HTTP (1 из 2)…');
   await waitForApiSlot();
   result.results.push(await nativeProbe(url.toString()));
+  result.requestCount=result.results.length;
+  // A second transport cannot resolve an API-level quota/authorization denial.
+  // Stop here rather than waste another request on an already rejected key.
+  if(result.results[0].outcome==='api_rejection' &&
+     ['quota','auth'].includes(result.results[0].reason)){
+    onProgress('API отклонил запрос: повтор другим транспортом пропущен');
+    return result;
+  }
   onProgress('Проверка WebView (2 из 2)…');
   await waitForApiSlot();
   result.results.push(await webProbe(url.toString()));
+  result.requestCount=result.results.length;
   onProgress('Проверка завершена');
   return result;
 }
