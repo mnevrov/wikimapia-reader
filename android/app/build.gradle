@@ -18,9 +18,12 @@ android {
     }
     buildTypes {
         debug {
-            applicationIdSuffix ".next"
-            resValue "string", "app_name", "WikiReader Next"
-            resValue "string", "title_activity_main", "WikiReader Next"
+            // CI opt-in diagnostic APK installs alongside the existing stable app.
+            // Default and signed release identity remain unchanged.
+            def isolatedProbe = System.getenv('WIKIREADER_DIAGNOSTIC_PACKAGE') == '1'
+            applicationIdSuffix isolatedProbe ? ".diagnostic.next" : ".next"
+            resValue "string", "app_name", isolatedProbe ? "WikiReader Diagnostics" : "WikiReader Next"
+            resValue "string", "title_activity_main", isolatedProbe ? "WikiReader Diagnostics" : "WikiReader Next"
         }
         release {
             minifyEnabled false
