@@ -18,7 +18,7 @@ export default function MapDiscover({mode,demo,query,onQuery,onSearch,results,se
     area.more?`Получено ${count} объектов · доступны остальные`:
     area.found!=null?`Получено ${count} объектов`:
     notice||'Показаны объекты, уже полученные на устройстве';
-  return <section className="discovery-panel" role="region" aria-label={mode==='search'?'Поиск на карте':'Объекты на карте'}>
+  return <section className={mode==='list'?'discovery-panel discovery-panel-list':'discovery-panel'} role="region" aria-label={mode==='search'?'Поиск на карте':'Объекты на карте'}>
     <header className="discovery-header">
       <div><p>WikiReader · Карта</p><h2>{mode==='search'?'Найти место':'Объекты в области'}</h2></div>
       <button className="icon-btn" aria-label="Закрыть панель карты" onClick={onClose}><Icon name="close"/></button>
