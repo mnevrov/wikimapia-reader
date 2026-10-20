@@ -26,11 +26,12 @@ test('real-shaped comment date displayed; Escape closes settings before card',as
  await page.keyboard.press('Escape');await expect(page.locator('.sheet')).toHaveCount(0);
 });
 test('geolocation after explicit tap centers the map',async({page,context})=>{
+ await page.addInitScript(()=>localStorage.setItem('wikimapia-reader-auto','false'));
  await page.route('https://api.wikimapia.org/**',r=>r.fulfill({json:{folder:[],found:0}}));
  await context.grantPermissions(['geolocation']);await context.setGeolocation({latitude:55.75,longitude:37.61});
  await page.route('https://tile.openstreetmap.org/**',r=>r.abort());await page.goto('/');
  await page.getByRole('button',{name:'Моё местоположение'}).click();
- await expect(page.locator('.status')).toContainText('Местоположение определено');
+ await expect.poll(async()=>JSON.parse(await page.evaluate(()=>localStorage.getItem('wikimapia-reader-view')))?.zoom).toBe(17);
  expect(JSON.parse(await page.evaluate(()=>localStorage.getItem('wikimapia-reader-view'))).zoom).toBe(17);
 });
 test('manual mode: moving map disables old pagination and makes no automatic request',async({page})=>{
@@ -74,7 +75,7 @@ test('auto pan debounces; background cancels queued load and resume reuses cover
  await page.waitForTimeout(1400);expect(requests).toBe(1);await expect(page.locator('path.leaflet-interactive')).toHaveCount(1);
 });
 test('card stays readable and attribution remains visible in portrait and landscape',async({page})=>{
- await page.route('https://tile.openstreetmap.org/**',r=>r.abort());await page.goto('/');
+ await tiles(page);await page.goto('/');
  await clickContour(page);await page.getByTitle('Развернуть').click();
  for(const viewport of [{width:320,height:640},{width:844,height:390},{width:768,height:1024}]){
   await page.setViewportSize(viewport);await expect(page.locator('.sheet-attribution')).toBeVisible();

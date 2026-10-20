@@ -11,6 +11,9 @@ import java.util.zip.GZIPInputStream;
 public final class SiteHttp {
  public static final int MAX_BYTES=4*1024*1024;
  private volatile String session="";
+ private long nextStart=0;
+ private synchronized long reserve(){long now=System.nanoTime()/1000000;long at=Math.max(now,nextStart);nextStart=at+1000;return at;}
+ private static int remaining(long deadline) throws InterruptedIOException {long left=deadline-System.nanoTime()/1000000;if(left<=0)throw new InterruptedIOException("Timeout");return (int)left;}
  public static URI validate(String value) throws IOException {
   try {
    URI u=new URI(value);String p=u.getPath();
@@ -30,13 +33,15 @@ public final class SiteHttp {
   Result(int s,String t,String u){status=s;text=t;url=u;}
  }
  public Result get(String url,String body,AtomicBoolean cancelled) throws IOException {
+  final long deadline=System.nanoTime()/1000000+12000;
   URI target=validate(url);
   if(body!=null&&(!target.getPath().equals("/search/")||body.length()>4096))throw new IOException("Body rejected");
   boolean bootstrapped=false;
   for(int redirect=0;redirect<5;redirect++){
    if(cancelled.get())throw new InterruptedIOException();
+   long start=reserve();while(System.nanoTime()/1000000<start){if(cancelled.get())throw new InterruptedIOException();remaining(deadline);try{Thread.sleep(50);}catch(InterruptedException e){Thread.currentThread().interrupt();throw new InterruptedIOException();}}
    HttpURLConnection c=(HttpURLConnection)target.toURL().openConnection();
-   c.setInstanceFollowRedirects(false);c.setConnectTimeout(12000);c.setReadTimeout(12000);
+   c.setInstanceFollowRedirects(false);c.setConnectTimeout(remaining(deadline));c.setReadTimeout(remaining(deadline));
    c.setRequestProperty("Accept-Encoding","gzip");c.setRequestProperty("Accept-Language","ru");
    c.setRequestProperty("User-Agent","WikiReader-Next/0.14 (+https://github.com/mnevrov/wikimapia-reader)");
    if(!session.isEmpty())c.setRequestProperty("Cookie",session);
@@ -48,7 +53,7 @@ public final class SiteHttp {
     InputStream raw=c.getInputStream();
     try(InputStream in="gzip".equalsIgnoreCase(c.getContentEncoding())?new GZIPInputStream(raw):raw;ByteArrayOutputStream out=new ByteArrayOutputStream()){
      byte[] buffer=new byte[8192];int n;
-     while((n=in.read(buffer))!=-1){if(cancelled.get())throw new InterruptedIOException();if(out.size()+n>MAX_BYTES)throw new IOException("Too large");out.write(buffer,0,n);}
+     while(true){c.setReadTimeout(remaining(deadline));n=in.read(buffer);if(n==-1)break;if(cancelled.get())throw new InterruptedIOException();if(out.size()+n>MAX_BYTES)throw new IOException("Too large");out.write(buffer,0,n);}
      String text=out.toString(StandardCharsets.UTF_8.name()),cookie=bootstrapCookie(text);
      if(cookie!=null&&!bootstrapped){session=cookie;bootstrapped=true;continue;}
      return new Result(status,text,target.toString());

@@ -1,5 +1,6 @@
 import {Capacitor,registerPlugin} from '@capacitor/core';
 const native=Capacitor.isNativePlatform()?registerPlugin('WikiReaderSite'):null;
+export class SiteError extends Error {constructor(message,siteKind){super(message);this.name='SiteError';this.siteKind=siteKind;}}
 export const SITE_MAX_BYTES=4*1024*1024;
 export function siteUrl(value){
  const u=new URL(value);
@@ -7,15 +8,18 @@ export function siteUrl(value){
  return u.href;
 }
 export function createSiteTransport(send){
+ let blockedUntil=0;
  return async({url,signal,body})=>{
   const safe=siteUrl(url);signal?.throwIfAborted();
+  if(Date.now()<blockedUntil)throw new SiteError('Сайт Wikimapia ограничил доступ. Повторите позже.','quota');
   try{
    const result=await send({url:safe,body,signal});signal?.throwIfAborted();
    if(result.finalUrl)siteUrl(result.finalUrl);
+   if([403,429].includes(result.status)){blockedUntil=Date.now()+60000;throw new SiteError('Сайт Wikimapia ограничил доступ. Повторите позже.',result.status===429?'quota':'auth');}
    if(result.status!==200)throw Error(`HTTP ${result.status}`);
    if(typeof result.text!=='string'||result.text.length>SITE_MAX_BYTES||new TextEncoder().encode(result.text).length>SITE_MAX_BYTES)throw Error('Слишком большой ответ сайта');
    return result;
-  }catch(e){signal?.throwIfAborted();if(e.name==='AbortError')throw e;
+  }catch(e){signal?.throwIfAborted();if(e.name==='AbortError'||e instanceof SiteError)throw e;
    if(/^HTTP (403|429)$/.test(e.message))throw Error('Сайт Wikimapia ограничил доступ. Повторите позже.');
    throw Error('Не удалось загрузить данные сайта Wikimapia. Повторите позже.');
   }

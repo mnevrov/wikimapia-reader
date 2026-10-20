@@ -145,3 +145,4 @@ test('failure kinds stay distinct and quota/auth errors require deliberate retry
 test('site area explicit partial completeness survives fewer than 50 objects',async()=>{
  const loader=new AreaLoader(async()=>({folder:[place(1)],found:null,more:false,complete:false,source:'site'}));await loader.load(bbox);assert.equal(loader.state.complete,false);assert.equal(loader.state.source,'site');assert.equal(loader.state.more,false);
 });
+test('forced refresh forwards the force flag to the source adapter',async()=>{const flags=[];const loader=new AreaLoader(async o=>{flags.push(o.force);return{folder:[],found:0};});await loader.load(bbox);await loader.load(bbox,{force:true});assert.deepEqual(flags,[false,true]);});

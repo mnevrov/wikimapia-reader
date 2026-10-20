@@ -13,8 +13,8 @@ function polygon(encoded,type){
  }else if(type===0){
   const parts=encoded.split(';');if(parts.length!==3||!/^\d+$/.test(parts[2].slice(0,2))&&!/^[a-f\d]{2}/i.test(parts[2]))throw Error('Неизвестная геометрия');
   let x=Number(parts[0]),y=Number(parts[1]);const width=parseInt(parts[2].slice(0,2),16)+1,hex=parts[2].slice(2);if(width<1||width>4||hex.length%(width*4)||!/^[a-f\d]*$/i.test(hex))throw Error('Неизвестная геометрия');
-  points.push([y/1e7,x/1e7]);const signed=t=>{let v=0;for(let i=0;i<width;i++)v+=parseInt(t.slice(i*2,i*2+2),16)*2**(8*i);return v>2**(8*width-1)-1?v-(width===1?256:2**(8*width)-1):v;};
-  for(let i=0;i<hex.length;i+=width*4){x-=signed(hex.slice(i,i+width*2));y-=signed(hex.slice(i+width*2,i+width*4));points.push([y/1e7,x/1e7]);}
+  points.push([y/1e7,x/1e7]);const signed=t=>{let v=0;for(let i=0;i<width;i++)v+=parseInt(t.slice(i*2,i*2+2),16)*2**(8*(width-i-1));return v>2**(8*width-1)-1?v-(width===1?256:2**(8*width)-1):v;};
+  for(let i=0;i<hex.length;i+=width*4){x-=signed(hex.slice(i,i+width*2));y-=signed(hex.slice(i+width*2,i+width*4));points.push([y/1e7,x/1e7]);if(points.length>30000)throw Error('Большой контур');}
  }else throw Error('Неизвестная кодировка');
  if(points.length<3||points.some(([a,b])=>!Number.isFinite(a)||!Number.isFinite(b)||Math.abs(a)>90||Math.abs(b)>180))throw Error('Некорректный контур');return points;
 }

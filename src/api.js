@@ -170,6 +170,7 @@ export function validateResponse(result, func, expectedId, dataBlocks) {
 // Never return raw server messages: Wikimapia may echo query parameters or API keys.
 export function classifyApiFailure(error, { offline = false } = {}) {
   if (error?.name === 'AbortError') return 'cancelled';
+  if (['quota','auth','schema','network'].includes(error?.siteKind)) return error.siteKind;
   if (offline) return 'offline';
   if (error instanceof ApiError) return ['quota','auth','schema'].includes(error.kind) ? error.kind : 'api';
   if (error instanceof ValidationError) return 'input';
@@ -183,6 +184,7 @@ export function classifyApiFailure(error, { offline = false } = {}) {
 }
 
 export function diagnosticError(error) {
+  if (error?.siteKind) return error.message;
   if (error instanceof ApiError || error instanceof ValidationError) return error.message;
   switch (classifyApiFailure(error)) {
     case 'quota': return 'Вероятно, исчерпан лимит API-запросов. Не повторяйте запросы часто.';

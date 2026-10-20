@@ -48,13 +48,28 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Build web assets and sync Android
         run: npm run android:sync
+      - name: Build and lint APK
+        working-directory: android
+        run: ./gradlew --no-daemon testDebugUnitTest assembleDebug lintDebug
       - name: Yandex branding regression (fail fast)
         run: npx playwright test tests/browser/yandexSafeBranding094.spec.js
       - name: Mobile browser tests (mock API)
         run: npx playwright test
-      - name: Build and lint APK
-        working-directory: android
-        run: ./gradlew --no-daemon testDebugUnitTest assembleDebug lintDebug
+      - name: Install emulator for website transport verification
+        run: |
+          sdkmanager 'emulator' 'system-images;android-30;default;x86_64'
+          echo no | avdmanager create avd --force --name wikireader-site --package 'system-images;android-30;default;x86_64'
+          sudo chmod 666 /dev/kvm
+      - name: Verify website transport on Android without API key
+        timeout-minutes: 12
+        run: |
+          "$ANDROID_HOME/emulator/emulator" -avd wikireader-site -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect > /tmp/wikireader-emulator.log 2>&1 &
+          emulator_pid=$!
+          trap 'kill "$emulator_pid" || true' EXIT
+          adb wait-for-device
+          timeout 180 bash -c 'until [[ "$(adb shell getprop sys.boot_completed | tr -d "\r")" == 1 ]]; do sleep 2; done'
+          cd android
+          ./gradlew --no-daemon connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.example.wikimapreader.SiteSourceLiveTest
       - name: Checksum
         working-directory: android/app/build/outputs/apk/debug
         run: sha256sum app-debug.apk > SHA256SUMS.txt
