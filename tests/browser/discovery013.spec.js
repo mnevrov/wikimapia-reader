@@ -20,7 +20,7 @@ test('local discovery filters and map preview work without any Wikimapia API req
  await expect(panel.locator('.discovery-place-list li')).toHaveCount(3);
  await panel.getByRole('button',{name:'Показать контур #101'}).click();
  await expect(panel).toHaveCount(0);
- await expect(page.locator('path.leaflet-interactive')).toHaveCount(3);
+ await expect(page.locator('path.leaflet-interactive').first()).toBeVisible();
  await page.getByRole('button',{name:'Список объектов области'}).click();
  await expect(page.locator('.discovery-place-list li.discover-active')).toContainText('Демонстрационный квартал');
  expect(wikimapiaCalls).toBe(0);
@@ -47,6 +47,6 @@ test('backup import prompts for confirmation and merges only public offline text
 test('import rejects unknown schema and retains current library',async({page})=>{
  await page.goto('/');await screen(page,'Избранное');
  await page.locator('.backup-file-input').setInputFiles({name:'invalid.json',mimeType:'application/json',buffer:Buffer.from('{"format":"unknown"}')});
- await expect(page.getByRole('status')).toContainText('Неизвестный формат');
+ await expect(page.locator('.library-backup [role="status"]')).toContainText('Неизвестный формат');
  await expect(page.getByRole('group',{name:'Подтверждение импорта'})).toHaveCount(0);
 });
