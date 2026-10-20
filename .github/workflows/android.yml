@@ -54,6 +54,10 @@ jobs:
         run: npx playwright test
       - name: Build and lint APK
         working-directory: android
+        env:
+          # This exploratory PR gets a separate app identity; official releases
+          # and all other builds retain the stable WikiReader package.
+          WIKIREADER_DIAGNOSTIC_PACKAGE: ${{ github.event_name == 'pull_request' && github.head_ref == 'diagnostic/android-api-transport' && '1' || '0' }}
         run: ./gradlew --no-daemon testDebugUnitTest assembleDebug lintDebug
       - name: Checksum
         working-directory: android/app/build/outputs/apk/debug
