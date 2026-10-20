@@ -44,3 +44,36 @@ test('explicit Android transport diagnostics make only two spaced requests and n
   expect(copied).not.toContain('api.wikimapia.org');
   await expect(panel).not.toContainText('test-transport-private-key');
 });
+
+test('known API quota code is shown safely and second request is skipped',async({page})=>{
+  await tiles(page);
+  await nativeVault(page,{key:'private-test-api-key',calls:[]});
+  await page.addInitScript(()=>{
+    localStorage.setItem('wikimapia-reader-auto','false');
+    window.__copiedTransportReport='';
+    Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async txt=>{window.__copiedTransportReport=txt;}}});
+  });
+  const calls=[];
+  await page.route('https://api.wikimapia.org/**',route=>{
+    calls.push(route.request().url());
+    return route.fulfill({json:{debug:{code:1004,message:'Key limit has been reached; private-test-api-key'}}});
+  });
+  await page.goto('/');
+  await screen(page,'Настройки');
+  const panel=page.getByLabel('Проверка сетевого подключения Android');
+  await panel.getByRole('button',{name:'Проверить два HTTP-транспорта'}).click();
+  await expect(panel.getByText('код API 1004',{exact:false})).toBeVisible({timeout:25000});
+  await expect(panel).toContainText('повтор другим транспортом пропущен');
+  await panel.getByRole('button',{name:'Скопировать результат проверки'}).click();
+  const reportJson=await page.evaluate(()=>window.__copiedTransportReport);
+  const report=JSON.parse(reportJson);
+  expect(calls).toHaveLength(1);
+  expect(report.requestCount).toBe(1);
+  expect(report.results).toHaveLength(1);
+  expect(report.results[0].apiCode).toBe(1004);
+  expect(report.results[0].reason).toBe('quota');
+  expect(reportJson).not.toContain('private-test-api-key');
+  expect(reportJson).not.toContain('Key limit has been reached');
+  expect(reportJson).not.toContain('api.wikimapia.org');
+  await expect(panel).not.toContainText('private-test-api-key');
+});
