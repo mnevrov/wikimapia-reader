@@ -43,3 +43,33 @@ test('confirmation and undo toasts take priority over background map status',asy
  });
  expect(result).toEqual({initial:'visible',withToast:'hidden',withUndo:'hidden',restored:'visible'});
 });
+
+test('warning moves to upper-left safe slot while normal progress stays below',async({page})=>{
+ await tiles(page);await page.goto('/');
+ const status=page.locator('.map-stage>.map-feedback').first();
+ await expect(status).toBeVisible();
+ await page.setViewportSize({width:390,height:844});
+ const box=async()=>page.evaluate(()=>{
+  const p=document.querySelector('.map-stage>.map-feedback').getBoundingClientRect();
+  const m=document.querySelector('.map-stage').getBoundingClientRect();
+  const b=document.querySelector('.map-tools').getBoundingClientRect();
+  const nav=document.querySelector('.bottom-nav').getBoundingClientRect();
+  const hit=(x,y)=>x.left<y.right&&x.right>y.left&&x.top<y.bottom&&x.bottom>y.top;
+  return {top:p.top-m.top,bottom:m.bottom-p.bottom,inMap:p.top>=m.top&&p.bottom<=m.bottom,
+    hitToolbar:hit(p,b),hitNav:hit(p,nav)};
+ });
+ const progress=await box();
+ expect(progress.bottom).toBeGreaterThan(55);
+ await status.evaluate(node=>node.classList.add('is-error'));
+ for(const [width,height] of [[390,844],[844,390]]){
+  await page.setViewportSize({width,height});
+  const warning=await box();
+  expect(warning.inMap).toBe(true);
+  expect(warning.top).toBeGreaterThanOrEqual(8);
+  expect(warning.top).toBeLessThan(40);
+  expect(warning.hitToolbar).toBe(false);
+  expect(warning.hitNav).toBe(false);
+ }
+ await status.evaluate(node=>node.classList.remove('is-error'));
+ expect((await box()).bottom).toBeGreaterThan(25);
+});
