@@ -210,3 +210,8 @@ main:has(.map-stack.has-yandex) .toast{
 .offline-stats strong{font-size:16px}.offline-stats span{font-size:12px;color:var(--muted)}
 .offline-card-action[aria-busy=true] svg{animation:map-refresh 1.2s linear infinite}
 @media(prefers-reduced-motion:reduce){.offline-card-action[aria-busy=true] svg{animation:none}}
+
+/* 0.12 saved library — native-sized touch controls, no changes to map SDK branding. */
+.reading-history-controls{margin:24px 16px 32px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:16px}
+.reading-history-controls .setting-row{margin:0}.reading-history-controls .helper{margin:12px 0 0}.reading-history-controls .cache-confirm{margin-top:12px}
+.history-list{margin-top:12px}

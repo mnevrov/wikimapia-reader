@@ -25,6 +25,8 @@ import {searchIntent} from './searchIntent.js';
 import {readFavorites,toggleFavorite as updateFavorites} from './favorites.js';
 import {offlineStore} from './offlineStore.js';
 import {nextFollowState,acceptableFix} from './gpsFollow.js';
+import {HISTORY_KEY,HISTORY_ENABLED_KEY,readHistory,recordHistory} from './readingHistory.js';
+import SavedLibrary from './SavedLibrary.jsx';
 
 const navigation=[['map','Карта','map'],['search','Поиск','search'],['saved','Избранное','bookmark'],['settings','Настройки','settings']];
 function App(){
@@ -32,6 +34,12 @@ function App(){
   const [online,setOnline]=useState(navigator.onLine);
   const [returnTo,setReturnTo]=useState('map'),[confirmForget,setConfirmForget]=useState(false);
   const [undo,setUndo]=useState(null),[savedQuery,setSavedQuery]=useState('');
+  const [history,setHistory]=useState(()=>{try{return readHistory(localStorage.getItem(HISTORY_KEY));}catch{return [];}});
+  const [historyEnabled,setHistoryEnabled]=useState(()=>{try{return localStorage.getItem(HISTORY_ENABLED_KEY)!=='false';}catch{return true;}});
+  useEffect(()=>{try{localStorage.setItem(HISTORY_KEY,JSON.stringify(history));}catch{}},[history]);
+  const historyRecording=useRef(historyEnabled);
+  const rememberViewed=useCallback(place=>{if(historyRecording.current&&place?.source!=='demo')setHistory(items=>recordHistory(items,place));},[]);
+  const toggleHistory=enabled=>{historyRecording.current=enabled;setHistoryEnabled(enabled);if(!enabled)setHistory([]);try{localStorage.setItem(HISTORY_ENABLED_KEY,String(enabled));if(!enabled)localStorage.removeItem(HISTORY_KEY);}catch{}};
   const screenBody=useRef(null),positions=useRef({}),origin=useRef(null),restoreFocus=useRef(false);
   const rememberScreen=()=>{if(screenBody.current)positions.current[screen]=screenBody.current.scrollTop;};
   const [theme,setTheme]=useTheme();
@@ -90,19 +98,19 @@ function App(){
     setMapPanel(null);
     setDemo(useDemo);setFocus(null);setScreen('map');setSelected({...place,source:useDemo?'demo':'wikimapia'});setDetails(null);setError('');
     if(useDemo){setDetails(DEMO_DETAILS[place.id]||null);setBusy(false);return;}
-    if(cached&&(!online||!credentials.key)){setDetails(cached.details);setBusy(false);return;}
+    if(cached&&(!online||!credentials.key)){setDetails(cached.details);rememberViewed({id:place.id,title:cached.details.title,source:'wikimapia'});setBusy(false);return;}
     if(!online){setError('Нет сети. Этот объект не сохранён для офлайн-чтения.');setBusy(false);return;}
     setBusy(true);
     try{
       const payload=await wikimapiaCall('place.getbyid',credentials.key,{id:place.id,signal:controller.signal});
-      if(token===request.current){revokeOffline();setDetails(normalizePlace(payload));setFocus(geometryOf(payload));}
+      if(token===request.current){const loaded=normalizePlace(payload);revokeOffline();setDetails(loaded);setFocus(geometryOf(payload));rememberViewed({id:place.id,title:loaded.title,source:'wikimapia'});}
     }catch(e){
       if(token===request.current){
-        if(cached){setDetails(cached.details);setToast('Сервер недоступен · показана сохранённая карточка');}
+        if(cached){setDetails(cached.details);rememberViewed({id:place.id,title:cached.details.title,source:'wikimapia'});setToast('Сервер недоступен · показана сохранённая карточка');}
         else setError(diagnosticError(e));
       }
     }finally{if(token===request.current)setBusy(false);}
-  },[demo,credentials.key,screen,selected,mapPanel,online]);
+  },[demo,credentials.key,screen,selected,mapPanel,online,rememberViewed]);
   const active=usePlatform(()=>{if(screen==='settings'&&confirmForget){setConfirmForget(false);return true;}if(screen!=='map'){setScreen('map');return true;}if(candidates.length){setCandidates([]);return true;}if(selected){dismissCard();return true;}if(mapPanel){searchAbort.current?.abort();setSearchBusy(false);setMapPanel(null);return true;}return false;});
   useEffect(()=>{const on=()=>setOnline(true),off=()=>setOnline(false);window.addEventListener('online',on);window.addEventListener('offline',off);return()=>{window.removeEventListener('online',on);window.removeEventListener('offline',off);};},[]);
   useLayoutEffect(()=>{if(screenBody.current){screenBody.current.scrollTop=positions.current[screen]??0;if(restoreFocus.current&&origin.current?.screen===screen){const o=origin.current;screenBody.current.querySelector(`[data-place-id="${o.id}"][data-source="${o.source}"]`)?.focus({preventScroll:true});restoreFocus.current=false;}}},[screen]);
@@ -150,7 +158,6 @@ function App(){
     if(!undo)return;const next=[...favorites];if(!next.some(x=>x.id===undo.place.id&&x.source===undo.place.source))next.splice(Math.min(undo.index,next.length),0,undo.place);
     try{localStorage.setItem('wikimapia-reader-favorites',JSON.stringify(next));setFavorites(next);setUndo(null);}catch{setToast('Не удалось вернуть место');}
   };
-  const visibleFavorites=favorites.filter(p=>p.title.toLocaleLowerCase('ru').includes(savedQuery.trim().toLocaleLowerCase('ru')));
   const locate=async()=>{
     if(locating)return;const token=++locationJob.current;setLocating(true);setNotice('Определяем местоположение…');
     try{const p=await Geolocation.getCurrentPosition({enableHighAccuracy:false,timeout:12000,maximumAge:60000});if(token!==locationJob.current)return;closeCard();setLocation({lat:p.coords.latitude,lng:p.coords.longitude,accuracy:p.coords.accuracy});setNotice('Местоположение определено');}
@@ -224,7 +231,7 @@ function App(){
       {screen==='settings'&&<Settings confirmForget={confirmForget} setConfirmForget={setConfirmForget} credentials={credentials} onCacheAction={changeCache} onShowArea={showCachedArea} cacheEpoch={cacheEpoch} currentAreaIds={currentAreaIds} cacheClearing={cacheClearing} offlineEpoch={offlineEpoch} onOfflineChange={()=>setOfflineEpoch(v=>v+1)} theme={theme} setTheme={setTheme} auto={auto} setAuto={setAuto} density={density} setDensity={setDensity} basemap={basemap} setBasemap={setBasemap} yandexKey={yandexKey} setYandexKey={setYandexKey} yandexReferer={yandexReferer} setYandexReferer={setYandexReferer} yandexDiagnostic={yandexDiagnostic} onApply={applyKey} onForget={forgetKey} demo={demo} onDemo={()=>{resetRequests();setDemo(true);setScreen('map');}} onReal={()=>{resetRequests();setDemo(false);setScreen('map');}}/>}
       {!online&&<div className="screen-network" role="status">Нет сети. Доступны сохранённые офлайн-карточки, избранное и контуры; новая загрузка требует сети.</div>}
       {screen==='search'&&<div className="screen-body search-page" ref={screenBody}>{demo?<div className="empty-state"><Icon name="search" size={36}/><h2>Найдите нужное место</h2><p>Подключите Wikimapia, чтобы искать по названию или открывать объекты по ID.</p><button className="primary" onClick={()=>setScreen('settings')}>Добавить API-ключ</button></div>:<><form className="search-form" onSubmit={search}><label htmlFor="place-query">Название, ID или ссылка Wikimapia</label><div className="search-input"><Icon name="search"/><input id="place-query" type="search" value={query} maxLength={200} onChange={e=>{searchAbort.current?.abort();setSearchBusy(false);setQuery(e.target.value);setResults([]);setSearchStatus('');}} enterKeyHint="search" placeholder="Место или ссылка на объект"/><button className="primary" disabled={searchBusy||!query.trim()}>Найти</button></div></form><div className="search-actions">{query&&<button className="text-button" onClick={()=>{searchAbort.current?.abort();setQuery('');setResults([]);setSearchStatus('');setSearchBusy(false);document.getElementById('place-query')?.focus();}}>Очистить поиск</button>}{searchBusy&&<button className="text-button" onClick={()=>{searchAbort.current?.abort();setSearchBusy(false);setSearchStatus('Поиск отменён');}}>Отменить поиск</button>}</div><p className="search-feedback" role="status">{searchStatus||'Поиск по объектам Wikimapia рядом с текущей картой'}</p><ul className="search-results">{results.map(p=><li key={p.id}><button data-place-id={p.id} data-source="wikimapia" onClick={()=>onSelect(p)}><span><strong>{p.title}</strong><small>Wikimapia · #{p.id}</small></span><Icon name="arrow" size={18}/></button></li>)}</ul><Disclosure className="id-disclosure" title="Открыть объект по ID"><div className="open-id"><label htmlFor="place-id">Число из ссылки Wikimapia</label><input id="place-id" type="number" min="1" value={placeId} onChange={e=>setPlaceId(e.target.value)}/><button className="secondary" onClick={openId}>Открыть по ID</button></div></Disclosure></>}</div>}
-      {screen==='saved'&&<div className="screen-body" ref={screenBody}>{offlineEntries.length>0&&<section className="offline-list"><p className="section-caption">Для чтения без сети · {offlineEntries.length}</p><ul className="saved-list">{offlineEntries.map(p=><li key={'offline:'+p.id}><button className="saved-open" onClick={()=>onSelect({id:p.id,title:p.title,source:'wikimapia'})}><span className="saved-icon"><Icon name="download"/></span><span><strong>{p.title}</strong><small>#{p.id} · {p.status==='partial'?'Сохранено частично':p.status==='stale'?'Данные устарели':p.status==='error'?'Ошибка':'Доступно без сети'}</small></span><Icon name="arrow" size={18}/></button><button className="icon-btn" aria-label={'Удалить офлайн-копию '+p.title} onClick={()=>removeOffline(p.id)}><Icon name="trash" size={18}/></button></li>)}</ul></section>}{favorites.length?<><p className="section-caption">Сохранённые места · {favorites.length}</p><label className="saved-filter">Найти в избранном<input type="search" value={savedQuery} onChange={e=>setSavedQuery(e.target.value)} placeholder="Название сохранённого места"/></label>{!visibleFavorites.length&&<p className="helper">Совпадений нет. Измените название или очистите поиск.</p>}<ul className="saved-list">{visibleFavorites.map(p=><li key={`${p.source}:${p.id}`}><button className="saved-open" data-place-id={p.id} data-source={p.source} onClick={()=>onSelect(p)}><span className="saved-icon"><Icon name="bookmark"/></span><span><strong>{p.title}</strong><small>{p.source==='demo'?'Демо':'Wikimapia'} · #{p.id}</small></span><Icon name="arrow" size={18}/></button><button className="icon-btn" aria-label={`Удалить ${p.title} из избранного`} onClick={()=>removeFavorite(p)}><Icon name="trash" size={18}/></button></li>)}</ul></>:offlineEntries.length?null:<div className="empty-state"><Icon name="bookmark" size={36}/><h2>Места, к которым хочется вернуться</h2><p>Откройте объект на карте и нажмите «Сохранить» в его карточке.</p><button className="secondary" onClick={()=>setScreen('map')}>На карту</button></div>}</div>}
+      {screen==='saved'&&<SavedLibrary offlineEntries={offlineEntries} favorites={favorites} history={history} historyEnabled={historyEnabled} savedQuery={savedQuery} onQuery={setSavedQuery} scrollRef={screenBody} onSelect={onSelect} onRemoveOffline={removeOffline} onRemoveFavorite={removeFavorite} onClearHistory={()=>setHistory([])} onRemoveHistory={id=>setHistory(items=>items.filter(p=>p.id!==id))} onToggleHistory={toggleHistory} onGoMap={()=>setScreen('map')}/>}
     </section></Motion>
     <nav className="bottom-nav" aria-label="Основная навигация">{navigation.map(([id,label,icon])=><button key={id} aria-current={screen===id?'page':undefined} onClick={()=>navigate(id)}><Icon name={icon}/><span>{label}</span></button>)}</nav>
     <Motion open={!!undo} identity={undo?`${undo.place.source}:${undo.place.id}`:''} kind="toast"><div className="undo-toast" role="status"><span>Место удалено из избранного</span><button className="text-button" onClick={undoRemove}>Вернуть</button></div></Motion>
