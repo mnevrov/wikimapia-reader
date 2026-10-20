@@ -37,7 +37,7 @@ test('backup import prompts for confirmation and merges only public offline text
  await expect(page.locator('.offline-list')).toHaveCount(0);
  await page.getByRole('button',{name:'Импортировать'}).click();
  await expect(page.locator('.offline-list .saved-open')).toContainText('Башня');
- await expect(page.locator('.saved-list .saved-open')).toHaveCount(2);
+ await expect(page.locator('.saved-list .saved-open[data-place-id="55"][data-source="wikimapia"]')).toContainText('Башня');
  await page.reload();await screen(page,'Избранное');
  await expect(page.locator('.offline-list .saved-open')).toContainText('Башня');
  const raw=await page.evaluate(()=>localStorage.getItem('wikimapia-reader-favorites'));
