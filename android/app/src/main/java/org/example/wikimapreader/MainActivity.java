@@ -8,6 +8,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(AppearancePlugin.class);
         registerPlugin(CredentialsVaultPlugin.class);
+        registerPlugin(WikiReaderTransferPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }
