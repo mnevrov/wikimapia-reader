@@ -260,3 +260,11 @@ main:has(.map-stack.has-yandex) .toast{
 
 /* List row and map shortcut share space; do not inherit generic 100% button width. */
 .discovery-place-list .discover-on-map{width:44px;flex:0 0 44px}
+
+/* Explicit Android connection comparison; scoped to app settings, not map SDK. */
+.transport-diagnostic{margin-top:16px;padding:12px 14px;background:var(--control-bg);border:1px solid var(--border);border-radius:14px}
+.transport-diagnostic h3{font-size:14px;margin:0 0 8px}
+.transport-diagnostic .secondary{width:100%;min-height:44px;white-space:normal}
+.transport-diagnostic .helper{margin:6px 0 10px}
+.transport-results p{margin:8px 0;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+.transport-results .secondary{margin-top:6px}
