@@ -290,3 +290,11 @@ main:has(.map-stack.has-yandex) .toast{
     overflow:auto;
   }
 }
+
+/* 0.13.1: transient confirmation/undo toast has priority over background map
+   statuses; avoid two simultaneous bubbles competing for the same bottom zone,
+   particularly when Yandex raises confirmation toast above legal controls. */
+main.has-toast .map-stage .map-feedback,
+main:has(.undo-toast) .map-stage .map-feedback{
+  visibility:hidden;
+}
