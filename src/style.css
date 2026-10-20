@@ -251,3 +251,9 @@ main:has(.map-stack.has-yandex) .toast{
 .discover-options .discover-filters{padding:8px 12px 12px;margin:0;gap:6px}
 .discover-options .discover-filters .discovery-status{font-size:11px;margin:2px 0}
 .discovery-scroll>.discovery-results{margin-top:4px}
+
+/* A definite list panel height prevents zero-height flex scroller on mobile. */
+.discovery-panel-list{height:min(61dvh,550px)}
+.discovery-panel-list .discovery-scroll{flex:1 1 0;min-height:0;overflow-y:auto}
+@media(min-width:700px){.discovery-panel-list{height:70dvh}}
+@media(max-height:500px){.discovery-panel-list{height:calc(100dvh - var(--nav-height) - var(--safe-bottom) - 18px)}}
