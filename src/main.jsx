@@ -213,7 +213,7 @@ function App(){
   const sharePlace=async place=>{
     const id=Number(place?.id);
     if(!Number.isSafeInteger(id)||id<=0)return;
-    if(demo){setToast('Демонстрационные объекты нельзя передавать как реальные');return;}
+    if(demo||selected?.source==='demo'||place?.source==='demo'){setToast('Демонстрационные объекты нельзя передавать как реальные');return;}
     const url='https://wikimapia.org/'+id+'/';
     try{
       if(await nativeShareUrl(url))return;
@@ -271,7 +271,7 @@ function App(){
       {!selected&&!candidates.length&&(gpsError||notice)&&<div className="map-feedback"><div className="status" role="status" aria-live="polite">{gpsError|| (gpsFollow==='paused'?'GPS Follow приостановлен · нажмите кнопку геолокации для возобновления':notice)}</div>{demo&&<button className="connect-action" onClick={()=>navigate('settings')}>Подключить Wikimapia <Icon name="arrow" size={18}/></button>}</div>}
       <span className="sr-only" role="status" aria-live="polite">{area.draining?`Догружаем: ${area.places.length}${area.found!=null?` из ${area.found}`:" объектов"}`:''}</span>
       <Motion open={candidates.length>0} identity={candidates.map(p=>p.id).join(',')} kind="chooser"><ObjectChooser places={candidates} onPick={onSelect} onClose={()=>setCandidates([])}/></Motion>
-      <Motion open={!!selected||busy||!!error} identity={selected?.id} kind="sheet"><Details returnLabel={returnTo==='search'||origin.current?.panel==='search'?'К результатам поиска':returnTo==='saved'?'К избранному':origin.current?.panel==='list'?'К объектам области':null} onReturn={dismissCard} data={details||(selected?{id:selected.id,title:selected.title}:null)} busy={busy} error={error} onClose={dismissCard} onRetry={()=>selected&&onSelect(selected)} basemap={basemap} favorites={favorites.filter(x=>x.source===(demo?'demo':'wikimapia')).map(x=>x.id)} toggleFavorite={toggleFavorite} offlineInfo={offlineInfo} offlineBusy={offlineBusy} onSaveOffline={saveOffline} onRemoveOffline={()=>removeOffline(selected?.id)} offlineAvailable={!demo&&online} shareAvailable={!demo} onShowOnMap={()=>showOnMap(details||selected)} onShare={()=>sharePlace(details||selected)}/></Motion>
+      <Motion open={!!selected||busy||!!error} identity={selected?.id} kind="sheet"><Details returnLabel={returnTo==='search'||origin.current?.panel==='search'?'К результатам поиска':returnTo==='saved'?'К избранному':origin.current?.panel==='list'?'К объектам области':null} onReturn={dismissCard} data={details||(selected?{id:selected.id,title:selected.title}:null)} busy={busy} error={error} onClose={dismissCard} onRetry={()=>selected&&onSelect(selected)} basemap={basemap} favorites={favorites.filter(x=>x.source===(demo?'demo':'wikimapia')).map(x=>x.id)} toggleFavorite={toggleFavorite} offlineInfo={offlineInfo} offlineBusy={offlineBusy} onSaveOffline={saveOffline} onRemoveOffline={()=>removeOffline(selected?.id)} offlineAvailable={!demo&&online} shareAvailable={!demo&&selected?.source!=='demo'} onShowOnMap={()=>showOnMap(details||selected)} onShare={()=>sharePlace(details||selected)}/></Motion>
     </div>
     <Motion open={screen!=='map'} identity={screen} kind="screen"><section className="app-screen" aria-label={navigation.find(x=>x[0]===screen)[1]}>
       <header className="screen-header"><button className="icon-btn" aria-label="Вернуться на карту" onClick={()=>setScreen('map')}><Icon name="back"/></button><div><p>WikiReader</p><h1>{navigation.find(x=>x[0]===screen)[1]}</h1></div></header>
