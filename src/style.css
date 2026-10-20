@@ -215,3 +215,18 @@ main:has(.map-stack.has-yandex) .toast{
 .reading-history-controls{margin:24px 16px 32px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:16px}
 .reading-history-controls .setting-row{margin:0}.reading-history-controls .helper{margin:12px 0 0}.reading-history-controls .cache-confirm{margin-top:12px}
 .history-list{margin-top:12px}
+
+/* 0.13: local discovery filters and map/list actions. Only app-owned surfaces. */
+.discover-filters{display:grid;gap:9px;margin:10px 0 14px}
+.discover-filters label{display:grid;gap:5px;color:var(--muted);font-size:12px;min-width:0}
+.discover-filters input{font-size:14px;padding:9px 11px;min-height:42px}
+.discover-selects{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.discover-selects select{min-width:0;width:100%;background:var(--control-bg);color:var(--text);border:1px solid var(--border);border-radius:9px;padding:9px 6px;font-size:12px;min-height:42px}
+.discover-nearby{width:100%;min-height:42px;font-size:12px}
+.discovery-place-list li{display:flex;align-items:stretch;min-width:0}
+.discovery-place-list li>button:first-child{flex:1;min-width:0;width:auto}
+.discovery-place-list .discover-on-map{background:transparent;color:var(--accent-text);min-width:44px;min-height:44px;padding:8px;border-left:1px solid var(--border)}
+.discovery-place-list li.discover-active{border-color:var(--accent)}
+.sheet-shortcuts{display:flex;gap:8px;padding:6px 0 8px;flex-shrink:0}
+.sheet-shortcuts .secondary{flex:1;min-width:0;min-height:38px;font-size:12px;padding:8px}
+@media(max-height:500px){.sheet-shortcuts .secondary{min-height:34px}}
