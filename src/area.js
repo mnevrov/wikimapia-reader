@@ -124,7 +124,7 @@ export class AreaLoader {
       // Repeated/empty pages cannot prove completeness when the server reports more.
       const fullyLoaded=typeof payload.complete==='boolean'?payload.complete:(found!==null?places.length>=found:(items.length<50));
       recordCoverage(places.length,found,fullyLoaded);
-      const state = {places,page,found,more,source:payload.source??'api',complete:fullyLoaded,dataSource:'network',cacheUpdatedAt:Date.now(),loading:false,background:false,error:'',failureKind:null,retryable:false};
+      const state = {places,page,found,more,source:payload.source??'api',complete:fullyLoaded,dataSource:'network',cacheUpdatedAt:Date.now(),loading:false,background:false,error:payload.warning??'',failureKind:payload.failureKind??null,retryable:false};
       const key=this.cacheKey,old=this.cache.get(key);
       const record={bbox:[...this.bbox],state,updated:Date.now(),pinned:old?.pinned??false,retentionDays:old?.retentionDays??1};
       this.cache.delete(key);
