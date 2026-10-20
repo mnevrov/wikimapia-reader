@@ -17,7 +17,7 @@ function initialView() {
   } catch {}
   return {lat:55.752,lng:37.618,zoom:16};
 }
-export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refresh,moreRequest,focus,location,gpsFollowing=false,onGpsPause,cacheEpoch,cacheView,selectedId,density,basemap,yandexKey,yandexReferer,onBasemapFallback,onBasemapConnected,onVisiblePlaces,onCandidates,onSelect,onState,onMessage}) {
+export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refresh,moreRequest,focus,location,gpsFollowing=false,onGpsPause,cacheEpoch,cacheView,mapTarget,selectedId,density,basemap,yandexKey,yandexReferer,onBasemapFallback,onBasemapConnected,onVisiblePlaces,onCandidates,onSelect,onState,onMessage}) {
   const el=useRef(null), mapRef=useRef(null), overlayRef=useRef(null), polygonsRef=useRef(new Map()),tileRef=useRef(null),yandexHost=useRef(null);
   const [viewport,setViewport]=useState(0);
   const [moving,setMoving]=useState(false);
@@ -136,6 +136,11 @@ export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refr
     map.fitBounds(focus,{maxZoom:17,paddingTopLeft:[24,88],paddingBottomRight:[32,Math.min(window.innerHeight*.52,420)]});
     return()=>p.remove();
   },[focus]);
+  useEffect(()=>{
+    const map=mapRef.current,coords=mapTarget?.coords;
+    if(!map||!Array.isArray(coords)||coords.length<3)return;
+    map.fitBounds(coords,{maxZoom:17,paddingTopLeft:[24,88],paddingBottomRight:[32,90]});
+  },[mapTarget]);
   useEffect(()=>{
     if(!cacheView||!mapRef.current)return;
     const [w,s,e,n]=cacheView.bbox;
