@@ -76,6 +76,7 @@ function App(){
   const [focus,setFocus]=useState(null),[location,setLocation]=useState(null),[locating,setLocating]=useState(false);
   const [recenterLocation,setRecenterLocation]=useState(null);
    const [gpsFollow,setGpsFollow]=useState('off'),[gpsError,setGpsError]=useState('');
+   const gpsWeakFixNotified=useRef(false);
    const [offlineEpoch,setOfflineEpoch]=useState(0),[offlineEntries,setOfflineEntries]=useState([]),[offlineInfo,setOfflineInfo]=useState(null),[offlineBusy,setOfflineBusy]=useState(false);
    const offlineUrls=useRef([]),offlineAbort=useRef(null);
    const revokeOffline=()=>{for(const url of offlineUrls.current)URL.revokeObjectURL(url);offlineUrls.current=[];};
@@ -133,7 +134,8 @@ function App(){
           if(cancelled)return;
           if(error){setGpsError('Местоположение недоступно · проверьте разрешение или сигнал GPS.');if(error.code===1||/permission|denied|разрешен/i.test(String(error.message||'')))setGpsFollow('off');return;}
           if(!p?.coords||!Number.isFinite(p.coords.latitude)||!Number.isFinite(p.coords.longitude))return;
-          if(!acceptableFix(p.coords)){setGpsError('Низкая точность GPS · ожидаем сигнал');return;}
+          if(!acceptableFix(p.coords)){if(!gpsWeakFixNotified.current){gpsWeakFixNotified.current=true;setGpsError('Низкая точность GPS · ожидаем сигнал');}return;}
+           gpsWeakFixNotified.current=false;
           setGpsError('');
           setLocation({lat:p.coords.latitude,lng:p.coords.longitude,accuracy:p.coords.accuracy,at:Date.now()});
         });
@@ -143,6 +145,8 @@ function App(){
     start();
     return()=>{cancelled=true;if(watchId)Geolocation.clearWatch({id:watchId}).catch(()=>{});};
   },[gpsFollow,active,screen,selected]);
+  // A weak GPS fix must not leave a permanent banner covering the map.
+  useEffect(()=>{if(!gpsError)return;const t=setTimeout(()=>setGpsError(''),5000);return()=>clearTimeout(t);},[gpsError]);
   useEffect(()=>{if(!toast)return;const t=setTimeout(()=>setToast(''),3000);return()=>clearTimeout(t);},[toast]);
   const resetRequests=()=>{closeCard();searchAbort.current?.abort();setSearchBusy(false);setResults([]);setSearchStatus('');setRefresh(0);};
   const applyKey=async value=>{if(await credentials.apply(value)){resetRequests();setDemo(false);setScreen('map');setToast('Wikimapia подключена');return true;}return false;};
@@ -171,6 +175,7 @@ function App(){
   };
   const findNearby=()=>{setListSort('distance');locate(true);};
   const toggleGps=()=>{
+     gpsWeakFixNotified.current=false;
     if(gpsFollow==='following'){setGpsFollow(nextFollowState(gpsFollow,'tap'));setGpsError('');return;}
     setGpsError('');setGpsFollow(nextFollowState(gpsFollow,'tap'));locate();
   };
@@ -257,7 +262,7 @@ function App(){
   if(!credentials.ready)return <Startup/>;
   return <main className={`${selected||candidates.length?'has-sheet':''} ${screen!=='map'?'has-screen':''} ${mapPanel?'has-map-panel':''} ${toast?'has-toast':''}`}>
     <div className="map-stage" inert={screen!=='map'} aria-hidden={screen!=='map'}>
-      <MapPane zoomRequest={zoomRequest} demo={demo} apiKey={apiKey} auto={auto} active={active} paused={screen!=='map'||!!selected||cacheClearing||gpsFollow==='following'} cacheEpoch={cacheEpoch} refresh={refresh} moreRequest={moreRequest} focus={focus} location={location} recenterLocation={recenterLocation} gpsFollowing={gpsFollow==='following'} onGpsPause={()=>setGpsFollow(s=>nextFollowState(s,'manual-pan'))} cacheView={cacheView} mapTarget={mapTarget} selectedId={selected?.id??highlightedId} density={density} basemap={basemap} yandexKey={yandexKey} yandexReferer={yandexReferer} onBasemapFallback={fallbackBasemap} onBasemapConnected={()=>setYandexDiagnostic(null)} onVisiblePlaces={setVisiblePlaces} onCandidates={setCandidates} onSelect={onSelect} onState={acceptArea} onMessage={setNotice}/>
+      <MapPane zoomRequest={zoomRequest} demo={demo} apiKey={apiKey} auto={auto} active={active} paused={screen!=='map'||!!selected||cacheClearing} cacheEpoch={cacheEpoch} refresh={refresh} moreRequest={moreRequest} focus={focus} location={location} recenterLocation={recenterLocation} gpsFollowing={gpsFollow==='following'} onGpsPause={()=>setGpsFollow(s=>nextFollowState(s,'manual-pan'))} cacheView={cacheView} mapTarget={mapTarget} selectedId={selected?.id??highlightedId} density={density} basemap={basemap} yandexKey={yandexKey} yandexReferer={yandexReferer} onBasemapFallback={fallbackBasemap} onBasemapConnected={()=>setYandexDiagnostic(null)} onVisiblePlaces={setVisiblePlaces} onCandidates={setCandidates} onSelect={onSelect} onState={acceptArea} onMessage={setNotice}/>
       {!online&&<div className="network-hint" role="status">Нет подключения · доступно офлайн-чтение сохранённых карточек; карта может быть недоступна.</div>}
       <div className="map-tools" role="toolbar" aria-label="Управление картой">
         <button className="icon-btn search-launch" aria-label="Найти место" title="Найти место" aria-pressed={mapPanel==='search'} onClick={()=>setMapPanel(v=>v==='search'?null:'search')}><Icon name="search"/></button>
@@ -268,7 +273,7 @@ function App(){
         {!demo&&<button className={`icon-btn area-action ${areaBusy?'is-loading':''} ${area.error?'has-error':''} ${area.more&&!areaBusy&&!area.error?'can-continue':''}`} aria-label={areaActionLabel} title={areaActionTitle} aria-busy={areaBusy} disabled={areaBusy||!active} onClick={runAreaAction}><Icon name={areaBusy||area.error||!area.more?'refresh':'download'}/></button>}
       </div>
       <Motion open={!!mapPanel&&!selected&&!candidates.length} identity={mapPanel} kind="discovery"><MapDiscover mode={mapPanel} demo={demo} query={query} onQuery={queryOnMap} onSearch={search} results={results} searchBusy={searchBusy} searchStatus={searchStatus} visiblePlaces={visiblePlaces} area={area} notice={notice} density={density} onDensity={setDensity} onSelect={onSelect} sort={listSort} onSort={setListSort} filter={listFilter} onFilter={setListFilter} listQuery={listQuery} onListQuery={setListQuery} favorites={favorites} offlineEntries={offlineEntries} location={location} onLocate={findNearby} onShowOnMap={showOnMap} highlightedId={highlightedId} onRefreshArea={refreshArea} onCancelSearch={cancelMapSearch} onSettings={()=>navigate('settings')} onClose={closeMapPanel}/></Motion>
-      {!selected&&!candidates.length&&(gpsError||notice)&&<div className="map-feedback"><div className="status" role="status" aria-live="polite">{gpsError|| (gpsFollow==='paused'?'GPS Follow приостановлен · нажмите кнопку геолокации для возобновления':notice)}</div>{demo&&<button className="connect-action" onClick={()=>navigate('settings')}>Подключить Wikimapia <Icon name="arrow" size={18}/></button>}</div>}
+      {!selected&&!candidates.length&&(gpsError||notice)&&<div className={'map-feedback'+(gpsError?' gps-feedback':'')}><div className="status" role="status" aria-live="polite">{gpsError|| (gpsFollow==='paused'?'GPS Follow приостановлен · нажмите кнопку геолокации для возобновления':notice)}</div>{demo&&<button className="connect-action" onClick={()=>navigate('settings')}>Подключить Wikimapia <Icon name="arrow" size={18}/></button>}</div>}
       <span className="sr-only" role="status" aria-live="polite">{area.draining?`Догружаем: ${area.places.length}${area.found!=null?` из ${area.found}`:" объектов"}`:''}</span>
       <Motion open={candidates.length>0} identity={candidates.map(p=>p.id).join(',')} kind="chooser"><ObjectChooser places={candidates} onPick={onSelect} onClose={()=>setCandidates([])}/></Motion>
       <Motion open={!!selected||busy||!!error} identity={selected?.id} kind="sheet"><Details returnLabel={returnTo==='search'||origin.current?.panel==='search'?'К результатам поиска':returnTo==='saved'?'К избранному':origin.current?.panel==='list'?'К объектам области':null} onReturn={dismissCard} data={details||(selected?{id:selected.id,title:selected.title}:null)} busy={busy} error={error} onClose={dismissCard} onRetry={()=>selected&&onSelect(selected)} basemap={basemap} favorites={favorites.filter(x=>x.source===(demo?'demo':'wikimapia')).map(x=>x.id)} toggleFavorite={toggleFavorite} offlineInfo={offlineInfo} offlineBusy={offlineBusy} onSaveOffline={saveOffline} onRemoveOffline={()=>removeOffline(selected?.id)} offlineAvailable={!demo&&online} shareAvailable={!demo&&selected?.source!=='demo'} onShowOnMap={()=>showOnMap(details||selected)} onShare={()=>sharePlace(details||selected)}/></Motion>
