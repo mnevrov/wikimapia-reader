@@ -14,3 +14,10 @@ export function areaCacheLabel(state, now = Date.now()) {
  const source = cached ? (fresh ? 'Кэш · свежие данные' : 'Кэш · данные могут устареть') : 'Данные с сервера';
  return partial ? source + ' · загружено не полностью' : source;
 }
+
+/** Only warnings/failures move above the map. Progress and guidance stay below.
+ * This function receives already-sanitized UI text, never raw API responses. */
+export function isMapErrorNotice(message) {
+ if (typeof message!=='string') return false;
+ return /недоступ|не удалось|не ответил|ошибк|тайм.?аут|лимит|квот|отклон|нет подключен|низкая точность|истекло время|превышен|повторите позже/i.test(message);
+}
