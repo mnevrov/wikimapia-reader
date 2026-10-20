@@ -243,3 +243,11 @@ main:has(.map-stack.has-yandex) .toast{
 .discovery-scroll .discovery-results{overflow:visible;min-height:auto}
 .discovery-scroll .discovery-status{flex-shrink:0}
 .discovery-place-list li.discover-active{background:var(--control-bg);border-radius:8px}
+
+/* 0.13 compact discovery: list remains immediately visible on short phones. */
+.discover-options{margin:4px 0 6px;border:1px solid var(--border);border-radius:12px;background:var(--surface-raised)}
+.discover-options summary{min-height:40px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;color:var(--accent-text)}
+.discover-options[open] summary{border-bottom:1px solid var(--border)}
+.discover-options .discover-filters{padding:8px 12px 12px;margin:0;gap:6px}
+.discover-options .discover-filters .discovery-status{font-size:11px;margin:2px 0}
+.discovery-scroll>.discovery-results{margin-top:4px}
