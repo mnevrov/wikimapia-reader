@@ -257,3 +257,6 @@ main:has(.map-stack.has-yandex) .toast{
 .discovery-panel-list .discovery-scroll{flex:1 1 0;min-height:0;overflow-y:auto}
 @media(min-width:700px){.discovery-panel-list{height:70dvh}}
 @media(max-height:500px){.discovery-panel-list{height:calc(100dvh - var(--nav-height) - var(--safe-bottom) - 18px)}}
+
+/* List row and map shortcut share space; do not inherit generic 100% button width. */
+.discovery-place-list .discover-on-map{width:44px;flex:0 0 44px}
