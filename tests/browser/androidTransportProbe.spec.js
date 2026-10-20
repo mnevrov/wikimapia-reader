@@ -36,6 +36,8 @@ test('explicit Android transport diagnostics make only two spaced requests and n
   const copied=await page.evaluate(()=>window.__copiedTransportReport);
   const report=JSON.parse(copied);
   expect(report.results.map(x=>x.outcome)).toEqual(['ok','ok']);
+  expect(report.results.map(x=>x.reason)).toEqual(['valid_folder','valid_folder']);
+  expect(report.results.map(x=>x.contentCategory)).toEqual(['unknown','json']);
   expect(report.requestCount).toBe(2);
   expect(copied).not.toContain('test-transport-private-key');
   expect(copied).not.toContain('37.616');
