@@ -55,7 +55,7 @@ export default function MapDiscover({mode,demo,query,onQuery,onSearch,results,se
         {shown.length?
           <ul className="discovery-results discovery-place-list">{shown.map(place=><li key={place.id} className={highlightedId===place.id?'discover-active':''}>
             <button onClick={()=>onSelect(place)}><span><strong>{place.title}</strong><small>#{place.id}{location&&' · '+distanceLabel(distanceMeters(location,polygonCenter(place)))}</small></span><Icon name="arrow" size={18}/></button>
-            <button className="discover-on-map" aria-label={'Показать на карте '+place.title} title="Показать контур" onClick={()=>onShowOnMap(place)}><Icon name="map" size={18}/></button>
+            <button className="discover-on-map" aria-label={'Показать контур #'+place.id} title="Показать контур" onClick={()=>onShowOnMap(place)}><Icon name="map" size={18}/></button>
           </li>)}</ul>:
           <p className="discovery-empty">{visiblePlaces.length?'Нет объектов по выбранным фильтрам.':'В этой части карты пока нет загруженных контуров. Приблизьте карту или дождитесь загрузки.'}</p>}
         {shownAll.length>limit&&<button className="secondary discovery-more" onClick={()=>setLimit(v=>v+80)}>Показать ещё {Math.min(80,shownAll.length-limit)}</button>}
