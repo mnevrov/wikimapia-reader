@@ -8,11 +8,11 @@ function cleanOffline(items){
   if(!Array.isArray(items)||items.length>5000)throw new Error('Недопустимое количество офлайн-карточек');
   const unique=new Map();
   for(const item of items){
-    if(!item||!validId(item.id)||typeof item.title!=='string'||typeof item.description!=='string'||item.title.length>1000||item.description.length>400000)
+    if(!item||!validId(item.id)||typeof item.title!=='string'||typeof item.description!=='string'||item.title.length>1000||item.description.length>maxLen)
       throw new Error('Некорректная офлайн-карточка в резервной копии');
     if(!Array.isArray(item.comments)||item.comments.length>500)throw new Error('Некорректные комментарии');
     const comments=item.comments.map(c=>{
-      if(!c||typeof c.author!=='string'||typeof c.text!=='string'||c.author.length>250||c.text.length>30000)
+      if(!c||typeof c.author!=='string'||typeof c.text!=='string'||c.author.length>250||c.text.length>maxLen)
         throw new Error('Некорректный комментарий');
       return {author:c.author,text:c.text,date:typeof c.date==='string'&&c.date.length<=40&&Number.isFinite(Date.parse(c.date))?new Date(c.date).toISOString():null};
     });
