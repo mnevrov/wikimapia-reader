@@ -1,7 +1,8 @@
 /* Explicit Android/WebView transport comparison. Never persist or copy URLs,
    exception messages, API keys, response bodies or geographic coordinates. */
 import {Capacitor, CapacitorHttp} from '@capacitor/core';
-import {buildRequest, normalizeArea, validateResponse} from './api.js';
+import {buildRequest} from './api.js';
+import {safeAreaResponseSummary} from './transportResponseSummary.js';
 import {waitForApiSlot} from './client.js';
 
 const FIXED_PUBLIC_BBOX=[37.616,55.751,37.625,55.756];
@@ -22,16 +23,9 @@ function outcome(transport, durationMs, httpStatus, result, objects=null, polygo
 }
 
 function parseResponse(response,transport,durationMs) {
-  const status=Number(response.status);
-  if(status!==200) return outcome(transport,durationMs,status,'http_error');
-  try{
-    const data=typeof response.data==='string'?JSON.parse(response.data):response.data;
-    const payload=validateResponse(data,'box');
-    const rows=normalizeArea(payload);
-    return outcome(transport,durationMs,status,'ok',rows.length,rows.filter(r=>r.coords.length>=3).length);
-  }catch{
-    return outcome(transport,durationMs,status,'schema_error');
-  }
+  const safe=safeAreaResponseSummary(response);
+  return {...outcome(transport,durationMs,safe.httpStatus,safe.outcome,safe.objects,safe.polygons),
+    reason:safe.reason,contentCategory:safe.contentCategory};
 }
 
 function networkOutcome(error,transport,durationMs,timedOut) {
@@ -56,7 +50,7 @@ async function webProbe(url) {
   try{
     const r=await fetch(url,{signal:controller.signal,cache:'no-store'});
     const data=await r.text();
-    return parseResponse({status:r.status,data},'webview_fetch',performance.now()-begin);
+    return parseResponse({status:r.status,data,headers:r.headers},'webview_fetch',performance.now()-begin);
   }catch(e){
     // Browser CORS errors and some network errors can look identical.
     return networkOutcome(e,'webview_fetch',performance.now()-begin,timedOut);
