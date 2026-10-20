@@ -2,13 +2,13 @@ import React,{useState} from 'react';
 import Icon from './Icon.jsx';
 import {filterLibrary} from './readingHistory.js';
 
-export default function SavedLibrary({offlineEntries,favorites,history,historyEnabled,savedQuery,onQuery,onSelect,onRemoveOffline,onRemoveFavorite,onClearHistory,onRemoveHistory,onToggleHistory,onGoMap}){
+export default function SavedLibrary({offlineEntries,favorites,history,historyEnabled,savedQuery,onQuery,onSelect,onRemoveOffline,onRemoveFavorite,onClearHistory,onRemoveHistory,onToggleHistory,onGoMap,scrollRef}){
   const [confirmClear,setConfirmClear]=useState(false);
   const offline=filterLibrary(offlineEntries,savedQuery,{searchDescription:true});
   const starred=filterLibrary(favorites,savedQuery);
   const recent=filterLibrary(history,savedQuery);
   const populated=offlineEntries.length+favorites.length+history.length>0;
-  return <div className="screen-body" aria-label="Библиотека">
+  return <div className="screen-body" aria-label="Библиотека" ref={scrollRef}>
     {populated&&<label className="saved-filter" htmlFor="saved-library-search">Найти в сохранённом и истории
       <input id="saved-library-search" type="search" value={savedQuery} onChange={e=>onQuery(e.target.value)} placeholder="Название, текст офлайн-карточки или ID"/>
     </label>}
