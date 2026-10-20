@@ -4,7 +4,9 @@ import {polygonCenter,distanceMeters,polygonAreaMeters,discoverPlaces,distanceLa
 const a={id:2,title:'Библиотека',coords:[[55.75,37.61],[55.75,37.62],[55.76,37.62],[55.76,37.61]]};
 const b={id:1,title:'Арка',coords:[[55.751,37.613],[55.751,37.614],[55.752,37.614],[55.752,37.613]]};
 test('valid polygon center, area and distance are computed without API',()=>{
- assert.deepEqual(polygonCenter(a),{lat:55.755,lng:37.615});
+ const center=polygonCenter(a);
+ assert.ok(Math.abs(center.lat-55.755)<1e-9);
+ assert.ok(Math.abs(center.lng-37.615)<1e-9);
  assert.ok(polygonAreaMeters(a)>polygonAreaMeters(b));
  assert.equal(distanceMeters({lat:55,lng:37},{lat:55,lng:37}),0);
  assert.ok(distanceMeters({lat:55.7515,lng:37.6135},polygonCenter(b))<100);
