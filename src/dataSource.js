@@ -1,8 +1,8 @@
 import {normalizePlace,normalizeArea,geometryOf} from './api.js';
 const reliable=s=>s==='ok'||s==='empty';
-function collectionValid(value,field){
+function collectionValid(value,field,normalized){
  let items=value;if(!Array.isArray(items)&&items&&typeof items==='object'){const key=['places','place','photo','comment','items','item'].find(k=>items[k]!==undefined);items=key?items[key]:null;if(items&&!Array.isArray(items)&&typeof items==='object')items=[items];}
- if(!Array.isArray(items))return false;
+ if(!Array.isArray(items)||field==='photos'&&normalized.length!==items.length)return false;
  return items.every(x=>x&&typeof x==='object'&&(field==='comments'?([true,1,'1'].includes(x.is_deleted)||['text','comment','message'].some(k=>typeof x[k]==='string')):['big_url','960_url','thumbnail_url','url_big','url_full','big','fullsize','url','url_thumb','thumb'].some(k=>typeof x[k]==='string')));
 }
 export function createDataSource({site,api,getKey}){
@@ -18,7 +18,7 @@ export function createDataSource({site,api,getKey}){
    if(missing.length&&key){
     const dataBlocks=[...new Set(missing.map(k=>k==='title'||k==='description'?'main':k))];
     try{const payload=await api('place.getbyid',key,{id,signal,dataBlocks});signal?.throwIfAborted();const normalized=normalizePlace(payload),raw=payload.place??payload;if(normalized.id!==id)throw Error('ID mismatch');
-     for(const field of missing){const available=field==='title'?typeof (raw.title??raw.main?.title)==='string'&&!!(raw.title??raw.main?.title):field==='description'?typeof (raw.main??raw).description==='string':collectionValid(raw[field],field)&&((raw[field]?.length??0)===0||normalized[field].length>0);
+     for(const field of missing){const available=field==='title'?typeof (raw.title??raw.main?.title)==='string'&&!!(raw.title??raw.main?.title):field==='description'?typeof (raw.main??raw).description==='string':collectionValid(raw[field],field,normalized[field])&&((raw[field]?.length??0)===0||normalized[field].length>0);
       if(available){place={...place,[field]:normalized[field]};blocks[field]=(Array.isArray(normalized[field])?normalized[field].length:normalized[field])?'ok':'empty';source=result?'hybrid':'api';}}
      const coords=geometryOf(payload);if(coords.length>=3)place={...place,coords};
     }catch(e){signal?.throwIfAborted();if(e.name==='AbortError')throw e;if(!result)throw e;}
