@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {areaMessage, areaCacheLabel} from '../src/mapStatus.js';
+import {areaMessage, areaCacheLabel, isMapErrorNotice} from '../src/mapStatus.js';
 test('only cold load speaks; background loading is silent',()=>{
  assert.equal(areaMessage({loading:true,background:false}),'Загружаем объекты…');
  assert.equal(areaMessage({loading:true,background:true,displayPlaces:[{}]}),'');
@@ -25,4 +25,21 @@ test('fresh, expired and incomplete cache are labeled without coordinates',()=>{
 test('fresh network data is not presented as cache',()=>{
  assert.equal(areaCacheLabel({page:1,places:[{}],found:1,complete:true,dataSource:'network',cacheUpdatedAt:1000},1001),'Данные с сервера');
  assert.match(areaCacheLabel({page:0,displayPlaces:[{}],complete:false,dataSource:'cache',cacheUpdatedAt:1000},400000),/могут устареть.*не полностью/);
+});
+
+test('geo, quota and transport failures are top banners while loading stays below',()=>{
+ for(const message of [
+  'Местоположение недоступно. Проверьте разрешение и геопозицию.',
+  'Местоположение недоступно · разрешите геолокацию.',
+  'Низкая точность GPS · ожидаем сигнал',
+  'Сервер не ответил вовремя. Повторите запрос позже.',
+  'Не удалось получить данные из Wikimapia API.',
+  'Исчерпан лимит API-запросов.',
+  'Ключ API отклонён.'
+ ]) assert.equal(isMapErrorNotice(message),true,message);
+ for(const message of [
+  '',null,'Загружаем объекты…','Местоположение определено',
+  'Здесь пока нет объектов Wikimapia','Приблизьте карту для загрузки объектов',
+  'Большая область: загружено ещё 20 страниц.'
+ ]) assert.equal(isMapErrorNotice(message),false,String(message));
 });

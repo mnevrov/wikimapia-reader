@@ -298,3 +298,36 @@ main.has-toast .map-stage .map-feedback,
 main:has(.undo-toast) .map-stage .map-feedback{
   visibility:hidden;
 }
+
+/* 0.13.2 — distinguish warnings from neutral progress. Warnings belong in a
+   small top-left slot; leave the right-hand toolbar and SDK legal UI untouched.
+   The normal map-feedback remains below, as in 0.13.1. */
+.map-stage .map-feedback.is-error{
+  top:calc(16px + var(--safe-top));
+  bottom:auto;
+  left:12px;
+  right:auto;
+  width:max-content;
+  max-width:min(300px,calc(100% - 96px));
+  padding:9px 12px;
+  border-left:2px solid var(--error-text);
+}
+.map-stage:has(.map-stack.has-yandex) .map-feedback.is-error{
+  top:calc(92px + var(--safe-top));
+}
+.map-stage:has(.network-hint) .map-feedback.is-error{
+  top:calc(96px + var(--safe-top));
+}
+.map-stage:has(.map-stack.has-yandex):has(.network-hint) .map-feedback.is-error{
+  top:calc(168px + var(--safe-top));
+}
+@media(max-height:500px){
+  .map-stage .map-feedback.is-error,
+  .map-stage:has(.map-stack.has-yandex) .map-feedback.is-error,
+  .map-stage:has(.network-hint) .map-feedback.is-error,
+  .map-stage:has(.map-stack.has-yandex):has(.network-hint) .map-feedback.is-error{
+    bottom:auto;
+    max-height:28vh;
+    overflow:auto;
+  }
+}

@@ -88,6 +88,25 @@ test('Yandex SDK legal controls are not restyled; map notices do not cover lower
  expect(bounds.toolsTop).toBeGreaterThanOrEqual(8);
  expect(bounds.logoVsCopy).toBe(false);
  expect(bounds.copyGap).toBeGreaterThanOrEqual(16);
+ // A warning goes to the top LEFT, below the provider logo and away from tools.
+ await page.locator('.map-stage>.map-feedback').first().evaluate(node=>node.classList.add('is-error'));
+ const warning=await page.evaluate(()=>{
+  const stage=document.querySelector('.map-stage').getBoundingClientRect();
+  const n=document.querySelector('.map-stage>.map-feedback').getBoundingClientRect();
+  const logo=document.querySelector('.mock-yandex-legal').getBoundingClientRect();
+  const copy=document.querySelector('.mock-yandex-copyrights').getBoundingClientRect();
+  const toolbar=document.querySelector('.map-tools').getBoundingClientRect();
+  const hit=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
+  return {top:n.top-stage.top,inside:n.top>=stage.top&&n.bottom<=stage.bottom,
+   logo:hit(n,logo),copyright:hit(n,copy),toolbar:hit(n,toolbar)};
+ });
+ expect(warning.top).toBeGreaterThanOrEqual(80);
+ expect(warning.top).toBeLessThan(160);
+ expect(warning.inside).toBe(true);
+ expect(warning.logo).toBe(false);
+ expect(warning.copyright).toBe(false);
+ expect(warning.toolbar).toBe(false);
+ await page.locator('.map-stage>.map-feedback').first().evaluate(node=>node.classList.remove('is-error'));
  // Landscape should retain the same clearance without off-screen controls.
  await page.setViewportSize({width:844,height:390});
  const landscape=await page.evaluate(()=>{
