@@ -19,3 +19,9 @@ test('backup round trip ignores demo favorites and invalid history',()=>{
  assert.deepEqual(parseBackup(JSON.stringify(saved)).favorites.map(x=>x.id),[2]);
  assert.equal(parseBackup(JSON.stringify(saved)).history.length,1);
 });
+
+test('malformed comment dates are stripped so reader date formatting cannot crash',()=>{
+ const source=buildBackup({offline:[{...row,comments:[{author:'А',text:'Объект',date:'corrupt-date'}]}]});
+ const parsed=parseBackup(JSON.stringify(source));
+ assert.equal(parsed.offline[0].comments[0].date,null);
+});
