@@ -13,11 +13,14 @@ test('local discovery filters and map preview work without any Wikimapia API req
  await page.getByRole('button',{name:'Список объектов области'}).click();
  const panel=page.getByRole('region',{name:'Объекты на карте'});
  await expect(panel.locator('.discovery-place-list li')).toHaveCount(3);
+ await panel.locator('.discover-options summary').click();
  await panel.locator('#discover-query').fill('исторического');
  await expect(panel.locator('.discovery-place-list li')).toHaveCount(1);
  await panel.locator('#discover-query').fill('');
  await panel.locator('#discover-sort').selectOption('area');
  await expect(panel.locator('.discovery-place-list li')).toHaveCount(3);
+ await panel.locator('.discover-options summary').click();
+ await expect(panel.getByText('Демонстрационный квартал')).toBeVisible();
  await panel.getByRole('button',{name:'Показать контур #101'}).click();
  await expect(panel).toHaveCount(0);
  await expect(page.locator('path.leaflet-interactive').first()).toBeVisible();
