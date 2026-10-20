@@ -25,3 +25,11 @@ test('malformed comment dates are stripped so reader date formatting cannot cras
  const parsed=parseBackup(JSON.stringify(source));
  assert.equal(parsed.offline[0].comments[0].date,null);
 });
+
+test('export keeps long existing offline descriptions losslessly within 10MB backup cap',()=>{
+ const long='Ж'.repeat(410000);
+ const item={...row,description:long};
+ const data=buildBackup({offline:[item]});
+ const text=JSON.stringify(data);
+ assert.equal(parseBackup(text).offline[0].description,long);
+});
