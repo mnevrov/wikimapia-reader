@@ -27,6 +27,8 @@ import {offlineStore} from './offlineStore.js';
 import {nextFollowState,acceptableFix} from './gpsFollow.js';
 import {HISTORY_KEY,HISTORY_ENABLED_KEY,readHistory,recordHistory} from './readingHistory.js';
 import SavedLibrary from './SavedLibrary.jsx';
+import {buildBackup} from './libraryBackup.js';
+import {saveLibraryText,nativeShareUrl} from './nativeTransfer.js';
 
 const navigation=[['map','Карта','map'],['search','Поиск','search'],['saved','Избранное','bookmark'],['settings','Настройки','settings']];
 function App(){
@@ -212,9 +214,31 @@ function App(){
     if(!Number.isSafeInteger(id)||id<=0)return;
     const url='https://wikimapia.org/'+id+'/';
     try{
+      if(await nativeShareUrl(url))return;
       if(typeof navigator.share==='function'){await navigator.share({title:String(place.title||'Wikimapia'),url});return;}
       await navigator.clipboard.writeText(url);setToast('Ссылка на объект скопирована');
     }catch(e){if(e?.name!=='AbortError')setToast('Не удалось поделиться ссылкой');}
+  };
+  const exportLibrary=async()=>{
+    const snapshot=await offlineStore.snapshot();
+    const content=JSON.stringify(buildBackup({favorites,history,offline:snapshot.entries}),null,2);
+    if(await saveLibraryText(content)){setToast('Резервная копия сохранена');return;}
+    const url=URL.createObjectURL(new Blob([content],{type:'application/json'}));
+    const link=document.createElement('a');link.href=url;link.download='wikireader-library-'+new Date().toISOString().slice(0,10)+'.json';
+    document.body.appendChild(link);link.click();link.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),60000);
+    setToast('Резервная копия подготовлена к сохранению');
+  };
+  const importLibrary=async backup=>{
+    const result=await offlineStore.importRows(backup.offline);
+    const favoriteMap=new Map([...favorites,...backup.favorites].map(item=>[item.source+':'+item.id,item]));
+    const nextFavorites=[...favoriteMap.values()];
+    const nextHistory=historyEnabled?readHistory(JSON.stringify([...history,...backup.history])):history;
+    localStorage.setItem('wikimapia-reader-favorites',JSON.stringify(nextFavorites));
+    if(historyEnabled)localStorage.setItem(HISTORY_KEY,JSON.stringify(nextHistory));
+    setFavorites(nextFavorites);if(historyEnabled)setHistory(nextHistory);
+    setOfflineEpoch(v=>v+1);
+    return {offline:result.added,favorites:nextFavorites.length-favorites.length,history:nextHistory.length-history.length};
   };
   const queryOnMap=value=>{searchAbort.current?.abort();setSearchBusy(false);setQuery(value);setResults([]);setSearchStatus('');};
   const cancelMapSearch=()=>{searchAbort.current?.abort();setSearchBusy(false);setSearchStatus('Поиск отменён');};
@@ -251,7 +275,7 @@ function App(){
       {screen==='settings'&&<Settings confirmForget={confirmForget} setConfirmForget={setConfirmForget} credentials={credentials} onCacheAction={changeCache} onShowArea={showCachedArea} cacheEpoch={cacheEpoch} currentAreaIds={currentAreaIds} cacheClearing={cacheClearing} offlineEpoch={offlineEpoch} onOfflineChange={()=>setOfflineEpoch(v=>v+1)} theme={theme} setTheme={setTheme} auto={auto} setAuto={setAuto} density={density} setDensity={setDensity} basemap={basemap} setBasemap={setBasemap} yandexKey={yandexKey} setYandexKey={setYandexKey} yandexReferer={yandexReferer} setYandexReferer={setYandexReferer} yandexDiagnostic={yandexDiagnostic} onApply={applyKey} onForget={forgetKey} demo={demo} onDemo={()=>{resetRequests();setDemo(true);setScreen('map');}} onReal={()=>{resetRequests();setDemo(false);setScreen('map');}}/>}
       {!online&&<div className="screen-network" role="status">Нет сети. Доступны сохранённые офлайн-карточки, избранное и контуры; новая загрузка требует сети.</div>}
       {screen==='search'&&<div className="screen-body search-page" ref={screenBody}>{demo?<div className="empty-state"><Icon name="search" size={36}/><h2>Найдите нужное место</h2><p>Подключите Wikimapia, чтобы искать по названию или открывать объекты по ID.</p><button className="primary" onClick={()=>setScreen('settings')}>Добавить API-ключ</button></div>:<><form className="search-form" onSubmit={search}><label htmlFor="place-query">Название, ID или ссылка Wikimapia</label><div className="search-input"><Icon name="search"/><input id="place-query" type="search" value={query} maxLength={200} onChange={e=>{searchAbort.current?.abort();setSearchBusy(false);setQuery(e.target.value);setResults([]);setSearchStatus('');}} enterKeyHint="search" placeholder="Место или ссылка на объект"/><button className="primary" disabled={searchBusy||!query.trim()}>Найти</button></div></form><div className="search-actions">{query&&<button className="text-button" onClick={()=>{searchAbort.current?.abort();setQuery('');setResults([]);setSearchStatus('');setSearchBusy(false);document.getElementById('place-query')?.focus();}}>Очистить поиск</button>}{searchBusy&&<button className="text-button" onClick={()=>{searchAbort.current?.abort();setSearchBusy(false);setSearchStatus('Поиск отменён');}}>Отменить поиск</button>}</div><p className="search-feedback" role="status">{searchStatus||'Поиск по объектам Wikimapia рядом с текущей картой'}</p><ul className="search-results">{results.map(p=><li key={p.id}><button data-place-id={p.id} data-source="wikimapia" onClick={()=>onSelect(p)}><span><strong>{p.title}</strong><small>Wikimapia · #{p.id}</small></span><Icon name="arrow" size={18}/></button></li>)}</ul><Disclosure className="id-disclosure" title="Открыть объект по ID"><div className="open-id"><label htmlFor="place-id">Число из ссылки Wikimapia</label><input id="place-id" type="number" min="1" value={placeId} onChange={e=>setPlaceId(e.target.value)}/><button className="secondary" onClick={openId}>Открыть по ID</button></div></Disclosure></>}</div>}
-      {screen==='saved'&&<SavedLibrary offlineEntries={offlineEntries} favorites={favorites} history={history} historyEnabled={historyEnabled} savedQuery={savedQuery} onQuery={setSavedQuery} scrollRef={screenBody} onSelect={onSelect} onRemoveOffline={removeOffline} onRemoveFavorite={removeFavorite} onClearHistory={()=>setHistory([])} onRemoveHistory={id=>setHistory(items=>items.filter(p=>p.id!==id))} onToggleHistory={toggleHistory} onGoMap={()=>setScreen('map')}/>}
+      {screen==='saved'&&<SavedLibrary offlineEntries={offlineEntries} favorites={favorites} history={history} historyEnabled={historyEnabled} savedQuery={savedQuery} onQuery={setSavedQuery} scrollRef={screenBody} onSelect={onSelect} onRemoveOffline={removeOffline} onRemoveFavorite={removeFavorite} onClearHistory={()=>setHistory([])} onRemoveHistory={id=>setHistory(items=>items.filter(p=>p.id!==id))} onToggleHistory={toggleHistory} onGoMap={()=>setScreen('map')} onExportLibrary={exportLibrary} onImportLibrary={importLibrary}/>}
     </section></Motion>
     <nav className="bottom-nav" aria-label="Основная навигация">{navigation.map(([id,label,icon])=><button key={id} aria-current={screen===id?'page':undefined} onClick={()=>navigate(id)}><Icon name={icon}/><span>{label}</span></button>)}</nav>
     <Motion open={!!undo} identity={undo?`${undo.place.source}:${undo.place.id}`:''} kind="toast"><div className="undo-toast" role="status"><span>Место удалено из избранного</span><button className="text-button" onClick={undoRemove}>Вернуть</button></div></Motion>
