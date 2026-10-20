@@ -260,3 +260,33 @@ main:has(.map-stack.has-yandex) .toast{
 
 /* List row and map shortcut share space; do not inherit generic 100% button width. */
 .discovery-place-list .discover-on-map{width:44px;flex:0 0 44px}
+
+/* 0.13.1: keep map feedback peripheral, clear of the Yandex SDK legal controls. */
+.map-stage .map-feedback,
+.map-stage:has(.map-stack.has-yandex) .map-feedback,
+.map-stage:has(.map-stack.has-yandex):has(.network-hint) .map-feedback{
+  top:auto;
+  bottom:78px;
+  left:12px;
+  right:auto;
+  width:max-content;
+  max-width:min(280px,calc(100% - 96px));
+}
+.map-stage .gps-feedback{
+  pointer-events:none;
+  padding:7px 10px;
+  opacity:.94;
+}
+.map-stage .gps-feedback .status{
+  font-size:12px;
+  line-height:1.35;
+}
+@media(max-height:500px){
+  .map-stage .map-feedback,
+  .map-stage:has(.map-stack.has-yandex) .map-feedback,
+  .map-stage:has(.map-stack.has-yandex):has(.network-hint) .map-feedback{
+    bottom:44px;
+    max-height:24vh;
+    overflow:auto;
+  }
+}
