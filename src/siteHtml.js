@@ -1,7 +1,7 @@
 // This module never executes scripts and never inserts fetched markup into the live DOM.
 function documentOf(html){if(typeof html!=='string'||html.length>4194304)throw Error('Некорректная страница Wikimapia');return new DOMParser().parseFromString(html,'text/html');}
 function text(node){if(!node)return '';const copy=node.cloneNode(true);copy.querySelectorAll('script,style,iframe,object,embed,noscript').forEach(x=>x.remove());copy.querySelectorAll('br').forEach(x=>x.replaceWith('\n'));copy.querySelectorAll('p,div,li').forEach(x=>x.append('\n'));return copy.textContent.replace(/\u00a0/g,' ').replace(/[\t ]+/g,' ').replace(/ *\n */g,'\n').replace(/\n{3,}/g,'\n\n').trim();}
-function photoUrl(raw){try{const u=new URL(raw);if(!['http:','https:'].includes(u.protocol)||u.hostname!=='photos.wikimapia.org'||u.username||u.password||u.port||!/^\/p\/(?:\d{2}\/){4}\d{2}_(?:big|\d+)\.jpg$/.test(u.pathname))return null;u.protocol='https:';u.search='';u.hash='';return u.href;}catch{return null;}}
+function photoUrl(raw){try{const u=new URL(raw);if(!['http:','https:'].includes(u.protocol)||u.hostname!=='photos.wikimapia.org'||u.username||u.password||u.port||!/^\/p\/(?:\d{2}\/){4}\d{2}_(?:big|full|\d+)\.jpg$/.test(u.pathname))return null;u.protocol='https:';u.search='';u.hash='';return u.href;}catch{return null;}}
 export function parseSitePlace(html,expectedId){
  if(!Number.isSafeInteger(expectedId)||expectedId<1)throw Error('Неверный ID');
  const doc=documentOf(html),identity=doc.querySelector('meta[property="og:url"]')?.content||doc.querySelector('link[rel="canonical"]')?.getAttribute('href');
