@@ -230,3 +230,10 @@ main:has(.map-stack.has-yandex) .toast{
 .sheet-shortcuts{display:flex;gap:8px;padding:6px 0 8px;flex-shrink:0}
 .sheet-shortcuts .secondary{flex:1;min-width:0;min-height:38px;font-size:12px;padding:8px}
 @media(max-height:500px){.sheet-shortcuts .secondary{min-height:34px}}
+
+/* 0.13 library backup: compact, keyboard-accessible file actions. */
+.library-backup{margin-top:16px;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:16px}
+.library-backup h2{font-size:15px;margin-bottom:8px}
+.library-backup .split-actions button{display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.library-backup .backup-file-input{display:none}
+.library-backup .cache-confirm{margin-top:12px}
