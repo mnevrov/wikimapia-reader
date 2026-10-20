@@ -1,12 +1,15 @@
-import React,{useEffect,useState} from 'react';
+import React,{useEffect,useMemo,useState} from 'react';
 import Icon from './Icon.jsx';
 import {areaCacheLabel} from './mapStatus.js';
+import {discoverPlaces,polygonCenter,distanceMeters,distanceLabel} from './discoverModel.js';
 
 export default function MapDiscover({mode,demo,query,onQuery,onSearch,results,searchBusy,searchStatus,
- visiblePlaces,area,notice,density,onDensity,onSelect,onRefreshArea,onCancelSearch,onSettings,onClose}) {
+ visiblePlaces,area,notice,density,onDensity,onSelect,onRefreshArea,onCancelSearch,onSettings,onClose,
+ sort,onSort,filter,onFilter,listQuery,onListQuery,favorites,offlineEntries,location,onLocate,onShowOnMap,highlightedId}) {
   const [limit,setLimit]=useState(80);
-  useEffect(()=>setLimit(80),[mode,visiblePlaces]);
-  const shown=visiblePlaces.slice(0,limit);
+  const shownAll=useMemo(()=>discoverPlaces(visiblePlaces,{text:listQuery,filter,sort,favorites,offline:offlineEntries,location}),[visiblePlaces,listQuery,filter,sort,favorites,offlineEntries,location]);
+  useEffect(()=>setLimit(80),[mode,visiblePlaces,listQuery,filter,sort]);
+  const shown=shownAll.slice(0,limit);
   const count=`${area.places.length}${area.found!=null?` из ${area.found}`:''}`;
   const cacheLabel=areaCacheLabel(area);
   const areaStatus=area.error?area.error:
@@ -36,13 +39,27 @@ export default function MapDiscover({mode,demo,query,onQuery,onSearch,results,se
           <label htmlFor="map-density">Контуры<select id="map-density" value={density} onChange={e=>onDensity(e.target.value)}><option value="auto">Авто</option><option value="detailed">Подробно</option><option value="calm">Спокойно</option></select></label>
           <span aria-live="polite">Видно: {visiblePlaces.length}</span>
         </div>
+        <div className="discover-filters">
+          <label htmlFor="discover-query">Поиск среди загруженных объектов<input id="discover-query" type="search" value={listQuery} onChange={e=>onListQuery(e.target.value)} placeholder="Название или ID"/></label>
+          <div className="discover-selects">
+            <label htmlFor="discover-filter">Показывать<select id="discover-filter" value={filter} onChange={e=>onFilter(e.target.value)}><option value="all">Все</option><option value="favorite">Избранное</option><option value="offline">Сохранено офлайн</option></select></label>
+            <label htmlFor="discover-sort">Сортировка<select id="discover-sort" value={sort} onChange={e=>onSort(e.target.value)}><option value="title">По названию</option><option value="distance" disabled={!location}>По расстоянию</option><option value="area">По площади</option></select></label>
+          </div>
+          <button className="secondary discover-nearby" onClick={onLocate}><Icon name="locate" size={17}/>Рядом со мной</button>
+          {sort==='distance'&&location&&<p className="discovery-status">Расстояние приблизительное, до центра границ контура.</p>}
+          {!location&&<p className="discovery-status">Для расстояний разрешите геолокацию нажатием «Рядом со мной».</p>}
+        </div>
         <p className="discovery-status" role="status">{demo?'Демонстрационные объекты':areaStatus}</p>
         {!demo&&cacheLabel&&<p className="discovery-status" aria-label="Состояние данных области">{cacheLabel}</p>}
         {!demo&&<button className="text-button discovery-refresh" disabled={area.loading||area.draining} onClick={onRefreshArea}><Icon name="refresh" size={16}/>Обновить область с сервера</button>}
         {shown.length?
-          <ul className="discovery-results">{shown.map(place=><li key={place.id}><button onClick={()=>onSelect(place)}><span><strong>{place.title}</strong><small>#{place.id}</small></span><Icon name="arrow" size={18}/></button></li>)}</ul>:
-          <p className="discovery-empty">В этой части карты пока нет загруженных контуров. Приблизьте карту или дождитесь загрузки.</p>}
-        {visiblePlaces.length>limit&&<button className="secondary discovery-more" onClick={()=>setLimit(v=>v+80)}>Показать ещё {Math.min(80,visiblePlaces.length-limit)}</button>}
+          <ul className="discovery-results discovery-place-list">{shown.map(place=><li key={place.id} className={highlightedId===place.id?'discover-active':''}>
+            <button onClick={()=>onSelect(place)}><span><strong>{place.title}</strong><small>#{place.id}{location&&' · '+distanceLabel(distanceMeters(location,polygonCenter(place)))}</small></span><Icon name="arrow" size={18}/></button>
+            <button className="discover-on-map" aria-label={'Показать на карте '+place.title} title="Показать контур" onClick={()=>onShowOnMap(place)}><Icon name="map" size={18}/></button>
+          </li>)}</ul>:
+          <p className="discovery-empty">{visiblePlaces.length?'Нет объектов по выбранным фильтрам.':'В этой части карты пока нет загруженных контуров. Приблизьте карту или дождитесь загрузки.'}</p>}
+        {shownAll.length>limit&&<button className="secondary discovery-more" onClick={()=>setLimit(v=>v+80)}>Показать ещё {Math.min(80,shownAll.length-limit)}</button>}
+        <p className="discovery-status">Список содержит только полученные контуры. Отсутствие объекта не означает его отсутствие в Wikimapia.</p>
       </>}
   </section>;
 }
