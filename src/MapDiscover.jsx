@@ -34,7 +34,7 @@ export default function MapDiscover({mode,demo,query,onQuery,onSearch,results,se
         {searchBusy&&<button className="text-button" onClick={onCancelSearch}>Отменить поиск</button>}
         <ul className="discovery-results">{results.map(place=><li key={place.id}><button onClick={()=>onSelect(place)}><span><strong>{place.title}</strong><small>Wikimapia · #{place.id}</small></span><Icon name="arrow" size={18}/></button></li>)}</ul>
       </>:
-      <>
+      <div className="discovery-scroll">
         <div className="discovery-controls">
           <label htmlFor="map-density">Контуры<select id="map-density" value={density} onChange={e=>onDensity(e.target.value)}><option value="auto">Авто</option><option value="detailed">Подробно</option><option value="calm">Спокойно</option></select></label>
           <span aria-live="polite">Видно: {visiblePlaces.length}</span>
@@ -60,6 +60,6 @@ export default function MapDiscover({mode,demo,query,onQuery,onSearch,results,se
           <p className="discovery-empty">{visiblePlaces.length?'Нет объектов по выбранным фильтрам.':'В этой части карты пока нет загруженных контуров. Приблизьте карту или дождитесь загрузки.'}</p>}
         {shownAll.length>limit&&<button className="secondary discovery-more" onClick={()=>setLimit(v=>v+80)}>Показать ещё {Math.min(80,shownAll.length-limit)}</button>}
         <p className="discovery-status">Список содержит только полученные контуры. Отсутствие объекта не означает его отсутствие в Wikimapia.</p>
-      </>}
+      </div>}
   </section>;
 }
