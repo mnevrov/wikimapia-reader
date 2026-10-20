@@ -37,8 +37,9 @@ function App(){
   const [history,setHistory]=useState(()=>{try{return readHistory(localStorage.getItem(HISTORY_KEY));}catch{return [];}});
   const [historyEnabled,setHistoryEnabled]=useState(()=>{try{return localStorage.getItem(HISTORY_ENABLED_KEY)!=='false';}catch{return true;}});
   useEffect(()=>{try{localStorage.setItem(HISTORY_KEY,JSON.stringify(history));}catch{}},[history]);
-  const rememberViewed=useCallback(place=>{if(historyEnabled&&place?.source!=='demo')setHistory(items=>recordHistory(items,place));},[historyEnabled]);
-  const toggleHistory=enabled=>{setHistoryEnabled(enabled);if(!enabled)setHistory([]);try{localStorage.setItem(HISTORY_ENABLED_KEY,String(enabled));if(!enabled)localStorage.removeItem(HISTORY_KEY);}catch{}};
+  const historyRecording=useRef(historyEnabled);
+  const rememberViewed=useCallback(place=>{if(historyRecording.current&&place?.source!=='demo')setHistory(items=>recordHistory(items,place));},[]);
+  const toggleHistory=enabled=>{historyRecording.current=enabled;setHistoryEnabled(enabled);if(!enabled)setHistory([]);try{localStorage.setItem(HISTORY_ENABLED_KEY,String(enabled));if(!enabled)localStorage.removeItem(HISTORY_KEY);}catch{}};
   const screenBody=useRef(null),positions=useRef({}),origin=useRef(null),restoreFocus=useRef(false);
   const rememberScreen=()=>{if(screenBody.current)positions.current[screen]=screenBody.current.scrollTop;};
   const [theme,setTheme]=useTheme();
