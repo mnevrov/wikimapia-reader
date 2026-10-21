@@ -145,39 +145,6 @@ main::before,main::after{content:'';position:fixed;left:0;right:0;z-index:2000;b
 /* 0.9.4: keep map provider legal UI at native SDK size and visible. Do not
    style, scale, fade, translate or hide any element inside .yandex-underlay.
    See also the scoped element resets at the top of this stylesheet. */
-/* Only app-owned informational panels move out of the bottom corners.
-   The SDK's copyrights, distribution button and legal links keep their
-   untouched default positions and size. */
-.map-stage:has(.map-stack.has-yandex) .map-feedback{
-  top:calc(12px + var(--safe-top));
-  bottom:auto;
-  left:12px;
-  right:78px;
-  max-width:min(360px,calc(100% - 102px));
-}
-.map-stage:has(.map-stack.has-yandex):has(.network-hint) .map-feedback{
-  top:calc(82px + var(--safe-top));
-}
-main:has(.map-stack.has-yandex) .toast{
-  bottom:calc(var(--nav-height) + var(--safe-bottom) + 68px);
-}
-@media (max-height:500px){
-  .map-stage:has(.map-stack.has-yandex) .map-feedback{max-height:24vh;overflow:auto}
-}
-
-/* 0.9.5: Keep the SDK's top-left distribution branding separate from
-   WikiReader's already-top-right toolbar (defined above). Never style SDK UI.
-   Reserve the top-left area for official Yandex controls. */
-.map-stage:has(.map-stack.has-yandex) .network-hint{
-  top:calc(82px + var(--safe-top));
-}
-.map-stage:has(.map-stack.has-yandex) .map-feedback{
-  top:calc(82px + var(--safe-top));
-}
-.map-stage:has(.map-stack.has-yandex):has(.network-hint) .map-feedback{
-  top:calc(154px + var(--safe-top));
-}
-
 /* In compact landscape, keep every tool visible without entering the
    bottom-right provider copyrights region. Base toolbar uses flex, so switch
    display mode as well as columns (grid-template alone does nothing). */
@@ -201,9 +168,6 @@ main:has(.map-stack.has-yandex) .toast{
 .offline-card-status{margin:0;padding:2px 0 0;font-size:11px;color:var(--muted);line-height:1.4}
 .offline-list{margin-bottom:24px;padding-bottom:12px;border-bottom:1px solid var(--border)}
 .offline-list .saved-list{margin-bottom:12px}
-/* Keep application-owned banners away from the official top-left Yandex button. */
-.map-stage:has(.map-stack.has-yandex) .map-feedback,
-.map-stage:has(.map-stack.has-yandex) .network-hint{left:12px;right:80px;max-width:calc(100% - 96px)}
 @media(max-height:500px){.offline-card-status{font-size:10px}.offline-settings .cache-stats{padding:8px}}
 
 .offline-stats{display:flex;flex-direction:column;gap:3px;padding:12px 14px;background:var(--control-bg);border-radius:12px;margin-bottom:16px}
@@ -261,76 +225,12 @@ main:has(.map-stack.has-yandex) .toast{
 /* List row and map shortcut share space; do not inherit generic 100% button width. */
 .discovery-place-list .discover-on-map{width:44px;flex:0 0 44px}
 
-/* 0.13.1: keep map feedback peripheral, clear of the Yandex SDK legal controls. */
-.map-stage .map-feedback,
-.map-stage:has(.map-stack.has-yandex) .map-feedback,
-.map-stage:has(.map-stack.has-yandex):has(.network-hint) .map-feedback{
-  top:auto;
-  bottom:78px;
-  left:12px;
-  right:auto;
-  width:max-content;
-  max-width:min(280px,calc(100% - 96px));
-}
-.map-stage .gps-feedback{
-  pointer-events:none;
-  padding:7px 10px;
-  opacity:.94;
-}
-.map-stage .gps-feedback .status{
-  font-size:12px;
-  line-height:1.35;
-}
-@media(max-height:500px){
-  .map-stage .map-feedback,
-  .map-stage:has(.map-stack.has-yandex) .map-feedback,
-  .map-stage:has(.map-stack.has-yandex):has(.network-hint) .map-feedback{
-    bottom:44px;
-    max-height:24vh;
-    overflow:auto;
-  }
-}
-
 /* 0.13.1: transient confirmation/undo toast has priority over background map
    statuses; avoid two simultaneous bubbles competing for the same bottom zone,
    particularly when Yandex raises confirmation toast above legal controls. */
 main.has-toast .map-stage .map-feedback,
 main:has(.undo-toast) .map-stage .map-feedback{
   visibility:hidden;
-}
-
-/* 0.13.2 — distinguish warnings from neutral progress. Warnings belong in a
-   small top-left slot; leave the right-hand toolbar and SDK legal UI untouched.
-   The normal map-feedback remains below, as in 0.13.1. */
-.map-stage .map-feedback.is-error{
-  top:calc(16px + var(--safe-top));
-  bottom:auto;
-  left:12px;
-  right:auto;
-  width:max-content;
-  max-width:min(300px,calc(100% - 96px));
-  padding:9px 12px;
-  border-left:2px solid var(--error-text);
-}
-.map-stage:has(.map-stack.has-yandex) .map-feedback.is-error{
-  top:calc(92px + var(--safe-top));
-  bottom:auto;
-}
-.map-stage:has(.network-hint) .map-feedback.is-error{
-  top:calc(96px + var(--safe-top));
-}
-.map-stage:has(.map-stack.has-yandex):has(.network-hint) .map-feedback.is-error{
-  top:calc(168px + var(--safe-top));
-}
-@media(max-height:500px){
-  .map-stage .map-feedback.is-error,
-  .map-stage:has(.map-stack.has-yandex) .map-feedback.is-error,
-  .map-stage:has(.network-hint) .map-feedback.is-error,
-  .map-stage:has(.map-stack.has-yandex):has(.network-hint) .map-feedback.is-error{
-    bottom:auto;
-    max-height:28vh;
-    overflow:auto;
-  }
 }
 
 /* 0.14.1: content gets the card; secondary commands open on demand. */
@@ -354,3 +254,52 @@ main:has(.undo-toast) .map-stage .map-feedback{
 .comment{padding:16px 0}.comment p{margin-top:8px;line-height:1.6}
 .sheet-attribution{padding-top:4px;font-size:9px}
 @media(max-height:500px){.sheet-header .sheet-controls{position:static;flex:0 0 auto}.sheet-header .sheet-controls .save-place{margin-right:0}.object-actions{top:56px;max-height:calc(100% - 68px)}.sheet.expanded h2{max-height:2.6em;-webkit-line-clamp:2}}
+
+/* 0.14.2: All app-owned map notifications use one predictable top-left slot.
+   It is beneath the Yandex SDK button when Yandex is active, beside the
+   WikiReader toolbar, and never changes with message type or screen height.
+   Do not modify the provider SDK's DOM, attribution or branding. */
+main{--map-notice-top:calc(12px + var(--safe-top))}
+main:has(.map-stack.has-yandex){--map-notice-top:calc(88px + var(--safe-top))}
+.map-stage .map-feedback,
+.map-stage .network-hint{
+  top:var(--map-notice-top);
+  bottom:auto;
+  left:12px;
+  right:auto;
+  width:max-content;
+  max-width:min(300px,calc(100% - 96px));
+  max-height:min(26dvh,140px);
+  overflow:auto;
+  padding:8px 11px;
+  border-radius:12px;
+}
+.map-stage .map-feedback .status{
+  font-size:12px;
+  line-height:1.4;
+  max-height:none;
+  overflow:visible;
+}
+.map-stage .map-feedback.is-error{border-left:2px solid var(--error-text)}
+.map-stage .gps-feedback{pointer-events:none;opacity:.96}
+/* An offline warning has priority over background map progress: no overlap. */
+.map-stage:has(.network-hint) .map-feedback{display:none}
+main.has-toast .map-stage .network-hint,
+main:has(.undo-toast) .map-stage .network-hint{visibility:hidden}
+/* Toasts originating on the map share the same slot. Other screens keep their
+   existing bottom-of-screen feedback and accessible undo action. */
+main:not(.has-screen) .toast,
+main:not(.has-screen) .undo-toast{
+  top:var(--map-notice-top);
+  bottom:auto;
+  left:12px;
+  right:auto;
+  width:max-content;
+  max-width:min(300px,calc(100% - 96px));
+  max-height:min(26dvh,140px);
+  overflow:auto;
+  padding:8px 11px;
+  transform:none;
+  text-align:left;
+}
+main:not(.has-screen):has(.undo-toast) .toast{visibility:hidden}
