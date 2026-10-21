@@ -21,8 +21,8 @@ test('real-shaped comment date displayed; Escape closes settings before card',as
  await expect(page.locator('.sheet h2')).toHaveText('Tower');
  await screen(page,'Настройки');await page.keyboard.press('Escape');await expect(page.locator('.settings-panel')).toHaveCount(0);await expect(page.locator('.sheet')).toBeVisible();
  await page.getByRole('tab',{name:/Комментарии/}).click();
- await expect(page.locator('.comment time')).toHaveText('16 ноября 2006 г.');
- await expect(page.locator('.comment time')).toHaveAttribute('datetime','2006-11-16T17:31:21.000Z');
+ await expect(page.locator('.comment time').first()).toHaveText('16 ноября 2006 г.');
+ await expect(page.locator('.comment time').first()).toHaveAttribute('datetime','2006-11-16T17:31:21.000Z');
  await page.keyboard.press('Escape');await expect(page.locator('.sheet')).toHaveCount(0);
 });
 test('geolocation after explicit tap centers the map',async({page,context})=>{
@@ -76,7 +76,7 @@ test('auto pan debounces; background cancels queued load and resume reuses cover
 });
 test('card stays readable and attribution remains visible in portrait and landscape',async({page})=>{
  await tiles(page);await page.goto('/');
- await clickContour(page);await page.getByTitle('Развернуть').click();
+ await clickContour(page);await page.getByRole('button',{name:'Развернуть карточку',exact:true}).click();
  for(const viewport of [{width:320,height:640},{width:844,height:390},{width:768,height:1024}]){
   await page.setViewportSize(viewport);await expect(page.locator('.sheet-attribution')).toBeVisible();
   await expect.poll(async()=> (await page.locator('.sheet-scroll').boundingBox()).height).toBeGreaterThan(60);

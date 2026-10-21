@@ -37,3 +37,9 @@ test('backup round-trip preserves partial-card statuses without exporting media 
  const entry={id:55,title:'Частичная карточка',description:'Текст',comments:[],savedAt:Date.now(),photos:[{src:'https://photos.wikimapia.org/private-test.jpg'}],blocks:{title:'ok',description:'ok',photos:'ok',comments:'unavailable'}};
  const raw=JSON.stringify(buildBackup({offline:[entry]}));const result=parseBackup(raw).offline[0];assert.equal(result.blocks.comments,'unavailable');assert.equal(result.blocks.photos,'unavailable');assert.ok(!raw.includes('private-test.jpg'));
 });
+
+test('relative website comment date survives backup without an invented timestamp',()=>{
+ const source=buildBackup({offline:[{...row,comments:[{author:'А',text:'Объект',date:null,dateLabel:'18 лет назад'}]}]});
+ const comment=parseBackup(JSON.stringify(source)).offline[0].comments[0];
+ assert.equal(comment.date,null);assert.equal(comment.dateLabel,'18 лет назад');
+});
