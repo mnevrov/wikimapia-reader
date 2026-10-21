@@ -9,7 +9,7 @@ test('explicit offline save keeps description, comments and local gallery after 
   await page.route('https://api.wikimapia.org/**',r=>r.fulfill({json:details}));
   await page.goto('/');await connect(page);await openId(page);
   await expect(page.locator('.description')).toContainText('Вторая строка');
-  await page.getByRole('button',{name:'Сохранить для чтения без сети'}).click();
+  await page.getByRole('button',{name:'Действия с объектом'}).click();await page.getByRole('button',{name:'Сохранить для чтения без сети'}).click();
   await expect(page.getByRole('button',{name:'Удалить офлайн-копию'})).toBeVisible();
   await page.route('https://api.wikimapia.org/**',r=>r.abort());
   await page.route('https://photos.wikimapia.org/**',r=>r.abort());
@@ -33,7 +33,7 @@ test('failed media download retains partial text and allows removal',async({page
   await page.route('https://photos.wikimapia.org/**',r=>r.abort());
   await page.route('https://api.wikimapia.org/**',r=>r.fulfill({json:details}));
   await page.goto('/');await connect(page);await openId(page);
-  await page.getByRole('button',{name:'Сохранить для чтения без сети'}).click();
+  await page.getByRole('button',{name:'Действия с объектом'}).click();await page.getByRole('button',{name:'Сохранить для чтения без сети'}).click();
   await expect(page.locator('.offline-card-status')).toContainText('частично');
   await page.getByRole('button',{name:'Удалить офлайн-копию'}).click();
   await expect(page.getByRole('button',{name:'Сохранить для чтения без сети'})).toBeVisible();

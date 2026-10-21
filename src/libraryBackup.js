@@ -14,7 +14,7 @@ function cleanOffline(items){
     const comments=item.comments.map(c=>{
       if(!c||typeof c.author!=='string'||typeof c.text!=='string'||c.author.length>250||c.text.length>maxLen)
         throw new Error('Некорректный комментарий');
-      return {author:c.author,text:c.text,date:typeof c.date==='string'&&c.date.length<=40&&Number.isFinite(Date.parse(c.date))?new Date(c.date).toISOString():null};
+      return {author:c.author,text:c.text,...(typeof c.dateLabel==='string'&&c.dateLabel.trim()?{dateLabel:c.dateLabel.trim().slice(0,100)}:{}),date:typeof c.date==='string'&&c.date.length<=40&&Number.isFinite(Date.parse(c.date))?new Date(c.date).toISOString():null};
     });
     const savedAt=Number(item.savedAt);
     if(!Number.isSafeInteger(savedAt)||savedAt<1577836800000||savedAt>Date.now()+86400000)

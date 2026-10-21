@@ -18,6 +18,7 @@ export function usePlatform(onBack) {
         document.dispatchEvent(new Event('wikireader-dismiss-overlay'));
         return true;
       }
+      if(document.querySelector('[data-card-menu]')){document.dispatchEvent(new Event('wikireader-dismiss-menu'));return true;}
       return handler.current();
     };
     const escape=e=>{if(e.key==='Escape')back();};

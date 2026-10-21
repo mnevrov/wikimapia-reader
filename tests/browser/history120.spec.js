@@ -39,7 +39,7 @@ test('failed details never enter history',async({page})=>{
 });
 test('offline full text search is local; clearing history preserves offline copies',async({page})=>{
  await page.goto('/');await connect(page);await openId(page);
- await page.getByRole('button',{name:'Сохранить для чтения без сети'}).click();
+ await page.getByRole('button',{name:'Действия с объектом'}).click();await page.getByRole('button',{name:'Сохранить для чтения без сети'}).click();
  await expect(page.getByRole('button',{name:'Удалить офлайн-копию'})).toBeVisible();
  await screen(page,'Избранное');
  await page.locator('#saved-library-search').fill('архитектура');

@@ -74,7 +74,7 @@ function cleaned(data){
     // Only public fields; never serialize responses or credentials.
     comments:Array.isArray(data.comments)?data.comments.slice(0,500).map(c=>({
       author:String(c.author||'Участник Wikimapia').slice(0,250),
-      text:String(c.text||''),date:typeof c.date==='string'?c.date:null
+      text:String(c.text||''),...(typeof c.dateLabel==='string'&&c.dateLabel.trim()?{dateLabel:c.dateLabel.trim().slice(0,100)}:{}),date:typeof c.date==='string'?c.date:null
     })):[],photos,
     ...(data.blocks?{blocks:Object.fromEntries(['title','description','photos','comments'].map(k=>[k,['ok','empty','unavailable','invalid'].includes(data.blocks[k])?data.blocks[k]:'unavailable']))}:{}),
     ...(['site','hybrid','api'].includes(data.dataSource)?{dataSource:data.dataSource}:{}),
