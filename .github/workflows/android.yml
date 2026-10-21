@@ -23,6 +23,8 @@ concurrency:
 jobs:
   verify-website-android:
     runs-on: ubuntu-24.04
+    env:
+      ANDROID_AVD_HOME: ${{ runner.temp }}/wikireader-avd
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -47,6 +49,7 @@ jobs:
       - name: Install emulator for website transport verification
         run: |
           sdkmanager 'emulator' 'system-images;android-30;default;x86_64'
+          mkdir -p "$ANDROID_AVD_HOME"
           echo no | avdmanager create avd --force --name wikireader-site --package 'system-images;android-30;default;x86_64'
           sudo chmod 666 /dev/kvm
       - name: Verify website transport on Android without API key
