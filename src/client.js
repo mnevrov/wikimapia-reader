@@ -27,7 +27,7 @@ export async function wikimapiaCall(func, key, opts = {}) {
     opts.signal?.addEventListener('abort',abort,{once:true});
     try{
       const {signal,...options}=opts;
-      const result=await car.request({requestId,method:func,options});
+      const result=await car.request({requestId,method:func,options:{...options,apiOnly:true}});
       opts.signal?.throwIfAborted();
       const value=validateResponse(result.data,func,opts.id,opts.dataBlocks);
       recordApiMetric(func,Date.now()-startedAt);return value;

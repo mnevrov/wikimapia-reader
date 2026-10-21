@@ -19,6 +19,10 @@ public class CarSiteSourceTest {
    assertEquals("Место",places.get(55L).getString("title"));
    assertEquals(3,places.get(55L).getJSONArray("polygon").length());
  }
+ @Test public void phoneFallbackUsesApiDirectlyWhileCarHostReadsWebsiteFirst()throws Exception {
+   assertTrue(WikiApi.websiteFirst(new JSONObject()));
+   assertFalse(WikiApi.websiteFirst(new JSONObject().put("apiOnly",true)));
+ }
  @Test public void unknownSourceSchemaDoesNotSilentlyReturnNoObjects()throws Exception {
    try{CarSiteSource.parseTile("bad|0|7","030",new LinkedHashMap<>());fail("expected a schema failure");}
    catch(java.io.IOException expected){}
