@@ -41,6 +41,9 @@ jobs:
         run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
       - run: npm ci
       - run: npm run android:sync
+      - name: Assemble Android instrumentation tests
+        working-directory: android
+        run: ./gradlew --no-daemon assembleDebugAndroidTest
       - name: Install emulator for website transport verification
         run: |
           sdkmanager 'emulator' 'system-images;android-30;default;x86_64'
