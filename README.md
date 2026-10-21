@@ -190,10 +190,10 @@ npx playwright install chromium
 npm run test:browser
 npm run android:sync
 cd android
-./gradlew --no-daemon testDebugUnitTest assembleDebug lintDebug
+./gradlew --no-daemon testMobileDebugUnitTest testAutoDevDebugUnitTest assembleMobileDebug assembleAutoDevDebug lintMobileDebug lintAutoDevDebug
 ```
 
-Результат: `android/app/build/outputs/apk/debug/app-debug.apk`. Минимальная версия Android 7.
+Результат для основной мобильной версии в ветке Android Auto: `android/app/build/outputs/apk/mobile/debug/app-mobile-debug.apk`; отдельная автомобильная сборка: `android/app/build/outputs/apk/autoDev/debug/app-autoDev-debug.apk`. Минимальная версия Android 7.
 AndroidKeystore требует проверки на физическом устройстве/эмуляторе. Browser mock native bridge
 и JVM-тесты шифрования её не заменяют. [Проверки 0.7.3](docs/CHECKS-0.7.3.md), [проверки 0.7.1](docs/CHECKS-0.7.1.md), [проверки 0.7](docs/CHECKS-0.7.md), [проверки 0.6.1](docs/CHECKS-0.6.1.md), [проверки 0.6](docs/CHECKS-0.6.md).
 История: [проверки 0.5.1](docs/CHECKS-0.5.1.md), [проверки 0.5](docs/CHECKS-0.5.md).

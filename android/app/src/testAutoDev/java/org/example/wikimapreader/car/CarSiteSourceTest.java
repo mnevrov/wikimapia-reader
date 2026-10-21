@@ -2,8 +2,12 @@ package org.example.wikimapreader.car;
 
 import org.json.JSONObject;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
+import org.robolectric.annotation.Config;
 import java.util.LinkedHashMap;
 import static org.junit.Assert.*;
+@RunWith(RobolectricTestRunner.class) @Config(sdk=35)
 public class CarSiteSourceTest {
  @Test public void siteTileAddressUsesTheSameQuadkeyAsWeb()throws Exception {
    assertEquals("03021323233220",CarSiteSource.tileId(4952,2561,13));
