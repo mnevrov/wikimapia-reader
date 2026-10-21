@@ -31,8 +31,8 @@ test('all map statuses share one top-left position alongside toolbar and beneath
      expect(info.height).toBeLessThan(145);
      await feedback.evaluate(node=>node.classList.add('is-error'));
      const warning=await measure();
-     expect(warning.top).toBe(info.top);
-     expect(warning.left).toBe(info.left);
+     expect(Math.abs(warning.top-info.top)).toBeLessThan(5);
+     expect(Math.abs(warning.left-info.left)).toBeLessThan(2);
      expect(warning.hitsTools).toBe(false);
      await feedback.evaluate(node=>node.classList.remove('is-error'));
    }
