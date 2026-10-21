@@ -1,0 +1,67 @@
+{
+  "note": "Synthetic documented API shapes, not a live Wikimapia response",
+  "box": {
+    "folder": [
+      {
+        "id": 101,
+        "title": "Test polygon",
+        "polygon": [
+          {
+            "x": 2.29,
+            "y": 48.85
+          },
+          {
+            "x": 2.3,
+            "y": 48.85
+          },
+          {
+            "x": 2.3,
+            "y": 48.86
+          }
+        ]
+      }
+    ],
+    "found": 1,
+    "page": 1
+  },
+  "byarea": {
+    "places": [
+      {
+        "id": 202,
+        "title": "Test place",
+        "polygon": [
+          {
+            "x": 2.29,
+            "y": 48.85
+          },
+          {
+            "x": 2.3,
+            "y": 48.85
+          },
+          {
+            "x": 2.3,
+            "y": 48.86
+          }
+        ]
+      }
+    ]
+  },
+  "ambiguous": [],
+  "invalidKey": {
+    "debug": {
+      "code": 1000,
+      "message": "Invalid key"
+    }
+  },
+  "quota": {
+    "debug": {
+      "code": 429,
+      "message": "Request limit reached"
+    }
+  },
+  "mismatched": {
+    "places": {
+      "count": 1
+    }
+  }
+}

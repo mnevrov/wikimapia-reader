@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {buildRequest, geometryOf, normalizeArea, normalizePlace, safeUrl, diagnosticError, wikimapiaUrl} from '../src/api.js';
+import {buildRequest, geometryOf, normalizeArea, normalizePlace, safeUrl, diagnosticError, classifyApiFailure, validateResponse, wikimapiaUrl} from '../src/api.js';
 
 test('area request builds documented method and bounded bbox',()=>{
  const u=new URL(buildRequest('place.getbyarea','sample-key',{bbox:[37.61,55.75,37.62,55.76]}));
@@ -42,4 +42,20 @@ test('description rendered as text and rejects scripting/image schemes',()=>{
 test('formats useful DNS and quota failures',()=>{
  assert.match(diagnosticError(new Error('Failed to fetch')),/DNS/);
  assert.match(diagnosticError(new Error('HTTP 429')),/лимит/);
+});
+
+test('0.11 failure categories distinguish quota, authentication, schema, network and timeout',()=>{
+ assert.equal(classifyApiFailure(new Error('HTTP 429')),'quota');
+ assert.equal(classifyApiFailure(new Error('HTTP 401')),'auth');
+ assert.equal(classifyApiFailure(new Error('Failed to fetch')),'network');
+ assert.equal(classifyApiFailure(new Error('AbortError')),'timeout');
+ assert.equal(classifyApiFailure(new Error('Failed to fetch'),{offline:true}),'offline');
+ assert.equal(classifyApiFailure(new Error('random response')),'unknown');
+ assert.equal(classifyApiFailure(new Error('HTTP 500?key=private-secret')),'unknown');
+ assert.equal(classifyApiFailure(new Error('Unexpected token < in JSON at position 0')),'schema');
+ assert.throws(()=>validateResponse({debug:{code:1000,message:'Invalid key'}},'box'),/Ключ/);
+ try { validateResponse({folder:{}},'box'); assert.fail('expected rejection'); }
+ catch(error) { assert.equal(classifyApiFailure(error),'schema'); }
+ try { validateResponse({debug:'API quota exceeded'},'box'); assert.fail('expected rejection'); }
+ catch(error) { assert.equal(classifyApiFailure(error),'quota'); }
 });

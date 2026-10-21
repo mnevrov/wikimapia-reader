@@ -127,3 +127,22 @@ test('continuation has a finite request budget and can be deliberately resumed',
  let calls=0;const loader=new AreaLoader(async({page})=>{calls++;return{folder:[place(page)],found:1000};});
  await loader.load(bbox);await loader.remaining();assert.equal(calls,21);assert.equal(loader.state.more,true);assert.equal(loader.state.batchLimited,true);await loader.remaining();assert.equal(calls,41);
 });
+
+test('failure kinds stay distinct and quota/auth errors require deliberate retry',async()=>{
+ const errors=['HTTP 429','HTTP 401','Unexpected token < in JSON'];
+ for(const [index, message] of errors.entries()){
+  const loader=new AreaLoader(async()=>{throw new Error(message);});
+  await loader.load(bbox);
+  assert.equal(loader.state.failureKind,['quota','auth','schema'][index]);
+  assert.equal(loader.state.retryable,false);
+  assert.equal(loader.state.loading,false);
+ }
+ const network=new AreaLoader(async()=>{throw new Error('Failed to fetch');});
+ await network.load(bbox);
+ assert.equal(network.state.failureKind,'network');
+ assert.equal(network.state.retryable,true);
+});
+test('site area explicit partial completeness survives fewer than 50 objects',async()=>{
+ const loader=new AreaLoader(async()=>({folder:[place(1)],found:null,more:false,complete:false,source:'site'}));await loader.load(bbox);assert.equal(loader.state.complete,false);assert.equal(loader.state.source,'site');assert.equal(loader.state.more,false);
+});
+test('forced refresh forwards the force flag to the source adapter',async()=>{const flags=[];const loader=new AreaLoader(async o=>{flags.push(o.force);return{folder:[],found:0};});await loader.load(bbox);await loader.load(bbox,{force:true});assert.deepEqual(flags,[false,true]);});

@@ -1,16 +1,22 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import {car,hasCar} from './carBridge.js';
-import { buildRequest, validateResponse } from './api.js';
+import { buildRequest, validateResponse, classifyApiFailure } from './api.js';
+import {recordApiMetric} from './apiDiagnostics.js';
 
 let nextRequestAt = 0;
 export async function wikimapiaCall(func, key, opts = {}) {
   const url = buildRequest(func, key, opts);
   if(hasCar()){
-    opts.signal?.throwIfAborted();
-    const requestId=crypto.randomUUID();
+    opts.signal?.throwIfAborted();const startedAt=Date.now(),requestId=crypto.randomUUID();
     const abort=()=>{void car.cancel({requestId});};
     opts.signal?.addEventListener('abort',abort,{once:true});
-    try {const {signal,...options}=opts;const result=await car.request({requestId,method:func,options});opts.signal?.throwIfAborted();return validateResponse(result.data,func,opts.id);}
+    try{
+      const {signal,...options}=opts;
+      const result=await car.request({requestId,method:func,options});
+      opts.signal?.throwIfAborted();
+      const value=validateResponse(result.data,func,opts.id,opts.dataBlocks);
+      recordApiMetric(func,Date.now()-startedAt);return value;
+    }catch(e){recordApiMetric(func,Date.now()-startedAt,opts.signal?.aborted?'cancelled':classifyApiFailure(e));throw e;}
     finally{opts.signal?.removeEventListener('abort',abort);}
   }
   opts.signal?.throwIfAborted();
@@ -26,6 +32,8 @@ export async function wikimapiaCall(func, key, opts = {}) {
   }
   nextRequestAt = Date.now() + 6000;
   let result;
+  const startedAt = Date.now();
+  try {
   // HTTPS is mandatory: the API key travels in the query string as required by Wikimapia.
   if (Capacitor.isNativePlatform()) {
     const response = await CapacitorHttp.get({ url, connectTimeout: 12000, readTimeout: 12000 });
@@ -36,14 +44,28 @@ export async function wikimapiaCall(func, key, opts = {}) {
     const controller = new AbortController();
     const abort = () => controller.abort();
     opts.signal?.addEventListener('abort',abort,{once:true});
-    const timer = setTimeout(abort, 12000);
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; abort(); }, 12000);
     try {
       const response = await fetch(url, { signal: controller.signal, cache: 'no-store' });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       result = await response.json();
+    } catch (error) {
+      if (timedOut && !opts.signal?.aborted) {
+        const timeout = new Error('Server timeout');
+        timeout.name = 'TimeoutError';
+        throw timeout;
+      }
+      throw error;
     } finally { clearTimeout(timer); opts.signal?.removeEventListener('abort',abort); }
   }
   opts.signal?.throwIfAborted();
-  return validateResponse(result, func, opts.id);
+  const validated = validateResponse(result, func, opts.id, opts.dataBlocks);
+  recordApiMetric(func, Date.now() - startedAt);
+  return validated;
+  } catch (error) {
+    const kind = opts.signal?.aborted ? 'cancelled' : classifyApiFailure(error, {offline:typeof navigator !== 'undefined' && navigator.onLine === false});
+    recordApiMetric(func, Date.now() - startedAt, kind);
+    throw error;
+  }
 }
-

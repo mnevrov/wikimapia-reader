@@ -18,7 +18,9 @@ export function buildRequest(func, key, opts = {}) {
     const id = Number(opts.id);
     if (!Number.isSafeInteger(id) || id < 1) throw new ValidationError('Неверный ID объекта');
     url.searchParams.set('id', String(id));
-    url.searchParams.set('data_blocks', 'main,location,geometry,photos,comments');
+    const blocks=opts.dataBlocks??['main','location','geometry','photos','comments'];
+    if(!Array.isArray(blocks)||!blocks.length||blocks.some(x=>!['main','location','geometry','photos','comments'].includes(x)))throw new ValidationError('Неизвестный блок API');
+    url.searchParams.set('data_blocks', [...new Set(blocks)].join(','));
   } else if (func === 'search') {
     const query = String(opts.query ?? '').trim();
     if (!query || query.length > 200) throw new ValidationError('Введите запрос длиной до 200 символов');
@@ -143,31 +145,53 @@ function photoUrl(candidate) {
   if (url.hostname === 'photos.wikimapia.org') url.protocol = 'https:';
   return url.protocol === 'https:' ? url.href : null;
 }
-export class ApiError extends Error {}
-export function validateResponse(result, func, expectedId) {
+export class ApiError extends Error {
+  constructor(message, kind = 'unknown') { super(message); this.kind = kind; }
+}
+export function validateResponse(result, func, expectedId, dataBlocks) {
   if (result?.debug || result?.error || result?.error_message) {
     const detail = result.debug ?? result.error ?? result.error_message;
-    const text = typeof detail === 'object' ? String(detail.message ?? detail.code ?? '') : String(detail);
-    if (/limit|quota|wait|too many/i.test(text)) throw new ApiError('Исчерпан лимит API. Подождите перед следующим запросом.');
-    if (/key|auth|1000/i.test(text)) throw new ApiError('Ключ API отклонён. Проверьте личный ключ.');
+    const text = typeof detail === 'object' ? `${String(detail.code ?? '')} ${String(detail.message ?? '')}` : String(detail);
+    if (/limit|quota|wait|too many/i.test(text)) throw new ApiError('Исчерпан лимит API. Подождите перед следующим запросом.', 'quota');
+    if (/key|auth|1000/i.test(text)) throw new ApiError('Ключ API отклонён. Проверьте личный ключ.', 'auth');
     throw new ApiError('Wikimapia API отклонил запрос.');
   }
-  if (!result || typeof result !== 'object' || Array.isArray(result)) throw new ApiError('Неподтверждённая структура ответа API (в том числе пустой массив).');
+  if (!result || typeof result !== 'object' || Array.isArray(result)) throw new ApiError('Неподтверждённая структура ответа API (в том числе пустой массив).', 'schema');
   if (func === 'place.getbyarea' || func === 'box' || func === 'search') {
-    if (!Array.isArray(func === 'place.getbyarea' ? result.places : result.folder)) throw new ApiError('Неподтверждённая структура списка объектов API.');
+    if (!Array.isArray(func === 'place.getbyarea' ? result.places : result.folder)) throw new ApiError('Неподтверждённая структура списка объектов API.', 'schema');
   } else {
     const place = result.place ?? result;
     const id = Number(place.id ?? place.main?.id);
-    if (id !== Number(expectedId) || !(place.title ?? place.main?.title)) throw new ApiError('API вернул другой объект или неполные сведения.');
+    if (id !== Number(expectedId) || ((!dataBlocks||dataBlocks.includes('main'))&&!(place.title ?? place.main?.title))) throw new ApiError('API вернул другой объект или неполные сведения.', 'schema');
   }
   return result;
 }
+// Stable, non-sensitive categories for UI, diagnostics and future telemetry.
+// Never return raw server messages: Wikimapia may echo query parameters or API keys.
+export function classifyApiFailure(error, { offline = false } = {}) {
+  if (error?.name === 'AbortError') return 'cancelled';
+  if (['quota','auth','schema','network'].includes(error?.siteKind)) return error.siteKind;
+  if (offline) return 'offline';
+  if (error instanceof ApiError) return ['quota','auth','schema'].includes(error.kind) ? error.kind : 'api';
+  if (error instanceof ValidationError) return 'input';
+  const message = String(error?.message ?? error ?? '');
+  if (/429|limit|quota|wait|too many|исчерпан лимит/i.test(message)) return 'quota';
+  if (/401|403|invalid key|api key|ключ api|ключ.*отклон|1000/i.test(message)) return 'auth';
+  if (/неподтверждённая структура|неполные сведения|другой объект|schema|unexpected token|invalid json|json parse|json\.parse|not valid json/i.test(message)) return 'schema';
+  if (/abort|timeout|timed out|вовремя/i.test(message)) return 'timeout';
+  if (/Failed to fetch|Network request failed|network error|cors|ERR_NAME_NOT_RESOLVED|dns|connection refused|ERR_INTERNET_DISCONNECTED/i.test(message)) return 'network';
+  return 'unknown';
+}
+
 export function diagnosticError(error) {
+  if (error?.siteKind) return error.message;
   if (error instanceof ApiError || error instanceof ValidationError) return error.message;
-  const message = String(error?.message ?? error ?? 'Неизвестная ошибка');
-  if (/Failed to fetch|Network request failed|network error|cors|ERR_NAME_NOT_RESOLVED|dns/i.test(message)) return 'Не удалось подключиться к API: проверьте DNS, HTTPS и CORS (для браузера).';
-  if (/429|limit|quota|too many/i.test(message)) return 'Вероятно, исчерпан лимит API-запросов. Не повторяйте запросы часто.';
-  if (/401|403|invalid key|api key/i.test(message)) return 'Ключ API отклонён или нет доступа к API.';
-  if (/abort|timeout/i.test(message)) return 'Сервер не ответил вовремя. Повторите запрос позже.';
-  return 'Не удалось загрузить данные. Проверьте подключение и повторите позже.';
+  switch (classifyApiFailure(error)) {
+    case 'quota': return 'Вероятно, исчерпан лимит API-запросов. Не повторяйте запросы часто.';
+    case 'auth': return 'Ключ API отклонён или нет доступа к API.';
+    case 'schema': return 'Ответ Wikimapia API имеет неожиданный формат. Повторите запрос позже.';
+    case 'timeout': return 'Сервер не ответил вовремя. Повторите запрос позже.';
+    case 'network': return 'Не удалось подключиться к API: проверьте DNS, HTTPS и CORS (для браузера).';
+    default: return 'Не удалось загрузить данные. Проверьте подключение и повторите позже.';
+  }
 }

@@ -10,6 +10,8 @@ export function cacheRecord(entry){
  if(!Array.isArray(bbox)||bbox.length!==4||bbox.some(v=>!Number.isFinite(v))||bbox[0]>=bbox[2]||bbox[1]>=bbox[3]||bbox[0]<-180||bbox[2]>180||bbox[1]<-90||bbox[3]>90||!Number.isFinite(updated)||!Array.isArray(state?.places))return null;
  const places=state.places.filter(p=>p&&Number.isSafeInteger(p.id)&&p.id>0&&typeof p.title==='string'&&Array.isArray(p.coords)).map(p=>({id:p.id,title:p.title,coords:p.coords.filter(c=>Array.isArray(c)&&c.length===2&&c.every(Number.isFinite)&&Math.abs(c[0])<=90&&Math.abs(c[1])<=180)}));
  const record={id:bbox.join(','),bbox:[...bbox],updated,pinned:entry.pinned===true,state:{places,page:Number.isSafeInteger(state.page)&&state.page>=1?state.page:1,found:Number.isSafeInteger(state.found)&&state.found>=0?state.found:null,more:!!state.more}};
+ record.state.source=['site','hybrid','api'].includes(state.source)?state.source:'api';
+ record.formatVersion=2;
  record.state.complete=state.complete===false?false:!record.state.more&&(record.state.found!==null?places.length>=record.state.found:(state.complete===true||places.length<50));
  record.bytes=0;
  let bytes=new TextEncoder().encode(JSON.stringify(record)).length;
@@ -71,11 +73,9 @@ const webAreaCache={
  clear:({includePinned=false}={})=>access(records=>({records:includePinned?[]:records.filter(r=>r.pinned)}))
 };
 
-
 let nativeQueue=Promise.resolve();
 function nativeAccess(action,options={}){
  const task=nativeQueue.then(async()=>{
-  // Legacy data is retained as a recovery copy; native marks migration atomically.
   const snapshot=await webAreaCache.snapshot();
   return car.cache({action,options:{...options,legacy:snapshot.entries,legacyPreferences:snapshot.preferences}});
  });nativeQueue=task.catch(()=>{});return task;

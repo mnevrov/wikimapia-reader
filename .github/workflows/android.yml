@@ -15,11 +15,63 @@ on:
 permissions:
   contents: read
 
+# Keep a release dispatch separate from the push run which schedules it.
 concurrency:
-  group: android-${{ github.ref }}
+  group: android-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag != '' && format('release-{0}', inputs.release_tag) || github.ref }}
   cancel-in-progress: true
 
 jobs:
+  verify-website-android:
+    runs-on: ubuntu-24.04
+    env:
+      ANDROID_AVD_HOME: ${{ github.workspace }}/.ci-avd
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd
+      - name: Install Android SDK
+        run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
+      - run: npm ci
+      - run: npm run android:sync
+      - name: Assemble Android instrumentation tests
+        working-directory: android
+        run: ./gradlew --no-daemon :app:assembleMobileDebugAndroidTest
+      - name: Install emulator for website transport verification
+        run: |
+          sdkmanager 'emulator' 'system-images;android-30;default;x86_64'
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo no | avdmanager create avd --force --name wikireader-site --package 'system-images;android-30;default;x86_64'
+          sudo chmod 666 /dev/kvm
+      - name: Verify website transport on Android without API key
+        timeout-minutes: 12
+        run: |
+          "$ANDROID_HOME/emulator/emulator" -avd wikireader-site -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect > /tmp/wikireader-emulator.log 2>&1 &
+          emulator_pid=$!
+          cleanup_emulator() {
+            status=$?
+            if [[ "$status" != 0 ]]; then
+              tail -n 120 /tmp/wikireader-emulator.log || true
+              adb devices -l || true
+              df -h || true
+            fi
+            kill "$emulator_pid" || true
+          }
+          trap cleanup_emulator EXIT
+          timeout 180 adb wait-for-device
+          timeout 180 bash -c 'until [[ "$(adb shell getprop sys.boot_completed | tr -d "\r")" == 1 ]]; do sleep 2; done'
+          cd android
+          ./gradlew --no-daemon :app:connectedMobileDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.example.wikimapreader.SiteSourceLiveTest
+
   verify-and-build:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -47,11 +99,13 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Build web assets and sync Android
         run: npm run android:sync
-      - name: Mobile browser tests (mock API)
-        run: npx playwright test
       - name: Build and lint APK
         working-directory: android
         run: ./gradlew --no-daemon testMobileDebugUnitTest testAutoDevDebugUnitTest assembleMobileDebug assembleAutoDevDebug lintMobileDebug lintAutoDevDebug
+      - name: Yandex branding regression (fail fast)
+        run: npx playwright test tests/browser/yandexSafeBranding094.spec.js
+      - name: Mobile browser tests (mock API)
+        run: npx playwright test
       - name: Verify APK isolation and checksums
         run: python3 scripts/check-auto-apks.py
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -66,16 +120,6 @@ jobs:
           path: apk-dist/autoDev/*
           retention-days: 30
           if-no-files-found: error
-      - name: Retain test evidence
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        with:
-          name: WikiReader-checks-${{ github.sha }}
-          path: |
-            android/app/build/reports/
-            android/app/build/test-results/
-            playwright-report/
-          retention-days: 30
 
       - name: Require a release commit from main
         if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
@@ -106,7 +150,7 @@ jobs:
 
   publish:
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
-    needs: verify-and-build
+    needs: [verify-and-build, verify-website-android]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -131,3 +175,59 @@ jobs:
           RELEASE_TARGET_SHA: ${{ github.sha }}
         run: bash scripts/publish-release.sh "$RELEASE_TAG"
 
+  # The GitHub connector may merge code but cannot create tags or dispatch workflows.
+  # Queue a release only when main receives a *new* app version, after its CI succeeds.
+  # A workflow_dispatch event from GITHUB_TOKEN is allowed to start another workflow.
+  dispatch-version-release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [verify-and-build, verify-website-android]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Determine version increase
+        id: version
+        env:
+          PREVIOUS_MAIN_SHA: ${{ github.event.before }}
+        run: |
+          python3 - <<'PY'
+          import json,os,pathlib,re,subprocess
+          previous=os.environ['PREVIOUS_MAIN_SHA']
+          if not re.fullmatch('[a-f0-9]{40}',previous) or previous=='0'*40:
+              raise SystemExit('Previous main commit is unavailable; refuse automatic release')
+          current=json.loads(pathlib.Path('package.json').read_text())['version']
+          old=json.loads(subprocess.check_output(['git','show',f'{previous}:package.json'],text=True))['version']
+          semver=r'\d+\.\d+\.\d+'
+          assert re.fullmatch(semver,current) and re.fullmatch(semver,old), 'Invalid release version'
+          if tuple(map(int,current.split('.')))<=tuple(map(int,old.split('.'))):
+              print(f'No version increase: {old} -> {current}')
+              raise SystemExit(0)
+          assert pathlib.Path(f'docs/releases/{current}/RELEASE_NOTES.md').is_file(), 'Release notes missing'
+          lock=json.loads(pathlib.Path('package-lock.json').read_text())
+          assert lock['version']==current and lock['packages']['']['version']==current, 'Lock version mismatch'
+          gradle=pathlib.Path('android/app/build.gradle').read_text()
+          assert re.search(r'versionName\s+"'+re.escape(current)+r'"',gradle), 'Android version mismatch'
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out: out.write(f'tag=v{current}\n')
+          print(f'New version verified: {old} -> {current}')
+          PY
+      - name: Dispatch signing and publishing workflow
+        if: steps.version.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if gh release view "$TAG" --json isDraft --jq '.isDraft' > release-status.txt 2>/dev/null; then
+            if [[ "$(cat release-status.txt)" == false ]]; then
+              echo "Release $TAG is already published; nothing to dispatch"
+              exit 0
+            fi
+          fi
+          gh workflow run android.yml --ref main --field release_tag="$TAG"
+          echo "Queued signing and publishing for $TAG"

@@ -8,9 +8,11 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(AppearancePlugin.class);
+        registerPlugin(WikiReaderSitePlugin.class);
         registerPlugin(CredentialsVaultPlugin.class);
+        registerPlugin(WikiReaderTransferPlugin.class);
         try { registerPlugin((Class<? extends com.getcapacitor.Plugin>) Class.forName("org.example.wikimapreader.car.CarDataPlugin")); }
-        catch (ClassNotFoundException ignored) { /* mobile has no car dependencies */ }
+        catch (ClassNotFoundException ignored) { /* no Car API in mobile */ }
         super.onCreate(savedInstanceState);
     }
     @Override protected void onNewIntent(Intent intent) {

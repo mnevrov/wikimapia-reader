@@ -7,8 +7,8 @@ android {
         applicationId "org.example.wikimapreader"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 12
-        versionName "0.7.3"
+        versionCode 30
+        versionName "0.14.2"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -20,10 +20,7 @@ android {
     flavorDimensions += "experience"
     productFlavors {
         mobile { dimension "experience" }
-        autoDev {
-            dimension "experience"
-            applicationId "org.example.wikimapreader.autodev"
-        }
+        autoDev { dimension "experience"; applicationId "org.example.wikimapreader.autodev" }
     }
     testOptions { unitTests.includeAndroidResources = true
         unitTests.all { systemProperty "wikireader.fixtures", rootProject.file("../tests/fixtures").absolutePath } }
@@ -57,6 +54,8 @@ dependencies {
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
+    // Align instrumentation-only legacy jdk7/jdk8 artifacts with the merged stdlib.
+    androidTestImplementation platform("org.jetbrains.kotlin:kotlin-bom:1.8.22")
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
@@ -72,4 +71,3 @@ try {
 } catch(Exception e) {
     logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
 }
-

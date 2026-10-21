@@ -7,11 +7,11 @@ async function start(page,folder=[{id:1,name:'Small',polygon}],found=folder.leng
  await page.goto('/');await expect(page.locator('path.leaflet-interactive')).toHaveCount(folder.length);
 }
 test('refresh with existing contours is silent, cancellation leaves no loading notice',async({page})=>{
- await start(page);await page.getByRole('button',{name:'Загрузить область',exact:true}).click();
- await expect(page.getByRole('button',{name:'Загрузить область',exact:true})).toHaveAttribute('aria-busy','true');
+ await start(page);await page.getByRole('button',{name:'Обновить область',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Загружаем область',exact:true})).toHaveAttribute('aria-busy','true');
  await expect(page.locator('.status')).toHaveCount(0);
  await screen(page,'Настройки');await page.getByLabel('Автозагрузка области').uncheck();await map(page);
- await expect(page.getByRole('button',{name:'Загрузить область',exact:true})).toBeEnabled();await expect(page.locator('.status')).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'Обновить область',exact:true})).toBeEnabled();await expect(page.locator('.status')).toHaveCount(0);
 });
 test('cache statistics retention and pin survive reload and ordinary clearing',async({page})=>{
  await start(page);await screen(page,'Настройки');await expect(page.locator('.cache-stats')).toContainText('1 из 32');
@@ -39,7 +39,7 @@ test('chooser closes with Back and map drag, and fits a short landscape screen',
 });
 test('pin survives an API refresh; deleting all requires a separate explicit action',async({page})=>{
  await start(page);await screen(page,'Настройки');await page.getByRole('button',{name:'Закрепить текущую область',exact:true}).click();await expect(page.locator('.cache-stats')).toContainText('Закреплено: 1');await map(page);
- await page.getByRole('button',{name:'Загрузить область',exact:true}).click();await expect(page.getByRole('button',{name:'Загрузить область',exact:true})).toBeEnabled({timeout:15000});
+ await page.getByRole('button',{name:'Обновить область',exact:true}).click();await expect(page.getByRole('button',{name:'Обновить область',exact:true})).toBeEnabled({timeout:15000});
  await screen(page,'Настройки');await expect(page.locator('.cache-stats')).toContainText('Закреплено: 1');await page.getByRole('button',{name:'Удалить весь кэш…'}).click();await expect(page.getByRole('group',{name:'Удаление всего кэша'})).toBeVisible();
  await page.getByRole('button',{name:'Отмена',exact:true}).click();await expect(page.locator('.cache-stats')).toContainText('1 из 32');await page.getByRole('button',{name:'Удалить весь кэш…'}).click();await page.getByRole('button',{name:'Удалить всё',exact:true}).click();await expect(page.locator('.cache-stats')).toContainText('0 из 32');
 });

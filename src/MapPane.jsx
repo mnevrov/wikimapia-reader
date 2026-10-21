@@ -1,11 +1,14 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import L from 'leaflet';
-import {wikimapiaCall} from './client.js';
+import {wikimapiaSource} from './wikimapiaSource.js';
 import {AreaLoader} from './area.js';
 import {areaCache} from './areaCache.js';
 import {areaMessage} from './mapStatus.js';
 import {hitTestPlaces} from './geometry.js';
 import {DEMO_AREA} from './demo.js';
+import {visibleInMap,contourStyle} from './mapPresentation.js';
+import {useYandexUnderlay} from './useYandexUnderlay.js';
+import {followMovement} from './gpsFollow.js';
 
 function initialView() {
   try {
@@ -14,21 +17,26 @@ function initialView() {
   } catch {}
   return {lat:55.752,lng:37.618,zoom:16};
 }
-export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refresh,moreRequest,focus,location,cacheEpoch,cacheView,selectedId,onCandidates,onSelect,onState,onMessage}) {
-  const el=useRef(null), mapRef=useRef(null), overlayRef=useRef(null);
+export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refresh,moreRequest,focus,location,recenterLocation,gpsFollowing=false,onGpsPause,cacheEpoch,cacheView,mapTarget,selectedId,density,basemap,yandexKey,yandexReferer,onBasemapFallback,onBasemapConnected,onVisiblePlaces,onCandidates,onSelect,onState,onMessage}) {
+  const el=useRef(null), mapRef=useRef(null), overlayRef=useRef(null), polygonsRef=useRef(new Map()),tileRef=useRef(null),yandexHost=useRef(null);
   const [viewport,setViewport]=useState(0);
   const [moving,setMoving]=useState(false);
   const [places,setPlaces]=useState(()=>demo?DEMO_AREA:[]);
   const blocked=useRef(false), retries=useRef(0);
+  const followRef=useRef({active:false,pause:null});
+  followRef.current={active:gpsFollowing,pause:onGpsPause};
+  const markerRef=useRef(null),accuracyRef=useRef(null),lastFollow=useRef(null);
+  const reduceMotion=typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
   const [progress,setProgress]=useState({});
   const currentLoader=useRef(null),pick=useRef(null),dismissPick=useRef(null);
-  const loader=useMemo(()=>new AreaLoader(opts=>wikimapiaCall('box',apiKey,opts), state=>{
+  const source=useMemo(()=>wikimapiaSource(apiKey),[apiKey]);
+  const loader=useMemo(()=>new AreaLoader(opts=>source.getArea(opts), state=>{
     if(demo)return;
     setPlaces(state.displayPlaces??state.places);setProgress(state);onState(state);
     if(state.error)blocked.current=!state.retryable;
     else if(state.page&&(!state.more||state.page>=3))retries.current=0;
     onMessage(areaMessage(state));
-  },areaCache),[demo,apiKey,cacheEpoch,onState,onMessage]);
+  },areaCache),[demo,source,cacheEpoch,onState,onMessage]);
   currentLoader.current=loader;
   pick.current=latlng=>{
     const map=mapRef.current;if(!map)return;
@@ -39,11 +47,13 @@ export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refr
   useEffect(()=>{
     const v=initialView();
     const map=L.map(el.current,{zoomControl:false,attributionControl:false,inertia:false}).setView([v.lat,v.lng],v.zoom);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
+    tileRef.current=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
 
     L.control.attribution({position:'bottomleft',prefix:false}).addTo(map);
-    mapRef.current=map;overlayRef.current=L.featureGroup().addTo(map);
+    mapRef.current=map;overlayRef.current=L.featureGroup().addTo(map);setViewport(v=>v+1);
     map.on('click',event=>pick.current?.(event.latlng));
+    map.on('dragstart',()=>{if(followRef.current.active)followRef.current.pause?.();});
+    map.on('boxzoomstart',()=>{if(followRef.current.active)followRef.current.pause?.();});
     map.on('movestart',()=>{dismissPick.current?.();setMoving(true);retries.current=0;currentLoader.current?.invalidate();});
     map.on('moveend',()=>{
       dismissPick.current?.();setMoving(false);
@@ -52,7 +62,7 @@ export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refr
       setViewport(v=>v+1);
     });
     const observer=new ResizeObserver(()=>map.invalidateSize());observer.observe(el.current);
-    return()=>{observer.disconnect();map.remove();mapRef.current=null;};
+    return()=>{observer.disconnect();polygonsRef.current.clear();markerRef.current=null;accuracyRef.current=null;lastFollow.current=null;map.remove();mapRef.current=null;tileRef.current=null;};
   },[]);
   useEffect(()=>{
     blocked.current=false;
@@ -64,7 +74,7 @@ export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refr
   const loadRef=useRef(null);
   loadRef.current=(force=false)=>{
     const map=mapRef.current;
-    if(demo||!apiKey||!active||!map)return;
+    if(demo||!active||!map)return;
     const b=map.getBounds();
     const bbox=[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()];
     if(bbox[2]-bbox[0]>.035||bbox[3]-bbox[1]>.035){onMessage('Приблизьте карту для загрузки объектов');return;}
@@ -76,7 +86,7 @@ export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refr
     return loader.load(padded,{force,view:bbox});
   };
   useEffect(()=>{
-    if(demo||!apiKey||!active||paused||moving||!auto||blocked.current){loader.stop();return;}
+    if(demo||!active||paused||moving||!auto||blocked.current){loader.stop();return;}
     const timer=setTimeout(()=>loadRef.current(),250);
     return()=>{clearTimeout(timer);loader.stop();};
   },[demo,apiKey,active,paused,auto,moving,viewport,loader]);
@@ -92,10 +102,34 @@ export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refr
   },[auto,active,paused,moving,progress,loader]);
   useEffect(()=>{if(refresh){blocked.current=false;retries.current=0;loadRef.current(true);}},[refresh]);
   useEffect(()=>{if(moreRequest&&active&&!paused)loader.remaining();},[moreRequest]);
+  // Reconcile only visible polygon layers. Avoid clearLayers() on each API page.
   useEffect(()=>{
-    const layer=overlayRef.current;if(!layer)return;layer.clearLayers();
-    for(const p of places){if(p.id===selectedId&&focus?.length>=3)continue;if(p.coords.length>=3)L.polygon(p.coords,{color:p.id===selectedId?'#f1a23b':'#16ac8d',weight:p.id===selectedId?3:1.5,fill:p.id===selectedId,fillColor:'#f1a23b',fillOpacity:.12}).addTo(layer);}
-  },[places,selectedId,focus]);
+    const map=mapRef.current,layer=overlayRef.current;if(!map||!layer)return;
+    const view=map.getBounds();
+    const bounds=[view.getWest(),view.getSouth(),view.getEast(),view.getNorth()];
+    const visible=visibleInMap(places,bounds);
+    onVisiblePlaces(visible);
+    const desired=new Set();
+    const styleZoom=map.getZoom();
+    for(const p of visible){
+      if(p.id===selectedId&&focus?.length>=3)continue;
+      desired.add(p.id);
+      const style=contourStyle(density,visible.length,styleZoom,p.id===selectedId);
+      const current=polygonsRef.current.get(p.id);
+      if(current){
+        // A renewed response can replace geometry without replacing the layer object.
+        if(current.coords!==p.coords){current.layer.setLatLngs(p.coords);current.coords=p.coords;}
+        const key=JSON.stringify(style);
+        if(current.styleSignature!==key){current.layer.setStyle(style);current.styleSignature=key;}
+      }else{
+        const polygon=L.polygon(p.coords,style).addTo(layer);
+        polygonsRef.current.set(p.id,{layer:polygon,coords:p.coords,styleSignature:JSON.stringify(style)});
+      }
+    }
+    for(const [id,record] of polygonsRef.current){
+      if(!desired.has(id)){layer.removeLayer(record.layer);polygonsRef.current.delete(id);}
+    }
+  },[places,selectedId,focus,viewport,density,onVisiblePlaces]);
   useEffect(()=>{
     if(focus?.length<3||!focus||!mapRef.current)return;
     const map=mapRef.current;
@@ -104,18 +138,55 @@ export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refr
     return()=>p.remove();
   },[focus]);
   useEffect(()=>{
+    const map=mapRef.current,coords=mapTarget?.coords;
+    if(map&&mapTarget?.center){const c=mapTarget.center;map.setView([c.lat,c.lon],c.zoom,{animate:false});return;}
+    if(!map||!Array.isArray(coords)||coords.length<3)return;
+    map.fitBounds(coords,{maxZoom:17,paddingTopLeft:[24,88],paddingBottomRight:[32,90]});
+  },[mapTarget]);
+  useEffect(()=>{
     if(!cacheView||!mapRef.current)return;
     const [w,s,e,n]=cacheView.bbox;
     mapRef.current.fitBounds([[s,w],[n,e]],{padding:[24,90],maxZoom:18});
   },[cacheView]);
   useEffect(()=>{if(zoomRequest&&mapRef.current)mapRef.current.setZoom(Math.max(2,Math.min(19,mapRef.current.getZoom()+zoomRequest.delta)));},[zoomRequest]);
+  // Explicit one-shot nearby request: center once, without enabling GPS tracking.
+  useEffect(()=>{
+    const map=mapRef.current;
+    if(!map||!recenterLocation||![recenterLocation.lat,recenterLocation.lng].every(Number.isFinite))return;
+    map.setView([recenterLocation.lat,recenterLocation.lng],Math.max(16,map.getZoom()),{animate:!reduceMotion,duration:.5});
+  },[recenterLocation]);
+  useEffect(()=>{if(!gpsFollowing)lastFollow.current=null;},[gpsFollowing]);
   useEffect(()=>{
     if(!location||!mapRef.current)return;
-    const map=mapRef.current;
-    map.setView([location.lat,location.lng],17);
-    const marker=L.circleMarker([location.lat,location.lng],{radius:7,color:'#fff',weight:3,fillColor:'#2d86ff',fillOpacity:1}).addTo(map);
-    const circle=L.circle([location.lat,location.lng],{radius:Math.min(location.accuracy,1000),color:'#2d86ff',weight:1,fillOpacity:.08}).addTo(map);
-    return()=>{marker.remove();circle.remove();};
-  },[location]);
-  return <div className="map" ref={el} aria-label="Карта"/>;
+    const map=mapRef.current,point=[location.lat,location.lng];
+    if(!Number.isFinite(point[0])||!Number.isFinite(point[1]))return;
+    if(!markerRef.current)markerRef.current=L.circleMarker(point,{radius:7,color:'#fff',weight:3,fillColor:'#2d86ff',fillOpacity:1}).addTo(map);
+    else markerRef.current.setLatLng(point);
+    const radius=Math.max(1,Math.min(Number(location.accuracy)||100,1000));
+    if(!accuracyRef.current)accuracyRef.current=L.circle(point,{radius,color:'#2d86ff',weight:1,fillOpacity:.08}).addTo(map);
+    else{accuracyRef.current.setLatLng(point);accuracyRef.current.setRadius(radius);}
+    if(!gpsFollowing)return;
+    const previous=lastFollow.current;
+    if(previous){
+      if(!followMovement(map.distance([previous.lat,previous.lng],point),Date.now()-previous.at,radius))return;
+    }
+    const currentZoom=map.getZoom();
+    map.setView(point,Math.max(17,currentZoom),{animate:!!previous&&!reduceMotion,duration:.55});
+    lastFollow.current={lat:location.lat,lng:location.lng,at:Date.now()};
+  },[location,gpsFollowing]);
+  const yandexActive=useYandexUnderlay({
+    mapRef,hostRef:yandexHost,selected:basemap==='yandex',
+    key:yandexKey,refererConfirmed:yandexReferer,
+    onUnavailable:onBasemapFallback,onConnected:onBasemapConnected
+  });
+  useEffect(()=>{
+    const map=mapRef.current,tile=tileRef.current;
+    if(!map||!tile)return;
+    if(yandexActive&&map.hasLayer(tile))map.removeLayer(tile);
+    if(!yandexActive&&!map.hasLayer(tile))tile.addTo(map).bringToBack();
+  },[yandexActive]);
+  return <div className={`map-stack ${yandexActive?'has-yandex':''}`}>
+    <div className="yandex-underlay" ref={yandexHost} aria-hidden="true"/>
+    <div className="map" ref={el} aria-label="Карта"/>
+  </div>;
 }

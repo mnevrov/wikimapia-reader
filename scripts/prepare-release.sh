@@ -58,4 +58,3 @@ text='\n'.join(line for line in text.splitlines() if not line.startswith('SHA256
 pathlib.Path('release-dist/RELEASE_NOTES.md').write_text(text.rstrip()+'\n\nSHA256: '+hashlib.sha256(apk.read_bytes()).hexdigest()+'\n')
 PYNOTES
 printf 'Verified signed APK: %s\n' "$apk"
-
