@@ -303,3 +303,9 @@ main:not(.has-screen) .undo-toast{
   text-align:left;
 }
 main:not(.has-screen):has(.undo-toast) .toast{visibility:hidden}
+
+/* Opt-in Android transport diagnostics, intentionally collapsed into Settings. */
+.transport-diagnostic{margin-top:1rem;padding-top:1rem;border-top:1px solid var(--line,rgba(127,127,127,.2))}
+.transport-diagnostic h3{font-size:1rem;margin:0 0 .5rem}
+.transport-results{overflow-wrap:anywhere;margin-top:.6rem}
+.transport-results p{font-size:.85rem;margin:.4rem 0}

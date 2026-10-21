@@ -1,5 +1,7 @@
 import React,{useEffect,useState} from 'react';
 import appPackage from '../package.json';
+import {Capacitor} from '@capacitor/core';
+import {compareAndroidTransports} from './androidTransportProbe.js';
 import Icon from './Icon.jsx';
 import Motion from './Motion.jsx';
 import CacheSettings from './CacheSettings.jsx';
@@ -11,6 +13,21 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
   const [editing,setEditing]=useState(false),[draft,setDraft]=useState('');
   const [reportStatus,setReportStatus]=useState('');
   const [apiReportStatus,setApiReportStatus]=useState('');
+  const [transportBusy,setTransportBusy]=useState(false);
+  const [transportProgress,setTransportProgress]=useState('');
+  const [transportReport,setTransportReport]=useState(null);
+  const startTransportProbe=async()=>{
+    if(transportBusy||!credentials.key||!Capacitor.isNativePlatform())return;
+    setTransportBusy(true);setTransportReport(null);setTransportProgress('');
+    try{setTransportReport(await compareAndroidTransports(credentials.key,setTransportProgress));}
+    catch{setTransportProgress('Не удалось выполнить диагностику');}
+    finally{setTransportBusy(false);}
+  };
+  const copyTransportReport=async()=>{
+    if(!transportReport)return;
+    try{await navigator.clipboard.writeText(JSON.stringify(transportReport,null,2));setTransportProgress('Обезличенный отчёт скопирован');}
+    catch{setTransportProgress('Не удалось скопировать отчёт');}
+  };
   const copyApiReport=async()=>{
     try { await navigator.clipboard.writeText(JSON.stringify(diagnosticSnapshot(),null,2)); setApiReportStatus('Обезличенная статистика скопирована'); }
     catch { setApiReportStatus('Буфер обмена недоступен; копирование отменено'); }
@@ -70,6 +87,16 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
         <button className="text-button" type="button" onClick={()=>{clearDiagnostics();setApiReportStatus('Статистика очищена');}}>Очистить</button>
       </div>
       {apiReportStatus&&<p className="helper" role="status">{apiReportStatus}</p>}
+      {Capacitor.isNativePlatform()&&credentials.key&&!demo&&<div className="transport-diagnostic" aria-label="Проверка сетевого подключения Android">
+        <h3>Резервный API: диагностика Android</h3>
+        <p className="helper">Основное чтение работает с сайтом без ключа. Эта проверка запускается только вручную и касается дополнительного API. Не более двух запросов на публичной тестовой области, интервал не менее 6 секунд. При отказе по квоте или ключу второй запрос пропускается. Никаких ключей, адресов запросов и координат в отчёте нет.</p>
+        <button className="secondary" type="button" disabled={transportBusy} onClick={startTransportProbe}>{transportBusy?'Проверяем соединение…':'Проверить два HTTP-транспорта'}</button>
+        {transportProgress&&<p className="helper" role="status">{transportProgress}</p>}
+        {transportReport&&<div className="transport-results" role="group" aria-label="Результаты теста транспорта">
+          {transportReport.results.map(item=><p key={item.transport}><strong>{item.transport==='android_native'?'Android HTTP':'WebView'}:</strong> {item.outcome}{item.reason?` (${item.reason})`:''}, {item.durationMs} мс{item.httpStatus!==null?`, HTTP ${item.httpStatus}`:''}{item.apiCode!=null?`, код API ${item.apiCode}`:''}{item.contentCategory?`, ответ: ${item.contentCategory}`:''}{item.objects!==null?`, объектов ${item.objects}, контуров ${item.polygons}`:''}</p>)}
+          <button className="secondary" type="button" onClick={copyTransportReport}>Скопировать результат проверки</button>
+        </div>}
+      </div>}
     </section>
     <CacheSettings epoch={cacheEpoch} busy={cacheClearing} currentIds={currentAreaIds} demo={demo} onAction={onCacheAction} onShowArea={onShowArea}/>
     <OfflineSettings epoch={offlineEpoch} onChange={onOfflineChange}/>
