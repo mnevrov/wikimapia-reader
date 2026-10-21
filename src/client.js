@@ -4,6 +4,21 @@ import { buildRequest, validateResponse, classifyApiFailure } from './api.js';
 import {recordApiMetric} from './apiDiagnostics.js';
 
 let nextRequestAt = 0;
+// One request gate for opt-in diagnostics and ordinary browser/native API calls.
+export async function waitForApiSlot(signal) {
+  signal?.throwIfAborted();
+  while (Date.now() < nextRequestAt) {
+    const wait = nextRequestAt - Date.now();
+    await new Promise((resolve,reject)=>{
+      const done=()=>{signal?.removeEventListener('abort',abort);resolve();};
+      const timer=setTimeout(done,wait);
+      const abort=()=>{clearTimeout(timer);signal?.removeEventListener('abort',abort);reject(new DOMException('Aborted','AbortError'));};
+      signal?.addEventListener('abort',abort,{once:true});
+    });
+    signal?.throwIfAborted();
+  }
+  nextRequestAt = Date.now() + 6000;
+}
 export async function wikimapiaCall(func, key, opts = {}) {
   const url = buildRequest(func, key, opts);
   if(hasCar()){
@@ -19,18 +34,7 @@ export async function wikimapiaCall(func, key, opts = {}) {
     }catch(e){recordApiMetric(func,Date.now()-startedAt,opts.signal?.aborted?'cancelled':classifyApiFailure(e));throw e;}
     finally{opts.signal?.removeEventListener('abort',abort);}
   }
-  opts.signal?.throwIfAborted();
-  while (Date.now() < nextRequestAt) {
-    const wait = nextRequestAt - Date.now();
-    await new Promise((resolve,reject)=>{
-    const done=()=>{opts.signal?.removeEventListener('abort',abort);resolve();};
-    const timer=setTimeout(done,wait);
-    const abort=()=>{clearTimeout(timer);opts.signal?.removeEventListener('abort',abort);reject(new DOMException('Aborted','AbortError'));};
-    opts.signal?.addEventListener('abort',abort,{once:true});
-  });
-    opts.signal?.throwIfAborted();
-  }
-  nextRequestAt = Date.now() + 6000;
+  await waitForApiSlot(opts.signal);
   let result;
   const startedAt = Date.now();
   try {
