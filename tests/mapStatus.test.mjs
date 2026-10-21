@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {areaMessage, areaCacheLabel, isMapErrorNotice} from '../src/mapStatus.js';
+import {areaMessage, areaCacheLabel, isMapErrorNotice, pickMapFeedback} from '../src/mapStatus.js';
 test('only cold load speaks; background loading is silent',()=>{
  assert.equal(areaMessage({loading:true,background:false}),'Загружаем объекты…');
  assert.equal(areaMessage({loading:true,background:true,displayPlaces:[{}]}),'');
@@ -42,4 +42,27 @@ test('geo, quota and transport failures are top banners while loading stays belo
   'Здесь пока нет объектов Wikimapia','Приблизьте карту для загрузки объектов',
   'Большая область: загружено ещё 20 страниц.'
  ]) assert.equal(isMapErrorNotice(message),false,String(message));
+});
+
+test('area loading failure outranks a paused GPS Follow hint and older notices',()=>{
+  const message='Не удалось загрузить данные. Проверьте подключение.';
+  assert.deepEqual(pickMapFeedback({areaError:message,notice:'Загружаем объекты…',gpsFollow:'paused'}),{
+    message,source:'area',isError:true
+  });
+  assert.deepEqual(pickMapFeedback({areaError:message,gpsError:'Низкая точность GPS · ожидаем сигнал',gpsFollow:'paused'}),{
+    message,source:'area',isError:true
+  });
+});
+test('network failure takes priority over the paused follow hint even without area.error',()=>{
+  const message='Не удалось загрузить данные. Попробуйте позже.';
+  assert.deepEqual(pickMapFeedback({notice:message,gpsFollow:'paused'}),{
+    message,source:'map',isError:true
+  });
+});
+test('paused Follow is only a fallback; ordinary map progress also outranks it',()=>{
+  assert.deepEqual(pickMapFeedback({notice:'Загружаем объекты…',gpsFollow:'paused'}),{
+    message:'Загружаем объекты…',source:'map',isError:false
+  });
+  assert.match(pickMapFeedback({gpsFollow:'paused'}).message,/GPS Follow приостановлен/);
+  assert.equal(pickMapFeedback({}),null);
 });

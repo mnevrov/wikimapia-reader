@@ -22,3 +22,14 @@ export function isMapErrorNotice(message) {
  if (typeof message!=='string') return false;
  return /недоступ|не удалось|не ответил|ошибк|тайм.?аут|лимит|квот|отклон|нет подключен|низкая точность|истекло время|превышен|повторите позже/i.test(message);
 }
+
+/** Choose one map banner. Data loading failures must never be replaced by
+ * the lower-priority GPS Follow paused hint. */
+export function pickMapFeedback({areaError='',notice='',gpsError='',gpsFollow='off'}={}) {
+  if(areaError) return {message:areaError,source:'area',isError:true};
+  if(isMapErrorNotice(notice)) return {message:notice,source:'map',isError:true};
+  if(gpsError) return {message:gpsError,source:'gps',isError:true};
+  if(notice) return {message:notice,source:'map',isError:false};
+  if(gpsFollow==='paused') return {message:'GPS Follow приостановлен · нажмите кнопку геолокации для возобновления',source:'gps',isError:false};
+  return null;
+}
