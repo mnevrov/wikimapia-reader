@@ -41,6 +41,7 @@ test('all map statuses share one top-left position alongside toolbar and beneath
 
 test('network hint uses same slot and suppresses map feedback rather than overlapping it',async({page})=>{
  await tiles(page);await page.goto('/');
+ await expect(page.locator('.map-stage>.map-feedback')).toBeVisible();
  const result=await page.evaluate(()=>{
    const status=document.querySelector('.map-feedback');
    const hint=document.createElement('div');hint.className='network-hint';hint.textContent='Нет подключения';
@@ -55,6 +56,7 @@ test('network hint uses same slot and suppresses map feedback rather than overla
 
 test('map confirmation/undo feedback also appears in the same top slot',async({page})=>{
  await tiles(page);await page.goto('/');
+ await expect(page.locator('.map-stage>.map-feedback')).toBeVisible();
  const result=await page.evaluate(()=>{
    const main=document.querySelector('main'),status=document.querySelector('.map-feedback');
    const initial=getComputedStyle(status).visibility;
