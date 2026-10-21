@@ -21,6 +21,51 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  verify-website-android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd
+      - name: Install Android SDK
+        run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
+      - run: npm ci
+      - run: npm run android:sync
+      - name: Install emulator for website transport verification
+        run: |
+          sdkmanager 'emulator' 'system-images;android-30;default;x86_64'
+          echo no | avdmanager create avd --force --name wikireader-site --package 'system-images;android-30;default;x86_64'
+          sudo chmod 666 /dev/kvm
+      - name: Verify website transport on Android without API key
+        timeout-minutes: 12
+        run: |
+          "$ANDROID_HOME/emulator/emulator" -avd wikireader-site -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect > /tmp/wikireader-emulator.log 2>&1 &
+          emulator_pid=$!
+          cleanup_emulator() {
+            status=$?
+            if [[ "$status" != 0 ]]; then
+              tail -n 120 /tmp/wikireader-emulator.log || true
+              adb devices -l || true
+              df -h || true
+            fi
+            kill "$emulator_pid" || true
+          }
+          trap cleanup_emulator EXIT
+          timeout 180 adb wait-for-device
+          timeout 180 bash -c 'until [[ "$(adb shell getprop sys.boot_completed | tr -d "\r")" == 1 ]]; do sleep 2; done'
+          cd android
+          ./gradlew --no-daemon connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.example.wikimapreader.SiteSourceLiveTest
+
   verify-and-build:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -55,21 +100,6 @@ jobs:
         run: npx playwright test tests/browser/yandexSafeBranding094.spec.js
       - name: Mobile browser tests (mock API)
         run: npx playwright test
-      - name: Install emulator for website transport verification
-        run: |
-          sdkmanager 'emulator' 'system-images;android-30;default;x86_64'
-          echo no | avdmanager create avd --force --name wikireader-site --package 'system-images;android-30;default;x86_64'
-          sudo chmod 666 /dev/kvm
-      - name: Verify website transport on Android without API key
-        timeout-minutes: 12
-        run: |
-          "$ANDROID_HOME/emulator/emulator" -avd wikireader-site -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect > /tmp/wikireader-emulator.log 2>&1 &
-          emulator_pid=$!
-          trap 'kill "$emulator_pid" || true' EXIT
-          adb wait-for-device
-          timeout 180 bash -c 'until [[ "$(adb shell getprop sys.boot_completed | tr -d "\r")" == 1 ]]; do sleep 2; done'
-          cd android
-          ./gradlew --no-daemon connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.example.wikimapreader.SiteSourceLiveTest
       - name: Checksum
         working-directory: android/app/build/outputs/apk/debug
         run: sha256sum app-debug.apk > SHA256SUMS.txt
@@ -111,7 +141,7 @@ jobs:
 
   publish:
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
-    needs: verify-and-build
+    needs: [verify-and-build, verify-website-android]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -141,7 +171,7 @@ jobs:
   # A workflow_dispatch event from GITHUB_TOKEN is allowed to start another workflow.
   dispatch-version-release:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: verify-and-build
+    needs: [verify-and-build, verify-website-android]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
