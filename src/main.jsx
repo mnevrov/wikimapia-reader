@@ -25,7 +25,7 @@ import {searchIntent} from './searchIntent.js';
 import {readFavorites,toggleFavorite as updateFavorites} from './favorites.js';
 import {offlineStore} from './offlineStore.js';
 import {nextFollowState,acceptableFix} from './gpsFollow.js';
-import {isMapErrorNotice} from './mapStatus.js';
+import {pickMapFeedback} from './mapStatus.js';
 import {HISTORY_KEY,HISTORY_ENABLED_KEY,readHistory,recordHistory} from './readingHistory.js';
 import SavedLibrary from './SavedLibrary.jsx';
 import {buildBackup} from './libraryBackup.js';
@@ -263,6 +263,7 @@ function App(){
     :area.more?'Загрузить остальные объекты области':area.error?'Повторить запрос области':'Обновить область с сервера';
   const refreshArea=()=>{if(demo||areaBusy||!active)return;closeCard();setRefresh(x=>x+1);};
   const runAreaAction=()=>{if(demo||areaBusy||!active)return;if(area.more)setMoreRequest(x=>x+1);else refreshArea();};
+  const mapFeedback=pickMapFeedback({areaError:area.error,notice,gpsError,gpsFollow});
   if(!credentials.ready)return <Startup/>;
   return <main className={`${selected||candidates.length?'has-sheet':''} ${screen!=='map'?'has-screen':''} ${mapPanel?'has-map-panel':''} ${toast?'has-toast':''}`}>
     <div className="map-stage" inert={screen!=='map'} aria-hidden={screen!=='map'}>
@@ -277,7 +278,7 @@ function App(){
         {!demo&&<button className={`icon-btn area-action ${areaBusy?'is-loading':''} ${area.error?'has-error':''} ${area.more&&!areaBusy&&!area.error?'can-continue':''}`} aria-label={areaActionLabel} title={areaActionTitle} aria-busy={areaBusy} disabled={areaBusy||!active} onClick={runAreaAction}><Icon name={areaBusy||area.error||!area.more?'refresh':'download'}/></button>}
       </div>
       <Motion open={!!mapPanel&&!selected&&!candidates.length} identity={mapPanel} kind="discovery"><MapDiscover mode={mapPanel} demo={demo} query={query} onQuery={queryOnMap} onSearch={search} results={results} searchBusy={searchBusy} searchStatus={searchStatus} visiblePlaces={visiblePlaces} area={area} notice={notice} density={density} onDensity={setDensity} onSelect={onSelect} sort={listSort} onSort={setListSort} filter={listFilter} onFilter={setListFilter} listQuery={listQuery} onListQuery={setListQuery} favorites={favorites} offlineEntries={offlineEntries} location={location} onLocate={findNearby} onShowOnMap={showOnMap} highlightedId={highlightedId} onRefreshArea={refreshArea} onCancelSearch={cancelMapSearch} onSettings={()=>navigate('settings')} onClose={closeMapPanel}/></Motion>
-      {!selected&&!candidates.length&&(gpsError||notice||gpsFollow==='paused')&&<div className={'map-feedback'+(gpsError?' gps-feedback':'')+((gpsError||isMapErrorNotice(notice))?' is-error':'')}><div className="status" role="status" aria-live="polite">{gpsError|| (gpsFollow==='paused'?'GPS Follow приостановлен · нажмите кнопку геолокации для возобновления':notice)}</div>{demo&&!gpsError&&<button className="connect-action" onClick={()=>navigate('settings')}>Подключить Wikimapia <Icon name="arrow" size={18}/></button>}</div>}
+      {!selected&&!candidates.length&&mapFeedback&&<div className={'map-feedback'+(mapFeedback.source==='gps'?' gps-feedback':'')+(mapFeedback.isError?' is-error':'')}><div className="status" role="status" aria-live="polite">{mapFeedback.message}</div>{demo&&mapFeedback.source==='map'&&<button className="connect-action" onClick={()=>navigate('settings')}>Подключить Wikimapia <Icon name="arrow" size={18}/></button>}</div>}
       <span className="sr-only" role="status" aria-live="polite">{area.draining?`Догружаем: ${area.places.length}${area.found!=null?` из ${area.found}`:" объектов"}`:''}</span>
       <Motion open={candidates.length>0} identity={candidates.map(p=>p.id).join(',')} kind="chooser"><ObjectChooser places={candidates} onPick={onSelect} onClose={()=>setCandidates([])}/></Motion>
       <Motion open={!!selected||busy||!!error} identity={selected?.id} kind="sheet"><Details returnLabel={returnTo==='search'||origin.current?.panel==='search'?'К результатам поиска':returnTo==='saved'?'К избранному':origin.current?.panel==='list'?'К объектам области':null} onReturn={dismissCard} data={details||(selected?{id:selected.id,title:selected.title}:null)} busy={busy} error={error} onClose={dismissCard} onRetry={()=>selected&&onSelect(selected)} basemap={basemap} favorites={favorites.filter(x=>x.source===(demo?'demo':'wikimapia')).map(x=>x.id)} toggleFavorite={toggleFavorite} offlineInfo={offlineInfo} offlineBusy={offlineBusy} onSaveOffline={saveOffline} onRemoveOffline={()=>removeOffline(selected?.id)} offlineAvailable={!demo&&online} shareAvailable={!demo&&selected?.source!=='demo'} onShowOnMap={()=>showOnMap(details||selected)} onShare={()=>sharePlace(details||selected)}/></Motion>
