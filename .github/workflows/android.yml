@@ -43,7 +43,7 @@ jobs:
       - run: npm run android:sync
       - name: Assemble Android instrumentation tests
         working-directory: android
-        run: ./gradlew --no-daemon assembleDebugAndroidTest
+        run: ./gradlew --no-daemon :app:assembleDebugAndroidTest
       - name: Install emulator for website transport verification
         run: |
           sdkmanager 'emulator' 'system-images;android-30;default;x86_64'
@@ -67,7 +67,7 @@ jobs:
           timeout 180 adb wait-for-device
           timeout 180 bash -c 'until [[ "$(adb shell getprop sys.boot_completed | tr -d "\r")" == 1 ]]; do sleep 2; done'
           cd android
-          ./gradlew --no-daemon connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.example.wikimapreader.SiteSourceLiveTest
+          ./gradlew --no-daemon :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.example.wikimapreader.SiteSourceLiveTest
 
   verify-and-build:
     runs-on: ubuntu-24.04

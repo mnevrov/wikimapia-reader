@@ -20,7 +20,12 @@ function cleanOffline(items){
     if(!Number.isSafeInteger(savedAt)||savedAt<1577836800000||savedAt>Date.now()+86400000)
       throw new Error('Некорректная дата сохранения');
     // No arbitrary URLs, HTML, credentials, media or location are restored.
-    unique.set(item.id,{id:item.id,title:item.title,description:item.description,comments,savedAt});
+    let blocks;
+    if(item.blocks!==undefined){
+      if(!item.blocks||typeof item.blocks!=='object'||Array.isArray(item.blocks))throw new Error('Некорректные статусы карточки');
+      blocks=Object.fromEntries(['title','description','photos','comments'].map(k=>{const v=item.blocks[k];if(!['ok','empty','unavailable','invalid'].includes(v))throw new Error('Некорректный статус данных');return [k,v];}));
+    }
+    unique.set(item.id,{id:item.id,title:item.title,description:item.description,comments,savedAt,...(blocks?{blocks}:{})});
   }
   return [...unique.values()];
 }
@@ -30,7 +35,7 @@ export function buildBackup({favorites,history,offline}){
     mediaIncluded:false,
     favorites:readFavorites(JSON.stringify(favorites||[])).filter(x=>x.source==='wikimapia'),
     history:JSON.parse(JSON.stringify(history||[])).map(x=>({id:x.id,title:x.title,viewedAt:x.viewedAt})),
-    offline:cleanOffline((offline||[]).map(x=>({id:x.id,title:x.title,description:x.description||'',comments:x.comments||[],savedAt:x.savedAt})))
+    offline:cleanOffline((offline||[]).map(x=>({id:x.id,title:x.title,description:x.description||'',comments:x.comments||[],savedAt:x.savedAt,...(x.blocks?{blocks:{...x.blocks,...(x.photos?.length?{photos:'unavailable'}:{})}}:{})})))
   };
 }
 export function parseBackup(raw){
