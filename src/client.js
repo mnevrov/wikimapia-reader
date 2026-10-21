@@ -46,7 +46,7 @@ export async function wikimapiaCall(func, key, opts = {}) {
     } finally { clearTimeout(timer); opts.signal?.removeEventListener('abort',abort); }
   }
   opts.signal?.throwIfAborted();
-  const validated = validateResponse(result, func, opts.id);
+  const validated = validateResponse(result, func, opts.id, opts.dataBlocks);
   recordApiMetric(func, Date.now() - startedAt);
   return validated;
   } catch (error) {

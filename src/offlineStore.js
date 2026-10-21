@@ -9,7 +9,7 @@ export const offlinePreferences=value=>({
 export const offlineStatus=(entry,preferences=OFFLINE_DEFAULTS,now=Date.now())=>{
   if(!entry)return 'absent';
   if(entry.error)return 'error';
-  if(entry.missing>0)return 'partial';
+  if(entry.missing>0||Object.values(entry.blocks??{}).some(s=>!['ok','empty'].includes(s)))return 'partial';
   if(now-entry.savedAt>offlinePreferences(preferences).retentionDays*86400000)return 'stale';
   return 'saved';
 };
@@ -75,7 +75,10 @@ function cleaned(data){
     comments:Array.isArray(data.comments)?data.comments.slice(0,500).map(c=>({
       author:String(c.author||'Участник Wikimapia').slice(0,250),
       text:String(c.text||''),date:typeof c.date==='string'?c.date:null
-    })):[],photos
+    })):[],photos,
+    ...(data.blocks?{blocks:Object.fromEntries(['title','description','photos','comments'].map(k=>[k,['ok','empty','unavailable','invalid'].includes(data.blocks[k])?data.blocks[k]:'unavailable']))}:{}),
+    ...(['site','hybrid','api'].includes(data.dataSource)?{dataSource:data.dataSource}:{}),
+    ...(data.blocks?{warnings:Object.entries(data.blocks).filter(([k,v])=>['title','description','photos','comments'].includes(k)&&!['ok','empty'].includes(v)).map(([k])=>({title:'Название',description:'Описание',photos:'Фотографии',comments:'Комментарии'}[k]+' временно недоступны.'))}:{})
   };
 }
 const mediaKey=(id,index)=>String(id)+':'+index;

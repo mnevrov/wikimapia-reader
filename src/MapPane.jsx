@@ -1,6 +1,6 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import L from 'leaflet';
-import {wikimapiaCall} from './client.js';
+import {wikimapiaSource} from './wikimapiaSource.js';
 import {AreaLoader} from './area.js';
 import {areaCache} from './areaCache.js';
 import {areaMessage} from './mapStatus.js';
@@ -29,13 +29,14 @@ export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refr
   const reduceMotion=typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
   const [progress,setProgress]=useState({});
   const currentLoader=useRef(null),pick=useRef(null),dismissPick=useRef(null);
-  const loader=useMemo(()=>new AreaLoader(opts=>wikimapiaCall('box',apiKey,opts), state=>{
+  const source=useMemo(()=>wikimapiaSource(apiKey),[apiKey]);
+  const loader=useMemo(()=>new AreaLoader(opts=>source.getArea(opts), state=>{
     if(demo)return;
     setPlaces(state.displayPlaces??state.places);setProgress(state);onState(state);
     if(state.error)blocked.current=!state.retryable;
     else if(state.page&&(!state.more||state.page>=3))retries.current=0;
     onMessage(areaMessage(state));
-  },areaCache),[demo,apiKey,cacheEpoch,onState,onMessage]);
+  },areaCache),[demo,source,cacheEpoch,onState,onMessage]);
   currentLoader.current=loader;
   pick.current=latlng=>{
     const map=mapRef.current;if(!map)return;
@@ -73,7 +74,7 @@ export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refr
   const loadRef=useRef(null);
   loadRef.current=(force=false)=>{
     const map=mapRef.current;
-    if(demo||!apiKey||!active||!map)return;
+    if(demo||!active||!map)return;
     const b=map.getBounds();
     const bbox=[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()];
     if(bbox[2]-bbox[0]>.035||bbox[3]-bbox[1]>.035){onMessage('Приблизьте карту для загрузки объектов');return;}
@@ -85,7 +86,7 @@ export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refr
     return loader.load(padded,{force,view:bbox});
   };
   useEffect(()=>{
-    if(demo||!apiKey||!active||paused||moving||!auto||blocked.current){loader.stop();return;}
+    if(demo||!active||paused||moving||!auto||blocked.current){loader.stop();return;}
     const timer=setTimeout(()=>loadRef.current(),250);
     return()=>{clearTimeout(timer);loader.stop();};
   },[demo,apiKey,active,paused,auto,moving,viewport,loader]);
@@ -138,6 +139,7 @@ export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refr
   },[focus]);
   useEffect(()=>{
     const map=mapRef.current,coords=mapTarget?.coords;
+    if(map&&mapTarget?.center){const c=mapTarget.center;map.setView([c.lat,c.lon],c.zoom,{animate:false});return;}
     if(!map||!Array.isArray(coords)||coords.length<3)return;
     map.fitBounds(coords,{maxZoom:17,paddingTopLeft:[24,88],paddingBottomRight:[32,90]});
   },[mapTarget]);

@@ -18,7 +18,9 @@ export function buildRequest(func, key, opts = {}) {
     const id = Number(opts.id);
     if (!Number.isSafeInteger(id) || id < 1) throw new ValidationError('Неверный ID объекта');
     url.searchParams.set('id', String(id));
-    url.searchParams.set('data_blocks', 'main,location,geometry,photos,comments');
+    const blocks=opts.dataBlocks??['main','location','geometry','photos','comments'];
+    if(!Array.isArray(blocks)||!blocks.length||blocks.some(x=>!['main','location','geometry','photos','comments'].includes(x)))throw new ValidationError('Неизвестный блок API');
+    url.searchParams.set('data_blocks', [...new Set(blocks)].join(','));
   } else if (func === 'search') {
     const query = String(opts.query ?? '').trim();
     if (!query || query.length > 200) throw new ValidationError('Введите запрос длиной до 200 символов');
@@ -146,7 +148,7 @@ function photoUrl(candidate) {
 export class ApiError extends Error {
   constructor(message, kind = 'unknown') { super(message); this.kind = kind; }
 }
-export function validateResponse(result, func, expectedId) {
+export function validateResponse(result, func, expectedId, dataBlocks) {
   if (result?.debug || result?.error || result?.error_message) {
     const detail = result.debug ?? result.error ?? result.error_message;
     const text = typeof detail === 'object' ? `${String(detail.code ?? '')} ${String(detail.message ?? '')}` : String(detail);
@@ -160,7 +162,7 @@ export function validateResponse(result, func, expectedId) {
   } else {
     const place = result.place ?? result;
     const id = Number(place.id ?? place.main?.id);
-    if (id !== Number(expectedId) || !(place.title ?? place.main?.title)) throw new ApiError('API вернул другой объект или неполные сведения.', 'schema');
+    if (id !== Number(expectedId) || ((!dataBlocks||dataBlocks.includes('main'))&&!(place.title ?? place.main?.title))) throw new ApiError('API вернул другой объект или неполные сведения.', 'schema');
   }
   return result;
 }
@@ -168,6 +170,7 @@ export function validateResponse(result, func, expectedId) {
 // Never return raw server messages: Wikimapia may echo query parameters or API keys.
 export function classifyApiFailure(error, { offline = false } = {}) {
   if (error?.name === 'AbortError') return 'cancelled';
+  if (['quota','auth','schema','network'].includes(error?.siteKind)) return error.siteKind;
   if (offline) return 'offline';
   if (error instanceof ApiError) return ['quota','auth','schema'].includes(error.kind) ? error.kind : 'api';
   if (error instanceof ValidationError) return 'input';
@@ -181,6 +184,7 @@ export function classifyApiFailure(error, { offline = false } = {}) {
 }
 
 export function diagnosticError(error) {
+  if (error?.siteKind) return error.message;
   if (error instanceof ApiError || error instanceof ValidationError) return error.message;
   switch (classifyApiFailure(error)) {
     case 'quota': return 'Вероятно, исчерпан лимит API-запросов. Не повторяйте запросы часто.';

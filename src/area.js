@@ -77,6 +77,7 @@ export class AreaLoader {
         return;
       }
     }
+    this.force = force;
     this.bbox = [...bbox];
     this.cacheKey = bbox.join(',');
     const displayPlaces=this.visibleCached();
@@ -109,7 +110,7 @@ export class AreaLoader {
     this.controller = new AbortController();
     this.publish({loading:true,background:this.state.displayPlaces.some(p=>p.coords.length>=3)||this.state.page>0,error:'',failureKind:null,retryable:false});
     try {
-      const payload = await this.call({bbox:this.bbox,page,signal:this.controller.signal});
+      const payload = await this.call({bbox:this.bbox,page,force:!!this.force,signal:this.controller.signal});
       if (n !== this.sequence) return;
       const items = normalizeArea(payload);
       const unique = new Map(this.state.places.map(p=>[p.id,p]));
@@ -119,11 +120,11 @@ export class AreaLoader {
       const found = payload.found != null && Number.isSafeInteger(rawFound) && rawFound >= 0 ? rawFound : null;
       // A repeated/empty page must not create an endless "more" loop.
       const progress = places.length > this.state.places.length;
-      const more = progress && items.length > 0 && (found !== null ? places.length < found : items.length === 50);
+      const more = typeof payload.more==='boolean'?payload.more:progress&&items.length>0&&(found!==null?places.length<found:items.length===50);
       // Repeated/empty pages cannot prove completeness when the server reports more.
-      const fullyLoaded=found!==null?places.length>=found:(items.length<50);
+      const fullyLoaded=typeof payload.complete==='boolean'?payload.complete:(found!==null?places.length>=found:(items.length<50));
       recordCoverage(places.length,found,fullyLoaded);
-      const state = {places,page,found,more,complete:fullyLoaded,dataSource:'network',cacheUpdatedAt:Date.now(),loading:false,background:false,error:'',failureKind:null,retryable:false};
+      const state = {places,page,found,more,source:payload.source??'api',complete:fullyLoaded,dataSource:'network',cacheUpdatedAt:Date.now(),loading:false,background:false,error:payload.warning??'',failureKind:payload.failureKind??null,retryable:false};
       const key=this.cacheKey,old=this.cache.get(key);
       const record={bbox:[...this.bbox],state,updated:Date.now(),pinned:old?.pinned??false,retentionDays:old?.retentionDays??1};
       this.cache.delete(key);
