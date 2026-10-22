@@ -1,5 +1,11 @@
 # WikiReader Next — Wikimapia для телефона
 
+<img src="public/brand.svg" width="96" alt="Логотип WikiReader" />
+
+**WikiReader — исследуй мир через Wikimapia.** Неофициальный клиент сервиса.
+
+[Фирменный стиль и иконки Android](docs/BRANDING.md)
+
 Неофициальный Android-клиент для чтения объектов Wikimapia без собственного сервера.
 Новая тестовая сборка называется **WikiReader Next** и устанавливается рядом с 0.4.
 
