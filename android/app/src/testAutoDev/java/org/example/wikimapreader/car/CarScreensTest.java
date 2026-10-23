@@ -1,0 +1,81 @@
+package org.example.wikimapreader.car;
+import android.content.Intent;import androidx.car.app.*;import androidx.car.app.model.*;import androidx.car.app.navigation.model.*;
+import androidx.car.app.testing.*;import androidx.lifecycle.Lifecycle;
+import org.robolectric.RuntimeEnvironment;import org.junit.*;import org.junit.runner.RunWith;import org.robolectric.RobolectricTestRunner;import org.robolectric.annotation.Config;import static org.junit.Assert.*;
+@RunWith(RobolectricTestRunner.class) @Config(sdk=35)
+public class CarScreensTest {
+ @Before public void isolatedStore()throws Exception{java.lang.reflect.Field instance=CarStore.class.getDeclaredField("instance");instance.setAccessible(true);instance.set(null,null);java.io.File dir=org.robolectric.RuntimeEnvironment.getApplication().getFilesDir();for(String suffix:new String[]{"",".bak",".new"})new java.io.File(dir,"car-data-v1.json"+suffix).delete();}
+
+ private SessionController controller;private TestCarContext context;private WikiSession session;
+ private WikiScreen create(int api){context=TestCarContext.createCarContext(RuntimeEnvironment.getApplication());context.updateHandshakeInfo(new HandshakeInfo("test.host",api));session=new WikiSession();controller=new SessionController(session,context,new Intent());controller.moveToState(Lifecycle.State.CREATED);return session.root;}
+ @After public void stop(){if(controller!=null)controller.moveToState(Lifecycle.State.DESTROYED);}
+ @Test public void modernTemplate(){
+  MapWithContentTemplate template=(MapWithContentTemplate)create(7).onGetTemplate();
+  assertTrue("Compact pane should leave maximum map space",template.getContentTemplate() instanceof PaneTemplate);
+ }
+ @Test public void mapTapShowsInlineCompactCardWithoutNewScreen()throws Exception{
+  WikiScreen root=create(7);
+  java.lang.reflect.Field field=WikiScreen.class.getDeclaredField("places");
+  field.setAccessible(true);
+  field.set(root,java.util.Arrays.asList(new Place(42,"Дом","<p>История здания &amp; двора</p>",
+   new double[][]{{55.0,37.0},{55.0,37.01},{55.01,37.01},{55.01,37.0}})));
+  root.tap(55.005,37.005);
+  MapWithContentTemplate card=(MapWithContentTemplate)root.onGetTemplate();
+  assertTrue(card.getContentTemplate() instanceof PaneTemplate);
+  Pane pane=((PaneTemplate)card.getContentTemplate()).getPane();
+  assertEquals("Дом",pane.getRows().get(0).getTitle().toString());
+  assertTrue(pane.getRows().get(0).getTexts().get(0).toString().contains("История здания & двора"));
+  assertEquals(2,pane.getActions().size());
+  root.tap(54.0,37.0);
+  Pane empty=((PaneTemplate)((MapWithContentTemplate)root.onGetTemplate()).getContentTemplate()).getPane();
+  assertFalse(empty.getRows().get(0).getTitle().toString().equals("Дом"));
+ }
+ @Test public void overlappingPolygonsCycleInPlaceWithoutScreenNavigation()throws Exception{
+  WikiScreen root=create(7);
+  double[][] shape={{55.0,37.0},{55.0,37.02},{55.02,37.02},{55.02,37.0}};
+  java.lang.reflect.Field field=WikiScreen.class.getDeclaredField("places");
+  field.setAccessible(true);
+  field.set(root,java.util.Arrays.asList(new Place(42,"Первый","Коротко",shape),
+   new Place(43,"Второй","Другой",shape)));
+  root.tap(55.01,37.01);
+  String first=((PaneTemplate)((MapWithContentTemplate)root.onGetTemplate()).getContentTemplate())
+   .getPane().getRows().get(0).getTitle().toString();
+  root.tap(55.01,37.01);
+  String second=((PaneTemplate)((MapWithContentTemplate)root.onGetTemplate()).getContentTemplate())
+   .getPane().getRows().get(0).getTitle().toString();
+  assertNotEquals(first,second);
+ }
+ @Test public void shortPreviewSanitizesAndLimitsText(){
+  assertEquals("Первый & второй",WikiScreen.shortPreview("<b>Первый</b> &amp; второй"));
+  assertTrue(WikiScreen.shortPreview("X".repeat(300)).length()<=105);
+ }
+ @Test public void nearbyListIsOptIn()throws Exception{
+  WikiScreen root=create(7);
+  java.lang.reflect.Field flag=WikiScreen.class.getDeclaredField("showNearby");
+  flag.setAccessible(true);
+  flag.setBoolean(root,true);
+  MapWithContentTemplate expanded=(MapWithContentTemplate)root.onGetTemplate();
+  assertTrue(expanded.getContentTemplate() instanceof ListTemplate);
+ }
+ @Test public void mapViewportUsesVisibleAreaWithoutClippingSurface(){
+  android.graphics.Rect visible=new android.graphics.Rect(400,30,1280,700);
+  android.graphics.Rect stable=new android.graphics.Rect(500,80,1190,650);
+  assertEquals(visible,MapRenderer.mapViewport(visible,stable,1400,800));
+  assertEquals(stable,MapRenderer.mapViewport(new android.graphics.Rect(),stable,1400,800));
+  assertEquals(new android.graphics.Rect(0,0,1400,800),MapRenderer.mapViewport(null,null,1400,800));
+ }
+ @Test public void tileSpanCoversLeftAndRightOfSafeArea(){
+  int[] span=MapRenderer.tileSpan(1400,400,880,500,256);
+  assertTrue(span[0]<500-880/512.0);
+  assertTrue(span[1]>500+880/512.0);
+  assertTrue(span[0]<span[1]);
+ }
+ @Test public void oldHostFallback(){assertTrue(create(1).onGetTemplate() instanceof PlaceListMapTemplate);}
+ @Test public void recreateRetainsViewport()throws Exception{WikiScreen root=create(7);session.view.lat=59;session.view.lon=30;session.store.viewport(session.view,42);controller.moveToState(Lifecycle.State.DESTROYED);controller=null;assertTrue(create(7).onGetTemplate() instanceof MapWithContentTemplate);assertEquals(59,session.view.lat,0);assertEquals(42,session.store.selected());}
+ @Test public void serviceCreatesSession(){assertTrue(new WikiCarService().onCreateSession() instanceof WikiSession);}
+ @Test public void nonEmptyFallbackBuilds()throws Exception{WikiScreen root=create(1);java.lang.reflect.Field field=WikiScreen.class.getDeclaredField("places");field.setAccessible(true);field.set(root,java.util.Arrays.asList(new Place(42,"Place","",new double[][]{{55,37},{55.01,37},{55,37.01}})));assertTrue(root.onGetTemplate() instanceof PlaceListMapTemplate);}
+ @Test public void searchLoadingBuilds()throws Exception{WikiScreen root=create(7);Class<?> type=Class.forName("org.example.wikimapreader.car.WikiScreen$Search");java.lang.reflect.Constructor<?> constructor=type.getDeclaredConstructors()[0];constructor.setAccessible(true);Screen screen=(Screen)constructor.newInstance(root,context);java.lang.reflect.Field busy=type.getDeclaredField("busy");busy.setAccessible(true);busy.setBoolean(screen,true);assertTrue(screen.onGetTemplate() instanceof SearchTemplate);}
+ @Test public void cachedPagesKeepTheirOriginalBounds()throws Exception{WikiScreen root=create(7);session.view.lat=55;session.view.lon=37;session.view.zoom=16;double[] bounds={36.98251,54.98251,37.01749,55.01749};org.json.JSONObject row=new org.json.JSONObject().put("bbox",new org.json.JSONArray(bounds)).put("updated",System.currentTimeMillis()).put("state",new org.json.JSONObject().put("page",2).put("more",true).put("places",new org.json.JSONArray().put(new Place(55,"Cached","",new double[][]{{55,37}}).contour())));session.store.putArea(row);java.lang.reflect.Field visible=WikiScreen.class.getDeclaredField("visible");visible.setAccessible(true);visible.setBoolean(root,true);flag(root,"loading",true);java.lang.reflect.Method load=WikiScreen.class.getDeclaredMethod("load",boolean.class);load.setAccessible(true);load.invoke(root,false);java.lang.reflect.Field loading=WikiScreen.class.getDeclaredField("loading");loading.setAccessible(true);assertFalse(loading.getBoolean(root));java.lang.reflect.Field bbox=WikiScreen.class.getDeclaredField("bbox");bbox.setAccessible(true);assertArrayEquals(bounds,(double[])bbox.get(root),1e-9);java.lang.reflect.Field pages=WikiScreen.class.getDeclaredField("pagePlaces");pages.setAccessible(true);assertEquals(1,((java.util.List<?>)pages.get(root)).size());root.suspend();}
+ private void flag(WikiScreen root,String name,boolean value)throws Exception{java.lang.reflect.Field f=WikiScreen.class.getDeclaredField(name);f.setAccessible(true);f.setBoolean(root,value);}
+ @Test public void motionCoalescesWithoutCancellingPendingRequest()throws Exception{WikiScreen root=create(7);flag(root,"visible",true);flag(root,"loading",true);root.viewportChanged();org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(2));java.lang.reflect.Field generation=WikiScreen.class.getDeclaredField("generation");generation.setAccessible(true);assertEquals(0,generation.getInt(root));flag(root,"loading",false);flag(root,"blockedError",true);root.viewportChanged();org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(2));assertEquals(0,generation.getInt(root));root.suspend();}
+}

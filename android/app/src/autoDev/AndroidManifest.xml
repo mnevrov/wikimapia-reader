@@ -1,0 +1,12 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+ <uses-permission android:name="androidx.car.app.ACCESS_SURFACE"/>
+ <uses-permission android:name="androidx.car.app.MAP_TEMPLATES"/>
+ <application android:label="WikiReader Auto Dev" tools:replace="android:label">
+  <activity android:name="org.example.wikimapreader.MainActivity" android:label="WikiReader Auto Dev" tools:replace="android:label"/>
+  <meta-data android:name="com.google.android.gms.car.application" android:resource="@xml/automotive_app_desc"/>
+  <meta-data android:name="androidx.car.app.minCarApiLevel" android:value="1"/>
+  <service android:name="org.example.wikimapreader.car.WikiCarService" android:exported="true">
+   <intent-filter><action android:name="androidx.car.app.CarAppService"/><category android:name="androidx.car.app.category.POI"/></intent-filter>
+  </service>
+ </application>
+</manifest>

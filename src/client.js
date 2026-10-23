@@ -1,18 +1,19 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
+import {car,hasCar} from './carBridge.js';
 import { buildRequest, validateResponse, classifyApiFailure } from './api.js';
 import {recordApiMetric} from './apiDiagnostics.js';
 
 let nextRequestAt = 0;
-// All optional API calls, including diagnostic calls, share one 6-second gate.
+// One request gate for opt-in diagnostics and ordinary browser/native API calls.
 export async function waitForApiSlot(signal) {
   signal?.throwIfAborted();
   while (Date.now() < nextRequestAt) {
     const wait = nextRequestAt - Date.now();
-    await new Promise((resolve, reject) => {
-      const done = () => { signal?.removeEventListener('abort', abort); resolve(); };
-      const timer = setTimeout(done, wait);
-      const abort = () => { clearTimeout(timer); signal?.removeEventListener('abort', abort); reject(new DOMException('Aborted', 'AbortError')); };
-      signal?.addEventListener('abort', abort, {once:true});
+    await new Promise((resolve,reject)=>{
+      const done=()=>{signal?.removeEventListener('abort',abort);resolve();};
+      const timer=setTimeout(done,wait);
+      const abort=()=>{clearTimeout(timer);signal?.removeEventListener('abort',abort);reject(new DOMException('Aborted','AbortError'));};
+      signal?.addEventListener('abort',abort,{once:true});
     });
     signal?.throwIfAborted();
   }
@@ -20,6 +21,19 @@ export async function waitForApiSlot(signal) {
 }
 export async function wikimapiaCall(func, key, opts = {}) {
   const url = buildRequest(func, key, opts);
+  if(hasCar()){
+    opts.signal?.throwIfAborted();const startedAt=Date.now(),requestId=crypto.randomUUID();
+    const abort=()=>{void car.cancel({requestId});};
+    opts.signal?.addEventListener('abort',abort,{once:true});
+    try{
+      const {signal,...options}=opts;
+      const result=await car.request({requestId,method:func,options:{...options,apiOnly:true}});
+      opts.signal?.throwIfAborted();
+      const value=validateResponse(result.data,func,opts.id,opts.dataBlocks);
+      recordApiMetric(func,Date.now()-startedAt);return value;
+    }catch(e){recordApiMetric(func,Date.now()-startedAt,opts.signal?.aborted?'cancelled':classifyApiFailure(e));throw e;}
+    finally{opts.signal?.removeEventListener('abort',abort);}
+  }
   await waitForApiSlot(opts.signal);
   let result;
   const startedAt = Date.now();

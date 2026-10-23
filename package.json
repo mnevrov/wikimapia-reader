@@ -13,7 +13,7 @@
     "android:open": "npx cap open android",
     "test:browser": "npm run build && playwright test",
     "test:probe": "python3 -m unittest discover -s tests -p 'test_*.py'",
-    "android:build": "npm run android:sync && cd android && ./gradlew clean assembleDebug"
+    "android:build": "npm run android:sync && cd android && ./gradlew clean assembleMobileDebug assembleAutoDevDebug"
   },
   "dependencies": {
     "@capacitor/android": "8.5.3",

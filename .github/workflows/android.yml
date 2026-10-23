@@ -45,7 +45,7 @@ jobs:
       - run: npm run android:sync
       - name: Assemble Android instrumentation tests
         working-directory: android
-        run: ./gradlew --no-daemon :app:assembleDebugAndroidTest
+        run: ./gradlew --no-daemon :app:assembleMobileDebugAndroidTest
       - name: Install emulator for website transport verification
         run: |
           sdkmanager 'emulator' 'system-images;android-30;default;x86_64'
@@ -70,7 +70,7 @@ jobs:
           timeout 180 adb wait-for-device
           timeout 180 bash -c 'until [[ "$(adb shell getprop sys.boot_completed | tr -d "\r")" == 1 ]]; do sleep 2; done'
           cd android
-          ./gradlew --no-daemon :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.example.wikimapreader.SiteSourceLiveTest
+          ./gradlew --no-daemon :app:connectedMobileDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.example.wikimapreader.SiteSourceLiveTest
 
   verify-and-build:
     runs-on: ubuntu-24.04
@@ -101,21 +101,24 @@ jobs:
         run: npm run android:sync
       - name: Build and lint APK
         working-directory: android
-        run: ./gradlew --no-daemon testDebugUnitTest assembleDebug lintDebug
+        run: ./gradlew --no-daemon testMobileDebugUnitTest testAutoDevDebugUnitTest assembleMobileDebug assembleAutoDevDebug lintMobileDebug lintAutoDevDebug
       - name: Yandex branding regression (fail fast)
         run: npx playwright test tests/browser/yandexSafeBranding094.spec.js
       - name: Mobile browser tests (mock API)
         run: npx playwright test
-      - name: Checksum
-        working-directory: android/app/build/outputs/apk/debug
-        run: sha256sum app-debug.apk > SHA256SUMS.txt
+      - name: Verify APK isolation and checksums
+        run: python3 scripts/check-auto-apks.py
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: WikiReader-debug-${{ github.sha }}
-          path: |
-            android/app/build/outputs/apk/debug/app-debug.apk
-            android/app/build/outputs/apk/debug/SHA256SUMS.txt
-          retention-days: 14
+          name: WikiReader-mobile-${{ github.sha }}
+          path: apk-dist/mobile/*
+          retention-days: 30
+          if-no-files-found: error
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: WikiReader-AutoDev-${{ github.sha }}
+          path: apk-dist/autoDev/*
+          retention-days: 30
           if-no-files-found: error
 
       - name: Require a release commit from main

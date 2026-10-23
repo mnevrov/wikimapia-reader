@@ -16,13 +16,14 @@ import Icon from './Icon.jsx';
 import Startup from './Startup.jsx';
 import Motion from './Motion.jsx';
 import Disclosure from './Disclosure.jsx';
-import {CacheCapacityError} from './areaCache.js';
+import {CacheCapacityError,areaCache} from './areaCache.js';
 import ObjectChooser from './ObjectChooser.jsx';
 import MapDiscover from './MapDiscover.jsx';
 import {validDensity} from './mapPresentation.js';
 import {YANDEX_KEY_PATTERN} from './yandexUsage.js';
 import {searchIntent} from './searchIntent.js';
 import {readFavorites,toggleFavorite as updateFavorites} from './favorites.js';
+import {car,hasCar,persistFavorites,syncFavorites,watchFavorites} from './carBridge.js';
 import {offlineStore} from './offlineStore.js';
 import {nextFollowState,acceptableFix} from './gpsFollow.js';
 import {pickMapFeedback} from './mapStatus.js';
@@ -121,6 +122,21 @@ function App(){
       }
     }finally{if(token===request.current)setBusy(false);}
   },[demo,dataSource,screen,selected,mapPanel,online,rememberViewed,closeCard]);
+  const selectRef=useRef(onSelect);selectRef.current=onSelect;
+  useEffect(()=>{
+    if(!hasCar())return;
+    const unwatch=watchFavorites(setFavorites);
+    const resume=()=>{
+      void syncFavorites().catch(()=>setToast('Избранное сохранено локально; синхронизация повторится при открытии'));
+      void areaCache.snapshot().then(()=>setCacheEpoch(v=>v+1)).catch(()=>{});
+      if(credentials.ready)void car.pending().then(({id})=>{
+        if(Number.isSafeInteger(id)&&id>0)selectRef.current({id,source:'wikimapia',title:`Объект #${id}`});
+      }).catch(()=>{});
+    };
+    const visible=()=>{if(document.visibilityState==='visible')resume();};
+    resume();document.addEventListener('visibilitychange',visible);window.addEventListener('wikireadercaropen',resume);
+    return()=>{unwatch();document.removeEventListener('visibilitychange',visible);window.removeEventListener('wikireadercaropen',resume);};
+  },[credentials.ready]);
   const active=usePlatform(()=>{if(screen==='settings'&&confirmForget){setConfirmForget(false);return true;}if(screen!=='map'){setScreen('map');return true;}if(candidates.length){setCandidates([]);return true;}if(selected){dismissCard();return true;}if(mapPanel){searchAbort.current?.abort();setSearchBusy(false);setMapPanel(null);return true;}return false;});
   useEffect(()=>{const on=()=>setOnline(true),off=()=>setOnline(false);window.addEventListener('online',on);window.addEventListener('offline',off);return()=>{window.removeEventListener('online',on);window.removeEventListener('offline',off);};},[]);
   useLayoutEffect(()=>{if(screenBody.current){screenBody.current.scrollTop=positions.current[screen]??0;if(restoreFocus.current&&origin.current?.screen===screen){const o=origin.current;screenBody.current.querySelector(`[data-place-id="${o.id}"][data-source="${o.source}"]`)?.focus({preventScroll:true});restoreFocus.current=false;}}},[screen]);
@@ -160,16 +176,16 @@ function App(){
     const source=selected?.source||(demo?'demo':'wikimapia');
     const existing=favorites.find(x=>x.id===id&&x.source===source);if(existing){removeFavorite(existing);return;}
     const next=updateFavorites(favorites,{id,source,title:details?.title||selected?.title||`Объект #${id}`});
-    try{localStorage.setItem('wikimapia-reader-favorites',JSON.stringify(next));setFavorites(next);setToast(next.length>favorites.length?'Место сохранено':'Место удалено из избранного');}catch{setToast('Не удалось сохранить избранное');}
+    try{persistFavorites(next);setFavorites(next);setToast(next.length>favorites.length?'Место сохранено':'Место удалено из избранного');}catch{setToast('Не удалось сохранить избранное');}
   };
   const removeFavorite=place=>{
     const index=favorites.findIndex(x=>x.id===place.id&&x.source===place.source);
     const next=favorites.filter(x=>x.id!==place.id||x.source!==place.source);
-    try{localStorage.setItem('wikimapia-reader-favorites',JSON.stringify(next));setFavorites(next);setToast('');setUndo({place,index});}catch{setToast('Не удалось удалить избранное');}
+    try{persistFavorites(next);setFavorites(next);setToast('');setUndo({place,index});}catch{setToast('Не удалось удалить избранное');}
   };
   const undoRemove=()=>{
     if(!undo)return;const next=[...favorites];if(!next.some(x=>x.id===undo.place.id&&x.source===undo.place.source))next.splice(Math.min(undo.index,next.length),0,undo.place);
-    try{localStorage.setItem('wikimapia-reader-favorites',JSON.stringify(next));setFavorites(next);setUndo(null);}catch{setToast('Не удалось вернуть место');}
+    try{persistFavorites(next);setFavorites(next);setUndo(null);}catch{setToast('Не удалось вернуть место');}
   };
   const locate=async(centerMap=false)=>{
     if(locating)return;const token=++locationJob.current;setLocating(true);setNotice('Определяем местоположение…');
