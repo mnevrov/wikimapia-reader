@@ -42,7 +42,8 @@ public final class WikiScreen extends Screen implements DefaultLifecycleObserver
  private ActionStrip controls(){return new ActionStrip.Builder().addAction(Action.PAN).addAction(action("Приблизить",android.R.drawable.ic_input_add,()->session.renderer.zoom(1))).addAction(action("Отдалить",org.example.wikimapreader.R.drawable.car_zoom_out,()->session.renderer.zoom(-1))).addAction(action("К автомобилю",android.R.drawable.ic_menu_mylocation,()->{if(session.gps==null){session.permission();return;}synchronized(session.view){session.view.follow=true;session.view.lat=session.gps[0];session.view.lon=session.gps[1];}viewportChanged();})).build();}
  private int limit(){try{return Math.min(20,getCarContext().getCarService(ConstraintManager.class).getContentLimit(ConstraintManager.CONTENT_LIMIT_TYPE_LIST));}catch(Exception e){return 6;}}
  private List<Place> nearest(){List<Place> out=new ArrayList<>(places);double a=session.gps!=null?session.gps[0]:session.view.lat,b=session.gps!=null?session.gps[1]:session.view.lon;out.sort(Comparator.comparingDouble(p->{double[] q=p.point();return q==null?Double.MAX_VALUE:Geo.distance(a,b,q[0],q[1]);}));return out;}
- private ItemList rows(List<Place> source,boolean map){ItemList.Builder rows=new ItemList.Builder().setNoItemsMessage("Нет объектов. Переместите карту или догрузите область");int n=0;for(Place p:source){if(n>=limit())break;double[] q=p.point();if(map&&q==null)continue;Row.Builder row=new Row.Builder().setTitle(p.title).setOnClickListener(()->{if(getCarContext().getCarAppApiLevel()>=7)showPreview(Collections.singletonList(p),0);else detail(p);});if(session.gps!=null&&q!=null)row.addText(Math.round(Geo.distance(session.gps[0],session.gps[1],q[0],q[1]))+" м");else row.addText("Wikimapia #"+p.id);if(map)row.setBrowsable(true);if(map)row.setMetadata(new Metadata.Builder().setPlace(new androidx.car.app.model.Place.Builder(CarLocation.create(q[0],q[1])).setMarker(new PlaceMarker.Builder().setLabel(String.valueOf(n+1)).build()).build()).build());rows.addItem(row.build());n++;}return rows.build();}
+ private ItemList rows(List<Place> source,boolean map){return rows(source,map,false);}
+ private ItemList rows(List<Place> source,boolean map,boolean inlinePreview){ItemList.Builder rows=new ItemList.Builder().setNoItemsMessage("Нет объектов. Переместите карту или догрузите область");int n=0;for(Place p:source){if(n>=limit())break;double[] q=p.point();if(map&&q==null)continue;Row.Builder row=new Row.Builder().setTitle(p.title).setOnClickListener(()->{if(inlinePreview)showPreview(Collections.singletonList(p),0);else detail(p);});if(session.gps!=null&&q!=null)row.addText(Math.round(Geo.distance(session.gps[0],session.gps[1],q[0],q[1]))+" м");else row.addText("Wikimapia #"+p.id);if(map)row.setBrowsable(true);if(map)row.setMetadata(new Metadata.Builder().setPlace(new androidx.car.app.model.Place.Builder(CarLocation.create(q[0],q[1])).setMarker(new PlaceMarker.Builder().setLabel(String.valueOf(n+1)).build()).build()).build());rows.addItem(row.build());n++;}return rows.build();}
  @NonNull @Override public Template onGetTemplate(){
   ActionStrip top=new ActionStrip.Builder()
    .addAction(action("Поиск",android.R.drawable.ic_menu_search,()->getScreenManager().push(new Search(getCarContext()))))
@@ -71,7 +72,7 @@ public final class WikiScreen extends Screen implements DefaultLifecycleObserver
    ItemList.Builder nearby=new ItemList.Builder()
     .addItem(new Row.Builder().setTitle(loading?"Загрузка области":status)
      .addText(session.gpsStatus).build());
-   int shown=1;for(Item item:rows(nearest(),false).getItems()){
+   int shown=1;for(Item item:rows(nearest(),false,true).getItems()){
     if(shown++>=limit())break;
     nearby.addItem(item);
    }
