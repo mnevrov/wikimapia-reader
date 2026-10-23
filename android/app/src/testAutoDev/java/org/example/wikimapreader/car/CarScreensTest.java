@@ -9,7 +9,31 @@ public class CarScreensTest {
  private SessionController controller;private TestCarContext context;private WikiSession session;
  private WikiScreen create(int api){context=TestCarContext.createCarContext(RuntimeEnvironment.getApplication());context.updateHandshakeInfo(new HandshakeInfo("test.host",api));session=new WikiSession();controller=new SessionController(session,context,new Intent());controller.moveToState(Lifecycle.State.CREATED);return session.root;}
  @After public void stop(){if(controller!=null)controller.moveToState(Lifecycle.State.DESTROYED);}
- @Test public void modernTemplate(){assertTrue(create(7).onGetTemplate() instanceof MapWithContentTemplate);}
+ @Test public void modernTemplate(){
+  MapWithContentTemplate template=(MapWithContentTemplate)create(7).onGetTemplate();
+  assertTrue("Compact pane should leave maximum map space",template.getContentTemplate() instanceof PaneTemplate);
+ }
+ @Test public void nearbyListIsOptIn()throws Exception{
+  WikiScreen root=create(7);
+  java.lang.reflect.Field flag=WikiScreen.class.getDeclaredField("showNearby");
+  flag.setAccessible(true);
+  flag.setBoolean(root,true);
+  MapWithContentTemplate expanded=(MapWithContentTemplate)root.onGetTemplate();
+  assertTrue(expanded.getContentTemplate() instanceof ListTemplate);
+ }
+ @Test public void mapViewportUsesVisibleAreaWithoutClippingSurface(){
+  android.graphics.Rect visible=new android.graphics.Rect(400,30,1280,700);
+  android.graphics.Rect stable=new android.graphics.Rect(500,80,1190,650);
+  assertEquals(visible,MapRenderer.mapViewport(visible,stable,1400,800));
+  assertEquals(stable,MapRenderer.mapViewport(new android.graphics.Rect(),stable,1400,800));
+  assertEquals(new android.graphics.Rect(0,0,1400,800),MapRenderer.mapViewport(null,null,1400,800));
+ }
+ @Test public void tileSpanCoversLeftAndRightOfSafeArea(){
+  int[] span=MapRenderer.tileSpan(1400,400,880,500,256);
+  assertTrue(span[0]<500-880/512.0);
+  assertTrue(span[1]>500+880/512.0);
+  assertTrue(span[0]<span[1]);
+ }
  @Test public void oldHostFallback(){assertTrue(create(1).onGetTemplate() instanceof PlaceListMapTemplate);}
  @Test public void recreateRetainsViewport()throws Exception{WikiScreen root=create(7);session.view.lat=59;session.view.lon=30;session.store.viewport(session.view,42);controller.moveToState(Lifecycle.State.DESTROYED);controller=null;assertTrue(create(7).onGetTemplate() instanceof MapWithContentTemplate);assertEquals(59,session.view.lat,0);assertEquals(42,session.store.selected());}
  @Test public void serviceCreatesSession(){assertTrue(new WikiCarService().onCreateSession() instanceof WikiSession);}
