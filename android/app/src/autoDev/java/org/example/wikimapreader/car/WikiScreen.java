@@ -17,11 +17,17 @@ public final class WikiScreen extends Screen implements DefaultLifecycleObserver
  private final WikiSession session;private final Handler main=new Handler(Looper.getMainLooper());
  private final ExecutorService io=Executors.newSingleThreadExecutor();private List<Place> places=new ArrayList<>();private List<Place> pagePlaces=new ArrayList<>();
  private String status="Сохранённые контуры · данные могут быть устаревшими",requestId="car:"+UUID.randomUUID();private boolean visible,loading,more,viewportDirty,blockedError,showNearby;private volatile int generation;private int page;private double[] bbox;private long selected;
+ private Place previewPlace;private String previewText="";
+ private List<Place> previewHits=Collections.emptyList();private int previewIndex,previewGeneration;
+ private final String previewRequestId="preview:"+UUID.randomUUID();
+ private final Map<Long,String> previewCache=new LinkedHashMap<Long,String>(32,.75f,true){
+  @Override protected boolean removeEldestEntry(Map.Entry<Long,String> entry){return size()>32;}
+ };
  private final Runnable refreshRequest=()->load(false);
  WikiScreen(CarContext c,WikiSession s){super(c);session=s;selected=s.store.selected();getLifecycle().addObserver(this);}
  @Override public void onStart(@NonNull LifecycleOwner owner){visible=true;io.execute(()->{List<Place> rows=session.store.cached();main.post(()->{places=rows;refresh();if(visible)load(false);});});}
  @Override public void onStop(@NonNull LifecycleOwner owner){suspend();}
- void suspend(){visible=false;generation++;loading=false;main.removeCallbacks(refreshRequest);WikiApi.INSTANCE.cancel(requestId);}
+ void suspend(){visible=false;generation++;previewGeneration++;loading=false;main.removeCallbacks(refreshRequest);WikiApi.INSTANCE.cancel(requestId);WikiApi.INSTANCE.cancel(previewRequestId);}
  void dispose(){suspend();io.shutdownNow();}
  void viewportChanged(){if(!visible)return;viewportDirty=true;if(!loading&&!blockedError){main.removeCallbacks(refreshRequest);main.postDelayed(refreshRequest,900);}refresh();}
  void refresh(){if(session.renderer!=null)session.renderer.update(places,selected,session.gps);invalidate();}
@@ -32,11 +38,11 @@ public final class WikiScreen extends Screen implements DefaultLifecycleObserver
  synchronized(this){if(g!=generation)return;session.store.putArea(r);}List<Place> cached=session.store.cached();main.post(()->{if(g!=generation)return;pagePlaces=accumulated;places=cached;page=requested;more=hasMore;loading=false;status=hasMore?"Неполное покрытие · ещё страницы доступны":(complete?"Загружена область":"Загружено частично · не все контуры подтверждены");refresh();persist();if((viewportDirty||!hasMore)&&visible){main.removeCallbacks(refreshRequest);main.postDelayed(refreshRequest,1000);}});}catch(Exception e){main.post(()->{if(g==generation){loading=false;blockedError=true;status="Не удалось сохранить область";refresh();}});}});}
  private CarIcon icon(int id){return new CarIcon.Builder(IconCompat.createWithResource(getCarContext(),id)).build();}
  private Action action(String title,int image,Runnable run){return new Action.Builder().setIcon(new CarIcon.Builder(IconCompat.createWithResource(getCarContext(),image)).build()).setOnClickListener(run::run).build();}
- private void toggleNearby(){showNearby=!showNearby;invalidate();}
+ private void toggleNearby(){showNearby=!showNearby;if(showNearby)clearPreview();invalidate();}
  private ActionStrip controls(){return new ActionStrip.Builder().addAction(Action.PAN).addAction(action("Приблизить",android.R.drawable.ic_input_add,()->session.renderer.zoom(1))).addAction(action("Отдалить",org.example.wikimapreader.R.drawable.car_zoom_out,()->session.renderer.zoom(-1))).addAction(action("К автомобилю",android.R.drawable.ic_menu_mylocation,()->{if(session.gps==null){session.permission();return;}synchronized(session.view){session.view.follow=true;session.view.lat=session.gps[0];session.view.lon=session.gps[1];}viewportChanged();})).build();}
  private int limit(){try{return Math.min(20,getCarContext().getCarService(ConstraintManager.class).getContentLimit(ConstraintManager.CONTENT_LIMIT_TYPE_LIST));}catch(Exception e){return 6;}}
  private List<Place> nearest(){List<Place> out=new ArrayList<>(places);double a=session.gps!=null?session.gps[0]:session.view.lat,b=session.gps!=null?session.gps[1]:session.view.lon;out.sort(Comparator.comparingDouble(p->{double[] q=p.point();return q==null?Double.MAX_VALUE:Geo.distance(a,b,q[0],q[1]);}));return out;}
- private ItemList rows(List<Place> source,boolean map){ItemList.Builder rows=new ItemList.Builder().setNoItemsMessage("Нет объектов. Переместите карту или догрузите область");int n=0;for(Place p:source){if(n>=limit())break;double[] q=p.point();if(map&&q==null)continue;Row.Builder row=new Row.Builder().setTitle(p.title).setOnClickListener(()->detail(p));if(session.gps!=null&&q!=null)row.addText(Math.round(Geo.distance(session.gps[0],session.gps[1],q[0],q[1]))+" м");else row.addText("Wikimapia #"+p.id);if(map)row.setBrowsable(true);if(map)row.setMetadata(new Metadata.Builder().setPlace(new androidx.car.app.model.Place.Builder(CarLocation.create(q[0],q[1])).setMarker(new PlaceMarker.Builder().setLabel(String.valueOf(n+1)).build()).build()).build());rows.addItem(row.build());n++;}return rows.build();}
+ private ItemList rows(List<Place> source,boolean map){ItemList.Builder rows=new ItemList.Builder().setNoItemsMessage("Нет объектов. Переместите карту или догрузите область");int n=0;for(Place p:source){if(n>=limit())break;double[] q=p.point();if(map&&q==null)continue;Row.Builder row=new Row.Builder().setTitle(p.title).setOnClickListener(()->{if(getCarContext().getCarAppApiLevel()>=7)showPreview(Collections.singletonList(p),0);else detail(p);});if(session.gps!=null&&q!=null)row.addText(Math.round(Geo.distance(session.gps[0],session.gps[1],q[0],q[1]))+" м");else row.addText("Wikimapia #"+p.id);if(map)row.setBrowsable(true);if(map)row.setMetadata(new Metadata.Builder().setPlace(new androidx.car.app.model.Place.Builder(CarLocation.create(q[0],q[1])).setMarker(new PlaceMarker.Builder().setLabel(String.valueOf(n+1)).build()).build()).build());rows.addItem(row.build());n++;}return rows.build();}
  @NonNull @Override public Template onGetTemplate(){
   ActionStrip top=new ActionStrip.Builder()
    .addAction(action("Поиск",android.R.drawable.ic_menu_search,()->getScreenManager().push(new Search(getCarContext()))))
@@ -48,7 +54,20 @@ public final class WikiScreen extends Screen implements DefaultLifecycleObserver
     .setItemList(rows(nearest(),true)).setActionStrip(top).build();
   Header header=new Header.Builder().setTitle("WikiReader").setStartHeaderAction(Action.APP_ICON).build();
   Template content;
-  if(showNearby){
+  if(previewPlace!=null&&!showNearby){
+   Pane.Builder pane=new Pane.Builder().addRow(new Row.Builder()
+    .setTitle(previewPlace.title)
+    .addText(previewText+(previewHits.size()>1?" · "+(previewIndex+1)+"/"+previewHits.size():"")).build());
+   if(previewPlace.point()!=null){
+    pane.addAction(new Action.Builder().setTitle("Маршрут")
+     .setIcon(icon(android.R.drawable.ic_menu_compass))
+     .setOnClickListener(this::navigatePreview).build());
+   }
+   pane.addAction(new Action.Builder().setTitle("Закрыть")
+    .setIcon(icon(android.R.drawable.ic_menu_close_clear_cancel))
+    .setOnClickListener(this::clearPreview).build());
+   content=new PaneTemplate.Builder(pane.build()).setHeader(header).build();
+  }else if(showNearby){
    ItemList.Builder nearby=new ItemList.Builder()
     .addItem(new Row.Builder().setTitle(loading?"Загрузка области":status)
      .addText(session.gpsStatus).build());
@@ -68,7 +87,62 @@ public final class WikiScreen extends Screen implements DefaultLifecycleObserver
      .setPanModeListener(panning->{}).build()).setActionStrip(top).build();
  }
 
- void tap(double lat,double lon){List<Place> hits=new ArrayList<>();for(Place p:places)if(Geo.inside(p.coords,lat,lon))hits.add(p);hits.sort(Comparator.comparingDouble(WikiScreen::area).thenComparingLong(p->p.id));if(hits.size()==1)detail(hits.get(0));else if(!hits.isEmpty())getScreenManager().push(new Places(getCarContext(),"Объекты в точке",hits));}
+ /** Native car host can deliver map taps while driving; no screen push or parked-only listener. */
+ void tap(double lat,double lon){
+  List<Place> hits=new ArrayList<>();
+  for(Place p:places)if(Geo.inside(p.coords,lat,lon))hits.add(p);
+  hits.sort(Comparator.comparingDouble(WikiScreen::area).thenComparingLong(p->p.id));
+  if(hits.isEmpty()){clearPreview();return;}
+  int next=0;
+  if(previewPlace!=null)for(int i=0;i<hits.size();i++)
+   if(hits.get(i).id==previewPlace.id){next=(i+1)%hits.size();break;}
+  showPreview(hits,next);
+ }
+ static String shortPreview(String html){
+  if(html==null)return "";
+  String s=html.replaceAll("(?is)<[^>]*>"," ").replace("&nbsp;"," ")
+   .replace("&quot;","\"").replace("&amp;","&").replaceAll("\\s+"," ").trim();
+  return s.length()>105?s.substring(0,102)+"…":s;
+ }
+ private void clearPreview(){
+  previewGeneration++;WikiApi.INSTANCE.cancel(previewRequestId);
+  previewPlace=null;previewHits=Collections.emptyList();previewText="";
+  selected=0;persist();refresh();
+ }
+ private void showPreview(List<Place> hits,int index){
+  if(hits.isEmpty()){clearPreview();return;}
+  previewGeneration++;WikiApi.INSTANCE.cancel(previewRequestId);
+  previewHits=new ArrayList<>(hits);previewIndex=index;previewPlace=hits.get(index);
+  selected=previewPlace.id;showNearby=false;
+  String cached=previewCache.get(previewPlace.id),description=shortPreview(previewPlace.description);
+  previewText=cached!=null?cached:description.isEmpty()?"Загружаем краткое описание":description;
+  persist();refresh();
+  if(cached!=null||!description.isEmpty())return;
+  final int requestGeneration=previewGeneration;final long id=previewPlace.id;
+  try{
+   JSONObject opts=new JSONObject().put("id",id);
+   WikiApi.INSTANCE.request(previewRequestId,new CredentialRepository(getCarContext()),"place.getbyid",opts,
+    (data,error)->main.post(()->{
+     if(requestGeneration!=previewGeneration||previewPlace==null||previewPlace.id!=id)return;
+     String detail="";
+     if(error==null)try{
+      JSONObject raw=data.optJSONObject("place");
+      Place loaded=Place.from(raw!=null?raw:data);
+      detail=shortPreview(loaded.description);
+     }catch(Exception ignored){}
+     previewText=detail.isEmpty()?"Краткое описание недоступно":detail;
+     if(!detail.isEmpty())previewCache.put(id,detail);
+     invalidate();
+    }));
+  }catch(Exception ignored){previewText="Краткое описание недоступно";invalidate();}
+ }
+ private void navigatePreview(){
+  if(previewPlace==null)return;
+  double[] q=previewPlace.point();
+  if(q==null)return;
+  try{getCarContext().startCarApp(new Intent(CarContext.ACTION_NAVIGATE,Uri.parse("geo:"+q[0]+","+q[1])));}
+  catch(RuntimeException e){previewText="Совместимый навигатор не найден";invalidate();}
+ }
  private static double area(Place p){double sum=0;for(int i=0,j=p.coords.length-1;i<p.coords.length;j=i++)sum+=Geo.delta(p.coords[j][1],p.coords[0][1])*p.coords[i][0]-Geo.delta(p.coords[i][1],p.coords[0][1])*p.coords[j][0];return Math.abs(sum);}
  private void favorites(){List<Place> list=new ArrayList<>();JSONArray a=session.store.favorites();for(int i=0;i<a.length();i++)try{JSONObject f=a.getJSONObject(i);if(!f.optString("source").equals("wikimapia"))continue;long id=f.getLong("id");Place found=null;for(Place p:places)if(p.id==id)found=p;list.add(found!=null?found:new Place(id,f.optString("title"),"",new double[0][]));}catch(Exception ignored){}getScreenManager().push(new Places(getCarContext(),"Избранное",list));}
  private void detail(Place p){selected=p.id;persist();refresh();getScreenManager().push(new Detail(getCarContext(),p));}
