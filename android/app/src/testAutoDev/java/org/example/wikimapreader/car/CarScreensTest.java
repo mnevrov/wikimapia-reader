@@ -13,6 +13,42 @@ public class CarScreensTest {
   MapWithContentTemplate template=(MapWithContentTemplate)create(7).onGetTemplate();
   assertTrue("Compact pane should leave maximum map space",template.getContentTemplate() instanceof PaneTemplate);
  }
+ @Test public void mapTapShowsInlineCompactCardWithoutNewScreen()throws Exception{
+  WikiScreen root=create(7);
+  java.lang.reflect.Field field=WikiScreen.class.getDeclaredField("places");
+  field.setAccessible(true);
+  field.set(root,java.util.Arrays.asList(new Place(42,"Дом","<p>История здания &amp; двора</p>",
+   new double[][]{{55.0,37.0},{55.0,37.01},{55.01,37.01},{55.01,37.0}})));
+  root.tap(55.005,37.005);
+  MapWithContentTemplate card=(MapWithContentTemplate)root.onGetTemplate();
+  assertTrue(card.getContentTemplate() instanceof PaneTemplate);
+  Pane pane=((PaneTemplate)card.getContentTemplate()).getPane();
+  assertEquals("Дом",pane.getRows().get(0).getTitle().toString());
+  assertTrue(pane.getRows().get(0).getTexts().get(0).toString().contains("История здания & двора"));
+  assertEquals(2,pane.getActions().size());
+  root.tap(54.0,37.0);
+  Pane empty=((PaneTemplate)((MapWithContentTemplate)root.onGetTemplate()).getContentTemplate()).getPane();
+  assertFalse(empty.getRows().get(0).getTitle().toString().equals("Дом"));
+ }
+ @Test public void overlappingPolygonsCycleInPlaceWithoutScreenNavigation()throws Exception{
+  WikiScreen root=create(7);
+  double[][] shape={{55.0,37.0},{55.0,37.02},{55.02,37.02},{55.02,37.0}};
+  java.lang.reflect.Field field=WikiScreen.class.getDeclaredField("places");
+  field.setAccessible(true);
+  field.set(root,java.util.Arrays.asList(new Place(42,"Первый","Коротко",shape),
+   new Place(43,"Второй","Другой",shape)));
+  root.tap(55.01,37.01);
+  String first=((PaneTemplate)((MapWithContentTemplate)root.onGetTemplate()).getContentTemplate())
+   .getPane().getRows().get(0).getTitle().toString();
+  root.tap(55.01,37.01);
+  String second=((PaneTemplate)((MapWithContentTemplate)root.onGetTemplate()).getContentTemplate())
+   .getPane().getRows().get(0).getTitle().toString();
+  assertNotEquals(first,second);
+ }
+ @Test public void shortPreviewSanitizesAndLimitsText(){
+  assertEquals("Первый & второй",WikiScreen.shortPreview("<b>Первый</b> &amp; второй"));
+  assertTrue(WikiScreen.shortPreview("X".repeat(300)).length()<=105);
+ }
  @Test public void nearbyListIsOptIn()throws Exception{
   WikiScreen root=create(7);
   java.lang.reflect.Field flag=WikiScreen.class.getDeclaredField("showNearby");
