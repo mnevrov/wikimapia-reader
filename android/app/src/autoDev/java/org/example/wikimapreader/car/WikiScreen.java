@@ -42,17 +42,17 @@ public final class WikiScreen extends Screen implements DefaultLifecycleObserver
  private CarIcon icon(int id){return new CarIcon.Builder(IconCompat.createWithResource(getCarContext(),id)).build();}
  private Action action(String title,int image,Runnable run){return new Action.Builder().setIcon(new CarIcon.Builder(IconCompat.createWithResource(getCarContext(),image)).build()).setOnClickListener(run::run).build();}
  private void toggleNearby(){showNearby=!showNearby;if(showNearby)clearPreview();invalidate();}
- private ActionStrip controls(){return new ActionStrip.Builder().addAction(Action.PAN).addAction(action("Приблизить",android.R.drawable.ic_input_add,()->session.renderer.zoom(1))).addAction(action("Отдалить",org.example.wikimapreader.R.drawable.car_zoom_out,()->session.renderer.zoom(-1))).addAction(action("К автомобилю",android.R.drawable.ic_menu_mylocation,()->{if(session.gps==null){session.permission();return;}synchronized(session.view){session.view.follow=true;session.view.lat=session.gps[0];session.view.lon=session.gps[1];}viewportChanged();})).build();}
+ private ActionStrip controls(){return new ActionStrip.Builder().addAction(Action.PAN).addAction(action("Приблизить",org.example.wikimapreader.R.drawable.car_zoom_in,()->session.renderer.zoom(1))).addAction(action("Отдалить",org.example.wikimapreader.R.drawable.car_zoom_out,()->session.renderer.zoom(-1))).addAction(action("К автомобилю",org.example.wikimapreader.R.drawable.car_my_location,()->{if(session.gps==null){session.permission();return;}synchronized(session.view){session.view.follow=true;session.view.lat=session.gps[0];session.view.lon=session.gps[1];}viewportChanged();})).build();}
  private int limit(){try{return Math.min(20,getCarContext().getCarService(ConstraintManager.class).getContentLimit(ConstraintManager.CONTENT_LIMIT_TYPE_LIST));}catch(Exception e){return 6;}}
  private List<Place> nearest(){List<Place> out=new ArrayList<>(places);double a=session.gps!=null?session.gps[0]:session.view.lat,b=session.gps!=null?session.gps[1]:session.view.lon;out.sort(Comparator.comparingDouble(p->{double[] q=p.point();return q==null?Double.MAX_VALUE:Geo.distance(a,b,q[0],q[1]);}));return out;}
  private ItemList rows(List<Place> source,boolean map){return rows(source,map,false);}
  private ItemList rows(List<Place> source,boolean map,boolean inlinePreview){ItemList.Builder rows=new ItemList.Builder().setNoItemsMessage("Нет объектов. Переместите карту или догрузите область");int n=0;for(Place p:source){if(n>=limit())break;double[] q=p.point();if(map&&q==null)continue;Row.Builder row=new Row.Builder().setTitle(p.title).setOnClickListener(()->{if(inlinePreview)showPreview(Collections.singletonList(p),0);else detail(p);});if(session.gps!=null&&q!=null)row.addText(Math.round(Geo.distance(session.gps[0],session.gps[1],q[0],q[1]))+" м");else row.addText("Wikimapia #"+p.id);if(map)row.setBrowsable(true);if(map)row.setMetadata(new Metadata.Builder().setPlace(new androidx.car.app.model.Place.Builder(CarLocation.create(q[0],q[1])).setMarker(new PlaceMarker.Builder().setLabel(String.valueOf(n+1)).build()).build()).build());rows.addItem(row.build());n++;}return rows.build();}
  @NonNull @Override public Template onGetTemplate(){
   ActionStrip top=new ActionStrip.Builder()
-   .addAction(action("Поиск",android.R.drawable.ic_menu_search,()->getScreenManager().push(new Search(getCarContext()))))
-   .addAction(action("Избранное",android.R.drawable.btn_star_big_on,this::favorites))
-   .addAction(action(showNearby?"Скрыть список":"Объекты рядом",android.R.drawable.ic_menu_agenda,this::toggleNearby))
-   .addAction(action(more?"Ещё":"Обновить",android.R.drawable.ic_menu_rotate,()->load(more))).build();
+   .addAction(action("Поиск",org.example.wikimapreader.R.drawable.car_search,()->getScreenManager().push(new Search(getCarContext()))))
+   .addAction(action("Избранное",org.example.wikimapreader.R.drawable.car_favorite,this::favorites))
+   .addAction(action(showNearby?"Скрыть список":"Объекты рядом",org.example.wikimapreader.R.drawable.car_nearby,this::toggleNearby))
+   .addAction(action(more?"Ещё":"Обновить",org.example.wikimapreader.R.drawable.car_refresh,()->load(more))).build();
   if(getCarContext().getCarAppApiLevel()<7)
    return new PlaceListMapTemplate.Builder().setTitle("WikiReader").setHeaderAction(Action.APP_ICON)
     .setItemList(rows(nearest(),true)).setActionStrip(top).build();
@@ -64,11 +64,11 @@ public final class WikiScreen extends Screen implements DefaultLifecycleObserver
     .addText(previewText+(previewHits.size()>1?" · "+(previewIndex+1)+"/"+previewHits.size():"")).build());
    if(previewPlace.point()!=null){
     pane.addAction(new Action.Builder().setTitle("Маршрут")
-     .setIcon(icon(android.R.drawable.ic_menu_compass))
+     .setIcon(icon(org.example.wikimapreader.R.drawable.car_route))
      .setOnClickListener(this::navigatePreview).build());
    }
    pane.addAction(new Action.Builder().setTitle("Закрыть")
-    .setIcon(icon(android.R.drawable.ic_menu_close_clear_cancel))
+    .setIcon(icon(org.example.wikimapreader.R.drawable.car_close))
     .setOnClickListener(this::clearPreview).build());
    content=new PaneTemplate.Builder(pane.build()).setHeader(header).build();
   }else if(showNearby){
