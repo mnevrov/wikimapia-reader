@@ -70,6 +70,20 @@ public class CarScreensTest {
   assertTrue(span[1]>500+880/512.0);
   assertTrue(span[0]<span[1]);
  }
+ @Test public void carSurfaceDensityIsNotPhoneDisplayDensity(){
+  assertEquals(1f,MapRenderer.surfaceDensity(160),0.001f);
+  assertEquals(2f,MapRenderer.surfaceDensity(320),0.001f);
+  assertEquals(1f,MapRenderer.surfaceDensity(0),0.001f);
+ }
+ @Test public void tileCacheHoldsWideSurfaceOverscan(){
+  // 1400x800 surfaces can require more than 48 tiles, including overscan.
+  assertTrue(TileSource.MAX_MEMORY_TILES>=96);
+ }
+ @Test public void successfulAreaLoadNeverPollsUnchangedViewport(){
+  assertFalse(WikiScreen.shouldReloadAfterSuccess(false,true));
+  assertFalse(WikiScreen.shouldReloadAfterSuccess(true,false));
+  assertTrue(WikiScreen.shouldReloadAfterSuccess(true,true));
+ }
  @Test public void oldHostFallback(){assertTrue(create(1).onGetTemplate() instanceof PlaceListMapTemplate);}
  @Test public void recreateRetainsViewport()throws Exception{WikiScreen root=create(7);session.view.lat=59;session.view.lon=30;session.store.viewport(session.view,42);controller.moveToState(Lifecycle.State.DESTROYED);controller=null;assertTrue(create(7).onGetTemplate() instanceof MapWithContentTemplate);assertEquals(59,session.view.lat,0);assertEquals(42,session.store.selected());}
  @Test public void serviceCreatesSession(){assertTrue(new WikiCarService().onCreateSession() instanceof WikiSession);}
