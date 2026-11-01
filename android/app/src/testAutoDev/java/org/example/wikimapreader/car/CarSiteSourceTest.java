@@ -23,6 +23,13 @@ public class CarSiteSourceTest {
    assertTrue(WikiApi.websiteFirst(new JSONObject()));
    assertFalse(WikiApi.websiteFirst(new JSONObject().put("apiOnly",true)));
  }
+ @Test public void siteFailureClassificationIsSafeAndActionable(){
+   assertEquals("Wikimapia ограничил запросы AutoDev (HTTP 403)",WikiApi.siteError(new CarSiteSource.SiteFailure(403)));
+   assertEquals("Wikimapia ограничил запросы AutoDev (HTTP 429)",WikiApi.siteError(new CarSiteSource.SiteFailure(429)));
+   assertEquals("DNS Wikimapia недоступен в AutoDev",WikiApi.siteError(new java.net.UnknownHostException()));
+   assertEquals("Тайм-аут Wikimapia в AutoDev",WikiApi.siteError(new java.net.SocketTimeoutException()));
+   assertEquals("Данные Wikimapia не загрузились в AutoDev",WikiApi.siteError(new java.io.IOException("private-response-body")));
+ }
  @Test public void unknownSourceSchemaDoesNotSilentlyReturnNoObjects()throws Exception {
    try{CarSiteSource.parseTile("bad|0|7","030",new LinkedHashMap<>());fail("expected a schema failure");}
    catch(java.io.IOException expected){}
