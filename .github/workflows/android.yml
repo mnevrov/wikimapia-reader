@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       ANDROID_AVD_HOME: ${{ github.workspace }}/.ci-avd
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -45,7 +45,7 @@ jobs:
       - run: npm run android:sync
       - name: Assemble Android instrumentation tests
         working-directory: android
-        run: ./gradlew --no-daemon :app:assembleMobileDebugAndroidTest
+        run: ./gradlew --no-daemon :app:assembleMobileDebugAndroidTest :app:assembleAutoDevDebugAndroidTest
       - name: Install emulator for website transport verification
         run: |
           sdkmanager 'emulator' 'system-images;android-30;default;x86_64'
@@ -53,7 +53,7 @@ jobs:
           echo no | avdmanager create avd --force --name wikireader-site --package 'system-images;android-30;default;x86_64'
           sudo chmod 666 /dev/kvm
       - name: Verify website transport on Android without API key
-        timeout-minutes: 12
+        timeout-minutes: 18
         run: |
           "$ANDROID_HOME/emulator/emulator" -avd wikireader-site -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect > /tmp/wikireader-emulator.log 2>&1 &
           emulator_pid=$!
@@ -71,6 +71,7 @@ jobs:
           timeout 180 bash -c 'until [[ "$(adb shell getprop sys.boot_completed | tr -d "\r")" == 1 ]]; do sleep 2; done'
           cd android
           ./gradlew --no-daemon :app:connectedMobileDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.example.wikimapreader.SiteSourceLiveTest
+          ./gradlew --no-daemon :app:connectedAutoDevDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.example.wikimapreader.car.CarSiteLiveTest
 
   verify-and-build:
     runs-on: ubuntu-24.04
