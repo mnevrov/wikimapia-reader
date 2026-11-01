@@ -23,6 +23,23 @@ public class CarSiteSourceTest {
    assertTrue(WikiApi.websiteFirst(new JSONObject()));
    assertFalse(WikiApi.websiteFirst(new JSONObject().put("apiOnly",true)));
  }
+ @Test public void carDecoderMatchesSharedPhoneTileFixture()throws Exception {
+   String fixtures=System.getProperty("wikireader.fixtures");
+   assertNotNull("Shared fixtures root",fixtures);
+   String raw=java.nio.file.Files.readString(java.nio.file.Path.of(fixtures,"car-site-parity.xy"));
+   java.util.Map<Long,JSONObject> parsed=new LinkedHashMap<>();
+   assertTrue(CarSiteSource.parseTile(raw,"030",parsed));
+   assertEquals(2,parsed.size());
+   JSONObject first=parsed.get(55L),second=parsed.get(56L);
+   assertEquals("Первый объект",first.getString("title"));
+   assertEquals("Второй объект",second.getString("title"));
+   assertEquals(3,first.getJSONArray("polygon").length());
+   assertEquals(3,second.getJSONArray("polygon").length());
+   assertEquals(55.75,first.getJSONArray("polygon").getJSONObject(0).getDouble("y"),0.0000001);
+   assertEquals(37.62,first.getJSONArray("polygon").getJSONObject(1).getDouble("x"),0.0000001);
+   assertEquals(55.76,second.getJSONArray("polygon").getJSONObject(0).getDouble("y"),0.0000001);
+   assertEquals(37.61999,second.getJSONArray("polygon").getJSONObject(1).getDouble("x"),0.0000001);
+ }
  @Test public void siteFailureClassificationIsSafeAndActionable(){
    assertEquals("Wikimapia ограничил запросы AutoDev (HTTP 403)",WikiApi.siteError(new CarSiteSource.SiteFailure(403)));
    assertEquals("Wikimapia ограничил запросы AutoDev (HTTP 429)",WikiApi.siteError(new CarSiteSource.SiteFailure(429)));
