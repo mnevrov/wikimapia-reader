@@ -26,7 +26,7 @@ public class CarSiteSourceTest {
  @Test public void carDecoderMatchesSharedPhoneTileFixture()throws Exception {
    String fixtures=System.getProperty("wikireader.fixtures");
    assertNotNull("Shared fixtures root",fixtures);
-   String raw=java.nio.file.Files.readString(java.nio.file.Path.of(fixtures,"car-site-parity.xy"));
+   String raw=new String(java.nio.file.Files.readAllBytes(new java.io.File(fixtures,"car-site-parity.xy").toPath()),java.nio.charset.StandardCharsets.UTF_8);
    java.util.Map<Long,JSONObject> parsed=new LinkedHashMap<>();
    assertTrue(CarSiteSource.parseTile(raw,"030",parsed));
    assertEquals(2,parsed.size());
