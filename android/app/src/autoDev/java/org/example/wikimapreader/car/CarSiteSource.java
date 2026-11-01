@@ -25,6 +25,10 @@ final class CarSiteSource {
  private static final Pattern SEARCH_ITEM=Pattern.compile("(?is)<[^>]*\\bclass=[\"'][^\"']*search-result-item[^\"']*[\"'][^>]*>");
  private static final Pattern STRONG=Pattern.compile("(?is)<strong\\b[^>]*>(.*?)</strong>");
  private static final Pattern ATTR=Pattern.compile("(?is)\\b%s\\s*=\\s*[\"']([^\"']*)[\"']");
+ static final class SiteFailure extends IOException {
+  final int status;
+  SiteFailure(int status){super("Site HTTP "+status);this.status=status;}
+ }
  private CarSiteSource() {}
 
  static JSONObject request(String method,JSONObject opts,AtomicBoolean cancelled)throws Exception {
@@ -38,7 +42,7 @@ final class CarSiteSource {
  }
  private static SiteHttp.Result checked(String url,String body,AtomicBoolean cancelled)throws IOException {
   SiteHttp.Result response=HTTP.get(url,body,cancelled);
-  if(response.status!=200)throw new IOException("Website unavailable");
+  if(response.status!=200)throw new SiteFailure(response.status);
   return response;
  }
  static String tileId(int x,int y,int z)throws IOException {
