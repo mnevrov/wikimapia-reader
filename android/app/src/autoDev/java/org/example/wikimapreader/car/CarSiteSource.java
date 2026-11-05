@@ -19,7 +19,7 @@ import java.util.regex.Pattern;
  * The website format may change; failed/partial decoding is never called complete. */
 final class CarSiteSource {
  private static final SiteHttp HTTP=new SiteHttp();
- private static final int TILE_Z=15, MAX_TILES=16, MAX_PLACES=30000;
+ private static final int TILE_Z=15, MAX_TILES=9, MAX_PLACES=30000;
  private static final Pattern H1=Pattern.compile("(?is)<h1\\b[^>]*>(.*?)</h1>");
  private static final Pattern DESCRIPTION=Pattern.compile("(?is)<[^>]*\\bid=[\"']place-description[\"'][^>]*>(.*?)</(?:div|section|p)>");
  private static final Pattern SEARCH_ITEM=Pattern.compile("(?is)<[^>]*\\bclass=[\"'][^\"']*search-result-item[^\"']*[\"'][^>]*>");
@@ -34,6 +34,8 @@ final class CarSiteSource {
  private static final long TILE_CACHE_TTL_MS=300_000L;
  private static final LinkedHashMap<String,CachedTile> TILE_CACHE=new LinkedHashMap<>(32,.75f,true);
  private static int tileBytes;
+ private static volatile long siteDeniedUntil;
+ private static volatile int siteDeniedCode;
  private static final class CachedTile {
   final String text;final long at;
   CachedTile(String text,long at){this.text=text;this.at=at;}
@@ -54,6 +56,7 @@ final class CarSiteSource {
  private static String fetchTile(String id,AtomicBoolean cancelled)throws Exception{
   String existing=cachedText(id);
   if(existing!=null)return existing;
+  if(System.currentTimeMillis()<siteDeniedUntil)throw new SiteFailure(siteDeniedCode);
   String value=checked(tilePath(id),null,cancelled).text;
   // Never cache malformed tiles.
   parseTile(value,id,new LinkedHashMap<Long,JSONObject>());
@@ -73,7 +76,10 @@ final class CarSiteSource {
  }
  private static SiteHttp.Result checked(String url,String body,AtomicBoolean cancelled)throws IOException {
   SiteHttp.Result response=HTTP.get(url,body,cancelled);
-  if(response.status!=200)throw new SiteFailure(response.status);
+  if(response.status!=200){
+   if(response.status==403||response.status==429){siteDeniedCode=response.status;siteDeniedUntil=System.currentTimeMillis()+60000;}
+   throw new SiteFailure(response.status);
+  }
   return response;
  }
  static String tileId(int x,int y,int z)throws IOException {
