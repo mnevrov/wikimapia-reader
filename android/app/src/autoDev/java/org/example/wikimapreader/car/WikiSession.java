@@ -30,6 +30,7 @@ public final class WikiSession extends Session implements DefaultLifecycleObserv
  String gpsStatus="Нет GPS: последняя позиция карты";
  private LocationManager location;
  private Location lastFix;
+ private final CarLocationService.Observer serviceObserver=this::onLocationChanged;
  private final Handler main=new Handler(Looper.getMainLooper());
 
  public WikiSession(){getLifecycle().addObserver(this);}
@@ -47,13 +48,21 @@ public final class WikiSession extends Session implements DefaultLifecycleObserv
   return root;
  }
 
- @Override public void onStart(@NonNull LifecycleOwner owner){startLocation();}
+ @Override public void onStart(@NonNull LifecycleOwner owner){
+  CarLocationService.subscribe(serviceObserver);
+  startLocation();
+ }
 
  void startLocation(){
   CarContext c=getCarContext();
   boolean fine=c.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED;
   boolean coarse=fine||c.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)==PackageManager.PERMISSION_GRANTED;
   if(!coarse){gpsStatus="Разрешите геопозицию для AutoDev на телефоне";if(root!=null)root.refresh();return;}
+  if(CarLocationService.isRunning()){
+   gpsStatus="GPS Follow: фоновая служба активна";
+   if(root!=null)root.refresh();
+   return;
+  }
   try{
    if(location==null)location=(LocationManager)c.getSystemService(Context.LOCATION_SERVICE);
    if(location==null){gpsStatus="Служба геопозиции недоступна";return;}
@@ -114,10 +123,12 @@ public final class WikiSession extends Session implements DefaultLifecycleObserv
   if(root!=null)root.refresh();
  }
  @Override public void onStop(@NonNull LifecycleOwner owner){
+  CarLocationService.unsubscribe(serviceObserver);
   if(location!=null)location.removeUpdates(this);
   if(root!=null)root.suspend();
  }
  @Override public void onDestroy(@NonNull LifecycleOwner owner){
+  CarLocationService.unsubscribe(serviceObserver);
   if(root!=null)root.dispose();
   if(renderer!=null)renderer.close();
   if(location!=null)location.removeUpdates(this);
