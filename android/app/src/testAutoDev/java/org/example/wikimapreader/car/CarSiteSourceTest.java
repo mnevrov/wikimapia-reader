@@ -71,7 +71,7 @@ public class CarSiteSourceTest {
  }
  @Test public void loadIsCenteredAndBoundedWithoutRequestAvalanche()throws Exception {
   JSONObject box=new JSONObject().put("bbox",new org.json.JSONArray()
-   .put(37.60).put(55.74).put(37.635).put(55.775)).put("page",1);
+   .put(37.60).put(55.74).put(37.634).put(55.774)).put("page",1);
   java.util.List<String> requested=new java.util.ArrayList<>();
   JSONObject area=CarSiteSource.areaWithReader(box,new java.util.concurrent.atomic.AtomicBoolean(),(id,cancelled)->{
    requested.add(id);return id+"|0|7";
