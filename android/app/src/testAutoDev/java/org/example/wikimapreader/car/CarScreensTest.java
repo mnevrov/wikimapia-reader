@@ -84,6 +84,32 @@ public class CarScreensTest {
   assertFalse(WikiScreen.shouldReloadAfterSuccess(true,false));
   assertTrue(WikiScreen.shouldReloadAfterSuccess(true,true));
  }
+ @Test public void gpsFixRejectsStaleAndVeryImpreciseProviders(){
+  android.location.Location previous=new android.location.Location("gps");
+  previous.setLatitude(55.75);previous.setLongitude(37.61);
+  previous.setAccuracy(15f);previous.setElapsedRealtimeNanos(10_000_000_000L);
+  android.location.Location stale=new android.location.Location("network");
+  stale.setLatitude(55.76);stale.setLongitude(37.62);
+  stale.setAccuracy(100f);stale.setElapsedRealtimeNanos(3_000_000_000L);
+  assertFalse(WikiSession.acceptFix(stale,previous));
+  android.location.Location fresh=new android.location.Location("network");
+  fresh.setLatitude(55.751);fresh.setLongitude(37.611);
+  fresh.setAccuracy(30f);fresh.setElapsedRealtimeNanos(11_000_000_000L);
+  assertTrue(WikiSession.acceptFix(fresh,previous));
+  fresh.setAccuracy(2500f);
+  assertFalse(WikiSession.acceptFix(fresh,previous));
+ }
+ @Test public void carTemplateExplicitlyShowsGpsFollowState(){
+  WikiScreen root=create(7);
+  session.gps=new double[]{55.75,37.61};
+  session.view.follow=true;
+  MapWithContentTemplate content=(MapWithContentTemplate)root.onGetTemplate();
+  Pane pane=((PaneTemplate)content.getContentTemplate()).getPane();
+  assertTrue(pane.getRows().get(0).getTexts().get(0).toString().contains("GPS Follow: вкл"));
+  session.view.follow=false;
+  pane=((PaneTemplate)((MapWithContentTemplate)root.onGetTemplate()).getContentTemplate()).getPane();
+  assertTrue(pane.getRows().get(0).getTexts().get(0).toString().contains("GPS Follow: пауза"));
+ }
  @Test public void oldHostFallback(){assertTrue(create(1).onGetTemplate() instanceof PlaceListMapTemplate);}
  @Test public void recreateRetainsViewport()throws Exception{WikiScreen root=create(7);session.view.lat=59;session.view.lon=30;session.store.viewport(session.view,42);controller.moveToState(Lifecycle.State.DESTROYED);controller=null;assertTrue(create(7).onGetTemplate() instanceof MapWithContentTemplate);assertEquals(59,session.view.lat,0);assertEquals(42,session.store.selected());}
  @Test public void serviceCreatesSession(){assertTrue(new WikiCarService().onCreateSession() instanceof WikiSession);}
