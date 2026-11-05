@@ -11,7 +11,8 @@ import org.example.wikimapreader.CredentialRepository;
 public final class WikiApi {
  public static final WikiApi INSTANCE=new WikiApi();
  private final RequestGate gate=new RequestGate();
- private final ExecutorService worker=Executors.newSingleThreadExecutor();
+ // Keep short detail/preview requests responsive while an area reads several site tiles.
+ private final ExecutorService worker=Executors.newFixedThreadPool(2);
  private final ConcurrentHashMap<String,Job> jobs=new ConcurrentHashMap<>();
  public interface Callback {void done(JSONObject data,String error);}
  static final class Job {final java.util.concurrent.atomic.AtomicBoolean siteCancelled=new java.util.concurrent.atomic.AtomicBoolean();volatile boolean cancelled;volatile HttpURLConnection connection;Future<?> future;Callback callback;final java.util.concurrent.atomic.AtomicBoolean delivered=new java.util.concurrent.atomic.AtomicBoolean();void done(JSONObject data,String error){if(delivered.compareAndSet(false,true))callback.done(data,error);}}
