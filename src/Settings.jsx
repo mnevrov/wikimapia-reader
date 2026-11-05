@@ -1,6 +1,8 @@
 import React,{useEffect,useState} from 'react';
 import appPackage from '../package.json';
 import {Capacitor} from '@capacitor/core';
+import {Geolocation} from '@capacitor/geolocation';
+import {car,hasCar} from './carBridge.js';
 import {compareAndroidTransports} from './androidTransportProbe.js';
 import Icon from './Icon.jsx';
 import Motion from './Motion.jsx';
@@ -16,6 +18,39 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
   const [transportBusy,setTransportBusy]=useState(false);
   const [transportProgress,setTransportProgress]=useState('');
   const [transportReport,setTransportReport]=useState(null);
+  const [carGpsEnabled,setCarGpsEnabled]=useState(false);
+  const [carGpsBusy,setCarGpsBusy]=useState(false);
+  const [carGpsMessage,setCarGpsMessage]=useState('');
+  useEffect(()=>{
+    if(!hasCar())return;
+    let alive=true;
+    car.gpsStatus().then(r=>{if(alive)setCarGpsEnabled(Boolean(r.running));})
+      .catch(()=>{if(alive)setCarGpsMessage('Статус GPS AutoDev не получен');});
+    return()=>{alive=false;};
+  },[]);
+  const toggleCarGps=async()=>{
+    if(!hasCar()||carGpsBusy)return;
+    setCarGpsBusy(true);
+    try{
+      if(carGpsEnabled){
+        await car.gpsStop();setCarGpsEnabled(false);
+        setCarGpsMessage('Фоновый GPS остановлен');
+      }else{
+        await Geolocation.requestPermissions();
+        await car.gpsStart();
+        // startForegroundService schedules onStartCommand asynchronously.
+        await new Promise(resolve=>setTimeout(resolve,700));
+        const status=await car.gpsStatus();
+        setCarGpsEnabled(Boolean(status.running));
+        setCarGpsMessage(status.running
+          ?'GPS Follow активен. Подключите Android Auto; пока работает служба, отображается уведомление.'
+          :'Не удалось запустить GPS. Проверьте разрешение местоположения и ограничения батареи.');
+      }
+    }catch{
+      setCarGpsMessage('Разрешите геопозицию и запустите GPS из открытого AutoDev на телефоне');
+    }finally{setCarGpsBusy(false);}
+  };
+
   const startTransportProbe=async()=>{
     if(transportBusy||!credentials.key||!Capacitor.isNativePlatform())return;
     setTransportBusy(true);setTransportReport(null);setTransportProgress('');
@@ -53,6 +88,15 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
       <a className="inline-link" href="https://wikimapia.org/api?action=create_key" target="_blank" rel="noreferrer">Получить API-ключ <Icon name="external" size={16}/></a>
     </section>
     <section className="settings-group"><h2>Карта</h2><label className="setting-row" htmlFor="auto-load"><span><strong>Автозагрузка области</strong><small>После остановки карты, с учётом лимита API</small></span><input id="auto-load" type="checkbox" checked={auto} onChange={e=>setAuto(e.target.checked)}/></label><p className="helper">Объекты загружаются при перемещении карты. В плотных областях после первых трёх страниц появится кнопка «Догрузить область». Одно нажатие запустит последовательную загрузку с прогрессом.</p><label className="density-setting" htmlFor="density-setting">Плотность контуров<select id="density-setting" value={density} onChange={e=>setDensity(e.target.value)}><option value="auto">Автоматически</option><option value="detailed">Подробно</option><option value="calm">Спокойный вид</option></select></label><p className="helper">«Автоматически» уменьшает контраст контуров в плотных областях. Объекты остаются доступными для выбора.</p></section>
+    {hasCar()&&<section className="settings-group" aria-label="Android Auto GPS Follow">
+      <h2>GPS Follow в Android Auto</h2>
+      <p className="helper">Android Auto работает в фоновом режиме телефона. Для надёжного слежения во время движения запустите GPS-службу здесь, пока AutoDev открыт на телефоне, затем подключите автомобиль. Показывается системное уведомление о геолокации.</p>
+      <button type="button" className="secondary" onClick={toggleCarGps} disabled={carGpsBusy}>
+        {carGpsBusy?'Применяем…':carGpsEnabled?'Остановить GPS Follow для Android Auto':'Включить GPS Follow для Android Auto'}
+      </button>
+      <p className="helper" role="status">{carGpsMessage||(carGpsEnabled?'GPS-служба включена':'GPS-служба выключена')}</p>
+      <p className="helper">При отключении GPS службы или завершении поездки можно остановить её здесь. Если обновлений нет, проверьте разрешение геолокации и экономию энергии Android.</p>
+    </section>}
     <section className="settings-group yandex-settings" aria-label="Картографическая подложка">
       <h2>Подложка карты</h2>
       <div className="basemap-choice" role="group" aria-label="Источник карты">
