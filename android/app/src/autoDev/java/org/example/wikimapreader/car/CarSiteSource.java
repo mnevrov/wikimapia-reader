@@ -29,6 +29,37 @@ final class CarSiteSource {
   final int status;
   SiteFailure(int status){super("Site HTTP "+status);this.status=status;}
  }
+ /** Public website tiles only. Cache parsed-valid bodies in memory to avoid repeated slow requests while driving. */
+ private static final int TILE_CACHE_MAX=32, TILE_CACHE_BYTES=8*1024*1024;
+ private static final long TILE_CACHE_TTL_MS=300_000L;
+ private static final LinkedHashMap<String,CachedTile> TILE_CACHE=new LinkedHashMap<>(32,.75f,true);
+ private static int tileBytes;
+ private static final class CachedTile {
+  final String text;final long at;
+  CachedTile(String text,long at){this.text=text;this.at=at;}
+ }
+ interface TileReader {String read(String id,AtomicBoolean cancelled)throws Exception;}
+ private static synchronized String cachedText(String id){
+  CachedTile e=TILE_CACHE.get(id);
+  return e!=null&&System.currentTimeMillis()-e.at<TILE_CACHE_TTL_MS?e.text:null;
+ }
+ private static synchronized void cacheText(String id,String text){
+  CachedTile old=TILE_CACHE.remove(id);if(old!=null)tileBytes-=old.text.length()*2;
+  TILE_CACHE.put(id,new CachedTile(text,System.currentTimeMillis()));tileBytes+=text.length()*2;
+  while(TILE_CACHE.size()>TILE_CACHE_MAX||tileBytes>TILE_CACHE_BYTES){
+   String first=TILE_CACHE.keySet().iterator().next();
+   tileBytes-=TILE_CACHE.remove(first).text.length()*2;
+  }
+ }
+ private static String fetchTile(String id,AtomicBoolean cancelled)throws Exception{
+  String existing=cachedText(id);
+  if(existing!=null)return existing;
+  String value=checked(tilePath(id),null,cancelled).text;
+  // Never cache malformed tiles.
+  parseTile(value,id,new LinkedHashMap<Long,JSONObject>());
+  cacheText(id,value);
+  return value;
+ }
  private CarSiteSource() {}
 
  static JSONObject request(String method,JSONObject opts,AtomicBoolean cancelled)throws Exception {
@@ -58,21 +89,49 @@ final class CarSiteSource {
  private static int tx(double lon){return Math.max(0,Math.min((1<<TILE_Z)-1,(int)Math.floor((lon+180)/360*(1<<TILE_Z))));}
  private static int ty(double lat){double rad=Math.toRadians(lat);double y=(1-Math.log(Math.tan(rad)+1/Math.cos(rad))/Math.PI)/2*(1<<TILE_Z);return Math.max(0,Math.min((1<<TILE_Z)-1,(int)Math.floor(y)));}
  private static JSONObject area(JSONObject opts,AtomicBoolean cancelled)throws Exception {
+  return areaWithReader(opts,cancelled,CarSiteSource::fetchTile);
+ }
+ /** Testable region loader: prioritize the center visible to the driver.
+  * A single bad tile is partial coverage, not loss of already decoded objects. */
+ static JSONObject areaWithReader(JSONObject opts,AtomicBoolean cancelled,TileReader reader)throws Exception {
   JSONArray box=opts.getJSONArray("bbox");if(box.length()!=4)throw new IOException("Invalid bbox");
   double w=box.getDouble(0),s=box.getDouble(1),e=box.getDouble(2),n=box.getDouble(3);
   if(!Double.isFinite(w)||!Double.isFinite(s)||!Double.isFinite(e)||!Double.isFinite(n)||w>=e||s>=n||w< -180||e>180||s< -85||n>85||e-w>.035||n-s>.035)throw new IOException("Invalid bbox");
   int page=opts.optInt("page",1);if(page<1)throw new IOException("Invalid page");
   if(page>1)return new JSONObject().put("folder",new JSONArray()).put("source","site").put("more",false).put("complete",false);
-  Map<Long,JSONObject> unique=new LinkedHashMap<>();boolean complete=true;int count=0;
-  outer:for(int x=tx(w);x<=tx(e);x++)for(int y=ty(n);y<=ty(s);y++){
-   if(++count>MAX_TILES){complete=false;break outer;}
-   if(cancelled.get())throw new IOException("Cancelled");
-   String id=tileId(x,y,TILE_Z);
-   SiteHttp.Result response=checked(tilePath(id),null,cancelled);
-   if(!parseTile(response.text,id,unique))complete=false;
-   if(unique.size()>MAX_PLACES)throw new IOException("Too many contours");
+  final double centerX=(tx(w)+tx(e))/2.0,centerY=(ty(n)+ty(s))/2.0;
+  java.util.List<int[]> candidates=new java.util.ArrayList<>();
+  for(int x=tx(w);x<=tx(e);x++)for(int y=ty(n);y<=ty(s);y++)candidates.add(new int[]{x,y});
+  candidates.sort((a,b)->Double.compare(
+   (a[0]-centerX)*(a[0]-centerX)+(a[1]-centerY)*(a[1]-centerY),
+   (b[0]-centerX)*(b[0]-centerX)+(b[1]-centerY)*(b[1]-centerY)));
+  Map<Long,JSONObject> unique=new LinkedHashMap<>();
+  boolean complete=candidates.size()<=MAX_TILES;int successes=0,failures=0;Exception firstFailure=null;
+  for(int[] coords:candidates){
+   if(successes+failures>=MAX_TILES)break;
+   if(cancelled.get()||Thread.currentThread().isInterrupted())throw new java.io.InterruptedIOException("Cancelled");
+   String id=tileId(coords[0],coords[1],TILE_Z);
+   try{
+    String raw=reader.read(id,cancelled);
+    // Parse into a temporary map to avoid leaking partially decoded tiles.
+    Map<Long,JSONObject> parsed=new LinkedHashMap<>();
+    if(!parseTile(raw,id,parsed))complete=false;
+    unique.putAll(parsed);successes++;
+    if(unique.size()>MAX_PLACES)throw new IOException("Too many contours");
+   }catch(Exception ex){
+    if(cancelled.get()||ex instanceof java.io.InterruptedIOException||Thread.currentThread().isInterrupted())throw ex;
+    if(firstFailure==null)firstFailure=ex;
+    failures++;complete=false;
+    // Stop quickly on denial/quota or repeated failure; never create a request avalanche.
+    if(ex instanceof SiteFailure&&(((SiteFailure)ex).status==403||((SiteFailure)ex).status==429))break;
+    if(failures>=2)break;
+   }
   }
-  return new JSONObject().put("folder",new JSONArray(unique.values())).put("source","site").put("more",false).put("complete",complete);
+  if(successes==0&&firstFailure!=null)throw firstFailure;
+  JSONObject result=new JSONObject().put("folder",new JSONArray(unique.values()))
+   .put("source","site").put("more",false).put("complete",complete);
+  if(failures>0)result.put("warning","Часть тайлов Wikimapia недоступна");
+  return result;
  }
  /** Returns true only when the tile explicitly declares no deeper tiles. */
  static boolean parseTile(String body,String id,Map<Long,JSONObject> places)throws Exception {
