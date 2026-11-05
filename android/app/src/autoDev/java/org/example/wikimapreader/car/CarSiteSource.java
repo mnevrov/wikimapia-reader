@@ -125,7 +125,7 @@ final class CarSiteSource {
     unique.putAll(parsed);successes++;
     if(unique.size()>MAX_PLACES)throw new IOException("Too many contours");
    }catch(Exception ex){
-    if(cancelled.get()||ex instanceof java.io.InterruptedIOException||Thread.currentThread().isInterrupted())throw ex;
+    if(cancelled.get()||Thread.currentThread().isInterrupted())throw ex;
     if(firstFailure==null)firstFailure=ex;
     failures++;complete=false;
     // Stop quickly on denial/quota or repeated failure; never create a request avalanche.
