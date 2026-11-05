@@ -52,7 +52,7 @@ public class CarSiteSourceTest {
    .put(37.61).put(55.75).put(37.635).put(55.77)).put("page",1);
   java.util.concurrent.atomic.AtomicInteger count=new java.util.concurrent.atomic.AtomicInteger();
   JSONObject area=CarSiteSource.areaWithReader(box,new java.util.concurrent.atomic.AtomicBoolean(),(id,cancelled)->{
-   if(count.incrementAndGet()==1)return id+"|0|7\\n55|100|376100000,376200000,557500000,557600000|16||!Дом|1|??????";
+   if(count.incrementAndGet()==1)return id+"|0|7\n55|100|376100000,376200000,557500000,557600000|16||!Дом|1|??????";
    throw new java.io.InterruptedIOException("Timeout");
   });
   assertTrue("One good tile survives",area.getJSONArray("folder").length()>0);
