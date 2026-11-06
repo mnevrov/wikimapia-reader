@@ -76,9 +76,12 @@ public class CarSiteSourceTest {
   JSONObject area=CarSiteSource.areaWithReader(box,new java.util.concurrent.atomic.AtomicBoolean(),(id,cancelled)->{
    requested.add(id);return id+"|0|7";
   });
-  assertTrue(requested.size()<=9);
-  assertFalse("Outer unvisited tiles imply partial coverage",area.getBoolean("complete"));
-  assertEquals(0,area.getJSONArray("folder").length());
+  assertTrue(requested.size()>0&&requested.size()<=9);
+  assertTrue("A bounded parent-level request covers all tiles",area.getBoolean("complete"));
+  assertEquals("No items in fixture",0,area.getJSONArray("folder").length());
+  int expectedZ=CarSiteSource.zoomForArea(37.60,55.74,37.634,55.774);
+  assertTrue("Zoom out chooses a parent tile level",expectedZ<15);
+  for(String id:requested)assertEquals("All tiles use the selected LOD",expectedZ+1,id.length());
  }
  @Test public void cancellationDoesNotBecomePartialCoverage()throws Exception {
   JSONObject box=new JSONObject().put("bbox",new org.json.JSONArray()
@@ -93,4 +96,18 @@ public class CarSiteSourceTest {
    try{CarSiteSource.parseTile("bad|0|7","030",new LinkedHashMap<>());fail("expected a schema failure");}
    catch(java.io.IOException expected){}
  }
+ @Test public void parentTileWithChildrenIsIncompleteEvenWithFullViewportCoverage()throws Exception {
+  JSONObject box=new JSONObject().put("bbox",new org.json.JSONArray()
+   .put(37.60).put(55.74).put(37.634).put(55.774)).put("page",1);
+  java.util.concurrent.atomic.AtomicInteger calls=new java.util.concurrent.atomic.AtomicInteger();
+  JSONObject area=CarSiteSource.areaWithReader(box,new java.util.concurrent.atomic.AtomicBoolean(),(id,c)->{
+   calls.incrementAndGet();return id+"|1|7";
+  });
+  assertTrue(calls.get()>0&&calls.get()<=9);
+  assertFalse("Server declares deeper tiles, so coverage is partial",area.getBoolean("complete"));
+ }
+ @Test public void tightViewportStillUsesFullDetail()throws Exception {
+  assertEquals(15,CarSiteSource.zoomForArea(37.615,55.749,37.622,55.755));
+ }
+
 }
