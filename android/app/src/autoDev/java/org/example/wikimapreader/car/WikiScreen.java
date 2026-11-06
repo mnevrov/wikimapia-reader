@@ -2,6 +2,9 @@ package org.example.wikimapreader.car;
 import android.content.*;
 import android.net.Uri;
 import android.os.*;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.drawable.Drawable;
 import androidx.annotation.NonNull;
 import androidx.car.app.*;
 import androidx.car.app.model.*;
@@ -24,32 +27,73 @@ public final class WikiScreen extends Screen implements DefaultLifecycleObserver
   @Override protected boolean removeEldestEntry(Map.Entry<Long,String> entry){return size()>32;}
  };
  private final Runnable refreshRequest=()->load(false);
+ private double lastLoadLat=Double.NaN,lastLoadLon=Double.NaN,lastLoadZoom=Double.NaN;
+ private long lastFailureAt;
+ private final Map<Integer,CarIcon> highResIcons=new HashMap<>();
  WikiScreen(CarContext c,WikiSession s){super(c);session=s;selected=s.store.selected();getLifecycle().addObserver(this);}
  @Override public void onStart(@NonNull LifecycleOwner owner){visible=true;io.execute(()->{List<Place> rows=session.store.cached();main.post(()->{places=rows;refresh();if(visible)load(false);});});}
  @Override public void onStop(@NonNull LifecycleOwner owner){suspend();}
  void suspend(){visible=false;generation++;previewGeneration++;loading=false;main.removeCallbacks(refreshRequest);WikiApi.INSTANCE.cancel(requestId);WikiApi.INSTANCE.cancel(previewRequestId);}
  void dispose(){suspend();io.shutdownNow();}
- void viewportChanged(){if(!visible)return;viewportDirty=true;if(!loading&&!blockedError){main.removeCallbacks(refreshRequest);main.postDelayed(refreshRequest,900);}refresh();}
+ void viewportChanged(){viewportChanged(false);}
+ void viewportChanged(boolean gpsMotion){
+  if(!visible)return;
+  if(gpsMotion){
+   synchronized(session.view){
+    if(Double.isFinite(lastLoadLat)&&Math.abs(lastLoadZoom-session.view.zoom)<0.01
+      &&Geo.distance(lastLoadLat,lastLoadLon,session.view.lat,session.view.lon)<100){refresh();return;}
+   }
+   if(blockedError&&SystemClock.elapsedRealtime()-lastFailureAt<30000){refresh();return;}
+  }
+  viewportDirty=true;
+  if(!loading){
+   main.removeCallbacks(refreshRequest);
+   main.postDelayed(refreshRequest,gpsMotion?1200:900);
+  }
+  refresh();
+ }
  void refresh(){if(session.renderer!=null)session.renderer.update(places,selected,session.gps);invalidate();}
  private void persist(){io.execute(()->{try{synchronized(session.view){session.store.viewport(session.view,selected);}}catch(Exception ignored){}});}
- void load(boolean next){if(!visible)return;blockedError=false;viewportDirty=false;loading=false;generation++;final int g=generation;WikiApi.INSTANCE.cancel(requestId);double[] b;int[] size=session.renderer!=null?session.renderer.viewSize():new int[]{800,480};synchronized(session.view){if(next&&bbox!=null)b=bbox;else{List<double[]> boxes=session.view.boxes(size[0],size[1]);b=boxes.isEmpty()?session.view.box():boxes.get(0);for(double[] candidate:boxes)if(session.store.fresh(candidate)==null){b=candidate;break;}}}final double[] targetBox=b;bbox=b;if(!next){page=0;pagePlaces=new ArrayList<>();JSONObject cached=session.store.fresh(b);if(cached!=null){try{JSONArray cachedBox=cached.getJSONArray("bbox");bbox=new double[]{cachedBox.getDouble(0),cachedBox.getDouble(1),cachedBox.getDouble(2),cachedBox.getDouble(3)};JSONArray cachedRows=cached.getJSONObject("state").getJSONArray("places");for(int i=0;i<cachedRows.length();i++)pagePlaces.add(Place.contour(cachedRows.getJSONObject(i)));page=cached.getJSONObject("state").optInt("page",1);more=cached.getJSONObject("state").optBoolean("more");status=more?"Кэш · неполное покрытие · доступны ещё страницы":"Свежий кэш области";refresh();persist();return;}catch(Exception ignored){}}}final int requested=page+1;JSONObject opts=new JSONObject();try{opts.put("bbox",new JSONArray(b)).put("page",requested);}catch(JSONException ignored){}loading=true;status="Загрузка · сохранённые контуры видны";refresh();WikiApi.INSTANCE.request(requestId,new CredentialRepository(getCarContext()),"box",opts,(data,error)->{if(error!=null){main.post(()->{if(g!=generation)return;loading=false;more=false;blockedError=true;status=error+" · кэш может быть устаревшим";refresh();});return;}try{List<Place> incoming=Place.area(data);Map<Long,Place> unique=new LinkedHashMap<>();for(Place p:pagePlaces)unique.put(p.id,p);int before=unique.size();for(Place p:incoming)unique.put(p.id,p);List<Place> accumulated=new ArrayList<>(unique.values());boolean site="site".equals(data.optString("source"));
+ void load(boolean next){load(next,false);}
+ void load(boolean next,boolean force){if(!visible)return;
+ synchronized(session.view){lastLoadLat=session.view.lat;lastLoadLon=session.view.lon;lastLoadZoom=session.view.zoom;}
+ blockedError=false;viewportDirty=false;loading=false;generation++;final int g=generation;WikiApi.INSTANCE.cancel(requestId);double[] b;int[] size=session.renderer!=null?session.renderer.viewSize():new int[]{800,480};synchronized(session.view){if(next&&bbox!=null)b=bbox;else{List<double[]> boxes=session.view.boxes(size[0],size[1]);b=boxes.isEmpty()?session.view.box():boxes.get(0);if(!force)for(double[] candidate:boxes)if(session.store.fresh(candidate)==null){b=candidate;break;}}}final double[] targetBox=b;bbox=b;if(!next){page=0;pagePlaces=new ArrayList<>();JSONObject cached=force?null:session.store.fresh(b);if(cached!=null){try{JSONArray cachedBox=cached.getJSONArray("bbox");bbox=new double[]{cachedBox.getDouble(0),cachedBox.getDouble(1),cachedBox.getDouble(2),cachedBox.getDouble(3)};JSONArray cachedRows=cached.getJSONObject("state").getJSONArray("places");for(int i=0;i<cachedRows.length();i++)pagePlaces.add(Place.contour(cachedRows.getJSONObject(i)));page=cached.getJSONObject("state").optInt("page",1);more=cached.getJSONObject("state").optBoolean("more");status=more?"Кэш · неполное покрытие · доступны ещё страницы":cached.getJSONObject("state").optBoolean("complete",false)?"Свежий кэш области":"Кэш · покрытие неполное";refresh();persist();return;}catch(Exception ignored){}}}final int requested=page+1;JSONObject opts=new JSONObject();try{opts.put("bbox",new JSONArray(b)).put("page",requested);}catch(JSONException ignored){}loading=true;status="Загрузка · сохранённые контуры видны";refresh();WikiApi.INSTANCE.request(requestId,new CredentialRepository(getCarContext()),"box",opts,(data,error)->{if(error!=null){main.post(()->{if(g!=generation)return;loading=false;more=false;blockedError=true;lastFailureAt=SystemClock.elapsedRealtime();status=error+" · кэш может быть устаревшим";refresh();});return;}try{List<Place> incoming=Place.area(data);Map<Long,Place> unique=new LinkedHashMap<>();for(Place p:pagePlaces)unique.put(p.id,p);int before=unique.size();for(Place p:incoming)unique.put(p.id,p);List<Place> accumulated=new ArrayList<>(unique.values());boolean site="site".equals(data.optString("source"));
  boolean hasMore=site?data.optBoolean("more",false):(unique.size()>before&&!incoming.isEmpty()&&(data.has("found")?unique.size()<data.optInt("found"):incoming.size()==50));
  boolean complete=site?data.optBoolean("complete",false):(!hasMore&&(data.has("found")?unique.size()>=data.optInt("found"):incoming.size()<50));JSONArray contours=new JSONArray();for(Place p:accumulated)contours.put(p.contour());JSONObject r=new JSONObject().put("bbox",new JSONArray(targetBox)).put("updated",System.currentTimeMillis()).put("state",new JSONObject().put("places",contours).put("page",requested).put("more",hasMore).put("complete",complete));
- synchronized(this){if(g!=generation)return;session.store.putArea(r);}List<Place> cached=session.store.cached();main.post(()->{if(g!=generation)return;pagePlaces=accumulated;places=cached;page=requested;more=hasMore;loading=false;status=hasMore?"Неполное покрытие · ещё страницы доступны":(complete?"Загружена область":"Загружено частично · не все контуры подтверждены");refresh();persist();if((viewportDirty||!hasMore)&&visible){main.removeCallbacks(refreshRequest);main.postDelayed(refreshRequest,1000);}});}catch(Exception e){main.post(()->{if(g==generation){loading=false;blockedError=true;status="Не удалось сохранить область";refresh();}});}});}
- private CarIcon icon(int id){return new CarIcon.Builder(IconCompat.createWithResource(getCarContext(),id)).build();}
- private Action action(String title,int image,Runnable run){return new Action.Builder().setIcon(new CarIcon.Builder(IconCompat.createWithResource(getCarContext(),image)).build()).setOnClickListener(run::run).build();}
+ synchronized(this){if(g!=generation)return;session.store.putArea(r);}List<Place> cached=session.store.cached();main.post(()->{if(g!=generation)return;pagePlaces=accumulated;places=cached;page=requested;more=hasMore;loading=false;status=hasMore?"Неполное покрытие · ещё страницы доступны":(complete?"Загружена область":data.has("warning")?data.optString("warning"):"Загружено частично · не все контуры подтверждены");refresh();persist();if(shouldReloadAfterSuccess(viewportDirty,visible)){main.removeCallbacks(refreshRequest);main.postDelayed(refreshRequest,1000);}});}catch(Exception e){main.post(()->{if(g==generation){loading=false;blockedError=true;status="Не удалось сохранить область";refresh();}});}});}
+ /** Reload only when camera changed while a request was running; never poll the same area. */
+ static boolean shouldReloadAfterSuccess(boolean viewportChanged,boolean visible){return viewportChanged&&visible;}
+ private String mapStatus(){
+  boolean follow;
+  synchronized(session.view){follow=session.view.follow;}
+  String prefix=session.gps==null?session.gpsStatus:follow?"GPS Follow: вкл":"GPS Follow: пауза";
+  return prefix+" · "+(blockedError?"Обновите область":loading?"Загрузка объектов":status);
+ }
+ /** Rasterize source vectors at 96px to avoid host-side mdpi resource upscaling. */
+ private CarIcon icon(int id){
+  CarIcon existing=highResIcons.get(id);if(existing!=null)return existing;
+  Drawable drawable=getCarContext().getDrawable(id);
+  if(drawable==null)return new CarIcon.Builder(IconCompat.createWithResource(getCarContext(),id)).build();
+  Bitmap bitmap=Bitmap.createBitmap(96,96,Bitmap.Config.ARGB_8888);
+  Canvas canvas=new Canvas(bitmap);drawable.setBounds(0,0,96,96);drawable.draw(canvas);
+  CarIcon result=new CarIcon.Builder(IconCompat.createWithBitmap(bitmap)).build();
+  highResIcons.put(id,result);return result;
+ }
+ private Action action(String title,int image,Runnable run){
+  return new Action.Builder().setIcon(icon(image)).setOnClickListener(run::run).build();
+ }
  private void toggleNearby(){showNearby=!showNearby;if(showNearby)clearPreview();invalidate();}
- private ActionStrip controls(){return new ActionStrip.Builder().addAction(Action.PAN).addAction(action("Приблизить",android.R.drawable.ic_input_add,()->session.renderer.zoom(1))).addAction(action("Отдалить",org.example.wikimapreader.R.drawable.car_zoom_out,()->session.renderer.zoom(-1))).addAction(action("К автомобилю",android.R.drawable.ic_menu_mylocation,()->{if(session.gps==null){session.permission();return;}synchronized(session.view){session.view.follow=true;session.view.lat=session.gps[0];session.view.lon=session.gps[1];}viewportChanged();})).build();}
+ private ActionStrip controls(){return new ActionStrip.Builder().addAction(Action.PAN).addAction(action("Приблизить",org.example.wikimapreader.R.drawable.car_zoom_in,()->session.renderer.zoom(1))).addAction(action("Отдалить",org.example.wikimapreader.R.drawable.car_zoom_out,()->session.renderer.zoom(-1))).addAction(action("GPS Follow / к автомобилю",org.example.wikimapreader.R.drawable.car_my_location,()->{if(session.gps==null){session.permission();return;}synchronized(session.view){session.view.follow=true;session.view.lat=session.gps[0];session.view.lon=session.gps[1];}viewportChanged();})).build();}
  private int limit(){try{return Math.min(20,getCarContext().getCarService(ConstraintManager.class).getContentLimit(ConstraintManager.CONTENT_LIMIT_TYPE_LIST));}catch(Exception e){return 6;}}
  private List<Place> nearest(){List<Place> out=new ArrayList<>(places);double a=session.gps!=null?session.gps[0]:session.view.lat,b=session.gps!=null?session.gps[1]:session.view.lon;out.sort(Comparator.comparingDouble(p->{double[] q=p.point();return q==null?Double.MAX_VALUE:Geo.distance(a,b,q[0],q[1]);}));return out;}
  private ItemList rows(List<Place> source,boolean map){return rows(source,map,false);}
  private ItemList rows(List<Place> source,boolean map,boolean inlinePreview){ItemList.Builder rows=new ItemList.Builder().setNoItemsMessage("Нет объектов. Переместите карту или догрузите область");int n=0;for(Place p:source){if(n>=limit())break;double[] q=p.point();if(map&&q==null)continue;Row.Builder row=new Row.Builder().setTitle(p.title).setOnClickListener(()->{if(inlinePreview)showPreview(Collections.singletonList(p),0);else detail(p);});if(session.gps!=null&&q!=null)row.addText(Math.round(Geo.distance(session.gps[0],session.gps[1],q[0],q[1]))+" м");else row.addText("Wikimapia #"+p.id);if(map)row.setBrowsable(true);if(map)row.setMetadata(new Metadata.Builder().setPlace(new androidx.car.app.model.Place.Builder(CarLocation.create(q[0],q[1])).setMarker(new PlaceMarker.Builder().setLabel(String.valueOf(n+1)).build()).build()).build());rows.addItem(row.build());n++;}return rows.build();}
  @NonNull @Override public Template onGetTemplate(){
   ActionStrip top=new ActionStrip.Builder()
-   .addAction(action("Поиск",android.R.drawable.ic_menu_search,()->getScreenManager().push(new Search(getCarContext()))))
-   .addAction(action("Избранное",android.R.drawable.btn_star_big_on,this::favorites))
-   .addAction(action(showNearby?"Скрыть список":"Объекты рядом",android.R.drawable.ic_menu_agenda,this::toggleNearby))
-   .addAction(action(more?"Ещё":"Обновить",android.R.drawable.ic_menu_rotate,()->load(more))).build();
+   .addAction(action("Поиск",org.example.wikimapreader.R.drawable.car_search,()->getScreenManager().push(new Search(getCarContext()))))
+   .addAction(action("Избранное",org.example.wikimapreader.R.drawable.car_favorite,this::favorites))
+   .addAction(action(showNearby?"Скрыть список":"Объекты рядом",org.example.wikimapreader.R.drawable.car_nearby,this::toggleNearby))
+   .addAction(action(more?"Ещё":"Обновить",org.example.wikimapreader.R.drawable.car_refresh,()->load(more,true))).build();
   if(getCarContext().getCarAppApiLevel()<7)
    return new PlaceListMapTemplate.Builder().setTitle("WikiReader").setHeaderAction(Action.APP_ICON)
     .setItemList(rows(nearest(),true)).setActionStrip(top).build();
@@ -61,11 +105,11 @@ public final class WikiScreen extends Screen implements DefaultLifecycleObserver
     .addText(previewText+(previewHits.size()>1?" · "+(previewIndex+1)+"/"+previewHits.size():"")).build());
    if(previewPlace.point()!=null){
     pane.addAction(new Action.Builder().setTitle("Маршрут")
-     .setIcon(icon(android.R.drawable.ic_menu_compass))
+     .setIcon(icon(org.example.wikimapreader.R.drawable.car_route))
      .setOnClickListener(this::navigatePreview).build());
    }
    pane.addAction(new Action.Builder().setTitle("Закрыть")
-    .setIcon(icon(android.R.drawable.ic_menu_close_clear_cancel))
+    .setIcon(icon(org.example.wikimapreader.R.drawable.car_close))
     .setOnClickListener(this::clearPreview).build());
    content=new PaneTemplate.Builder(pane.build()).setHeader(header).build();
   }else if(showNearby){
@@ -80,7 +124,7 @@ public final class WikiScreen extends Screen implements DefaultLifecycleObserver
   }else{
    Pane pane=new Pane.Builder().addRow(new Row.Builder()
     .setTitle(places.isEmpty()?"Карта Wikimapia":"Объектов в области: "+places.size())
-    .addText(loading?"Загрузка объектов":status).build()).build();
+    .addText(mapStatus()).build()).build();
    content=new PaneTemplate.Builder(pane).setHeader(header).build();
   }
   return new MapWithContentTemplate.Builder().setContentTemplate(content)
