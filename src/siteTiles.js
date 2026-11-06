@@ -33,16 +33,61 @@ export function parseSiteTile(text,expectedId){
 }
 export function createTileSource(request){
  const cache=new Map();let bytes=0;
+ const MAX_TILES=16,MAX_ZOOM=15;
  return async({bbox,signal,force=false})=>{
-  signal?.throwIfAborted();if(!Array.isArray(bbox)||bbox.length!==4||bbox.some(v=>!Number.isFinite(v))||bbox[0]>=bbox[2]||bbox[1]>=bbox[3]||bbox[0]<-180||bbox[2]>180||bbox[1]<-85||bbox[3]>85||bbox[2]-bbox[0]>.035||bbox[3]-bbox[1]>.035)throw Error('Приблизьте карту для загрузки объектов');
-  const z=15,n=2**z,tx=lon=>Math.min(n-1,Math.max(0,Math.floor((lon+180)/360*n))),ty=lat=>Math.floor((1-Math.asinh(Math.tan(lat*Math.PI/180))/Math.PI)/2*n);
-  const unique=new Map();let complete=true,count=0;const total=(tx(bbox[2])-tx(bbox[0])+1)*(ty(bbox[1])-ty(bbox[3])+1);
-  outer:for(let x=tx(bbox[0]);x<=tx(bbox[2]);x++)for(let y=ty(bbox[3]);y<=ty(bbox[1]);y++){
-   if(++count>16){complete=false;break outer;}
-   signal?.throwIfAborted();const address=tileAddress(x,y,z);let entry=cache.get(address.id);
-   if(!entry||force||Date.now()-entry.at>300000){const r=await request({url:address.url,signal}),data=parseSiteTile(r.text,address.id);signal?.throwIfAborted();if(entry)bytes-=entry.bytes;entry={data,at:Date.now(),bytes:r.text.length*2};cache.delete(address.id);cache.set(address.id,entry);bytes+=entry.bytes;while(cache.size>32||bytes>8*1024*1024){const key=cache.keys().next().value;bytes-=cache.get(key).bytes;cache.delete(key);}}
-   if(entry.data.deeperTiles)complete=false;for(const p of entry.data.places)unique.set(p.id,p);
+  signal?.throwIfAborted();
+  if(!Array.isArray(bbox)||bbox.length!==4||bbox.some(v=>!Number.isFinite(v))||bbox[0]>=bbox[2]||bbox[1]>=bbox[3]||bbox[0]<-180||bbox[2]>180||bbox[1]<-85||bbox[3]>85||bbox[2]-bbox[0]>.035||bbox[3]-bbox[1]>.035)throw Error('Приблизьте карту для загрузки объектов');
+  // Start with maximum detail, then choose the nearest parent level that covers
+  // the entire viewport within the bounded network budget. Never clip the
+  // viewport to its first 16 high-zoom tiles.
+  const span=z=>{
+   const n=2**z;
+   const tx=lon=>Math.min(n-1,Math.max(0,Math.floor((lon+180)/360*n)));
+   const ty=lat=>Math.min(n-1,Math.max(0,Math.floor((1-Math.asinh(Math.tan(lat*Math.PI/180))/Math.PI)/2*n)));
+   const x0=tx(bbox[0]),x1=tx(bbox[2]),y0=ty(bbox[3]),y1=ty(bbox[1]);
+   return {z,x0,x1,y0,y1,count:(x1-x0+1)*(y1-y0+1)};
+  };
+  let range=span(MAX_ZOOM);
+  while(range.count>MAX_TILES&&range.z>1)range=span(range.z-1);
+  const unique=new Map();let deeper=false,failed=0,succeeded=0,firstFailure=null;
+  outer:for(let x=range.x0;x<=range.x1;x++)for(let y=range.y0;y<=range.y1;y++){
+   signal?.throwIfAborted();
+   const address=tileAddress(x,y,range.z);let entry=cache.get(address.id);
+   if(!entry||force||Date.now()-entry.at>300000){
+    try{
+     const r=await request({url:address.url,signal});
+     const data=parseSiteTile(r.text,address.id);
+     signal?.throwIfAborted();
+     if(entry)bytes-=entry.bytes;
+     entry={data,at:Date.now(),bytes:r.text.length*2};
+     cache.delete(address.id);cache.set(address.id,entry);bytes+=entry.bytes;
+     while(cache.size>32||bytes>8*1024*1024){
+      const key=cache.keys().next().value;bytes-=cache.get(key).bytes;cache.delete(key);
+     }
+    }catch(error){
+     signal?.throwIfAborted();
+     if(error?.name==='AbortError')throw error;
+     failed++;firstFailure??=error;
+     // Preserve stale validated geometry if a refresh fails; it cannot prove
+     // completeness and must not be marked as a successful network refresh.
+     if(!entry){
+      if(error?.siteKind==='auth'||error?.siteKind==='quota')break outer;
+      continue;
+     }
+     if(error?.siteKind==='auth'||error?.siteKind==='quota'){
+      for(const p of entry.data.places)unique.set(p.id,p);
+      succeeded++;
+      break outer;
+     }
+    }
+   }
+   succeeded++;
+   if(entry.data.deeperTiles)deeper=true;
+   for(const p of entry.data.places)unique.set(p.id,p);
   }
-  return {places:[...unique.values()],complete:complete&&total<=16,source:'site'};
+  // A wholly failed request must remain an error, not become a false
+  // "no Wikimapia objects here" result.
+  if(!succeeded&&firstFailure)throw firstFailure;
+  return {places:[...unique.values()],complete:failed===0&&!deeper,source:'site',failedTiles:failed,zoomLevel:range.z};
  };
 }
