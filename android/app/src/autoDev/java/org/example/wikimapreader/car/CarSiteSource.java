@@ -92,8 +92,16 @@ final class CarSiteSource {
   for(int i=0;i<id.length();i+=3){if(i>0)p.append('/');p.append(id, i, Math.min(id.length(),i+3));}
   return p.append(".xy").toString();
  }
- private static int tx(double lon){return Math.max(0,Math.min((1<<TILE_Z)-1,(int)Math.floor((lon+180)/360*(1<<TILE_Z))));}
- private static int ty(double lat){double rad=Math.toRadians(lat);double y=(1-Math.log(Math.tan(rad)+1/Math.cos(rad))/Math.PI)/2*(1<<TILE_Z);return Math.max(0,Math.min((1<<TILE_Z)-1,(int)Math.floor(y)));}
+ private static int tx(double lon,int z){return Math.max(0,Math.min((1<<z)-1,(int)Math.floor((lon+180)/360*(1<<z))));}
+ private static int ty(double lat,int z){double rad=Math.toRadians(lat);double y=(1-Math.log(Math.tan(rad)+1/Math.cos(rad))/Math.PI)/2*(1<<z);return Math.max(0,Math.min((1<<z)-1,(int)Math.floor(y)));}
+ /** Finest tile detail that covers the entire map within MAX_TILES requests. */
+ static int zoomForArea(double w,double s,double e,double n){
+  for(int z=TILE_Z;z>1;z--){
+   long columns=(long)tx(e,z)-tx(w,z)+1,rows=(long)ty(s,z)-ty(n,z)+1;
+   if(columns*rows<=MAX_TILES)return z;
+  }
+  return 1;
+ }
  private static JSONObject area(JSONObject opts,AtomicBoolean cancelled)throws Exception {
   return areaWithReader(opts,cancelled,CarSiteSource::fetchTile);
  }
@@ -105,9 +113,13 @@ final class CarSiteSource {
   if(!Double.isFinite(w)||!Double.isFinite(s)||!Double.isFinite(e)||!Double.isFinite(n)||w>=e||s>=n||w< -180||e>180||s< -85||n>85||e-w>.035||n-s>.035)throw new IOException("Invalid bbox");
   int page=opts.optInt("page",1);if(page<1)throw new IOException("Invalid page");
   if(page>1)return new JSONObject().put("folder",new JSONArray()).put("source","site").put("more",false).put("complete",false);
-  final double centerX=(tx(w)+tx(e))/2.0,centerY=(ty(n)+ty(s))/2.0;
+  // Parent tiles cover the complete viewport on wider zoom levels instead of
+  // dropping all but the closest 9 detail tiles. A parent with children is
+  // still reported incomplete until those children are loaded.
+  final int tileZ=zoomForArea(w,s,e,n);
+  final double centerX=(tx(w,tileZ)+tx(e,tileZ))/2.0,centerY=(ty(n,tileZ)+ty(s,tileZ))/2.0;
   java.util.List<int[]> candidates=new java.util.ArrayList<>();
-  for(int x=tx(w);x<=tx(e);x++)for(int y=ty(n);y<=ty(s);y++)candidates.add(new int[]{x,y});
+  for(int x=tx(w,tileZ);x<=tx(e,tileZ);x++)for(int y=ty(n,tileZ);y<=ty(s,tileZ);y++)candidates.add(new int[]{x,y});
   candidates.sort((a,b)->Double.compare(
    (a[0]-centerX)*(a[0]-centerX)+(a[1]-centerY)*(a[1]-centerY),
    (b[0]-centerX)*(b[0]-centerX)+(b[1]-centerY)*(b[1]-centerY)));
@@ -116,7 +128,7 @@ final class CarSiteSource {
   for(int[] coords:candidates){
    if(successes+failures>=MAX_TILES)break;
    if(cancelled.get()||Thread.currentThread().isInterrupted())throw new java.io.InterruptedIOException("Cancelled");
-   String id=tileId(coords[0],coords[1],TILE_Z);
+   String id=tileId(coords[0],coords[1],tileZ);
    try{
     String raw=reader.read(id,cancelled);
     // Parse into a temporary map to avoid leaking partially decoded tiles.

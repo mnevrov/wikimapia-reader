@@ -20,7 +20,13 @@ android {
     flavorDimensions += "experience"
     productFlavors {
         mobile { dimension "experience" }
-        autoDev { dimension "experience"; applicationId "org.example.wikimapreader.autodev" }
+        autoDev {
+            dimension "experience"
+            applicationId "org.example.wikimapreader.autodev"
+            // AutoDev builds are versioned independently of the signed mobile release.
+            versionCode 33
+            versionName "0.14.5-auto.1"
+        }
     }
     testOptions { unitTests.includeAndroidResources = true
         unitTests.all { systemProperty "wikireader.fixtures", rootProject.file("../tests/fixtures").absolutePath } }

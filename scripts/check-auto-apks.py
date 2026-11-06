@@ -7,6 +7,13 @@ for variant,package,label in [('mobile','org.example.wikimapreader.next','WikiRe
     apk=pathlib.Path(f'android/app/build/outputs/apk/{variant}/debug/app-{variant}-debug.apk')
     badging=subprocess.check_output([str(aapt),'dump','badging',str(apk)],text=True)
     assert f"package: name='{package}'" in badging,badging[:200]
+    parsed=re.search(r"^package: name='[^']+' versionCode='(\d+)' versionName='([^']+)'",badging,re.M)
+    assert parsed,"Cannot read APK version from manifest"
+    actual_version=parsed.group(2)
+    if variant=='mobile':
+        assert actual_version==version, f"Mobile version mismatch: {actual_version} != {version}"
+    else:
+        assert re.fullmatch(r'\d+\.\d+\.\d+-auto\.\d+',actual_version),actual_version
     manifest=subprocess.check_output([str(aapt),'dump','xmltree',str(apk),'AndroidManifest.xml'],text=True)
     assert ('WikiCarService' in manifest)==(variant=='autoDev')
     assert ('androidx.car.app.MAP_TEMPLATES' in manifest)==(variant=='autoDev')
@@ -16,8 +23,8 @@ for variant,package,label in [('mobile','org.example.wikimapreader.next','WikiRe
         assert (b'Landroidx/car/app/CarAppService;' in dex)==(variant=='autoDev')
     signing=subprocess.check_output([str(sdk/'build-tools/35.0.0/apksigner'),'verify','--print-certs',str(apk)],text=True)
     folder=pathlib.Path('apk-dist')/variant;folder.mkdir(parents=True,exist_ok=True)
-    target=folder/f'{label}-{version}-debug.apk';shutil.copyfile(apk,target)
+    target=folder/f'{label}-{actual_version}-debug.apk';shutil.copyfile(apk,target)
     digest=hashlib.sha256(target.read_bytes()).hexdigest()
     (folder/'SHA256SUMS.txt').write_text(f'{digest}  {target.name}\n')
-    (folder/'BUILD.txt').write_text(f'package={package}\nversion={version}\nvariant={variant}Debug\nTemporary debug signing; mobile is not a stable Next update.\n'+signing)
+    (folder/'BUILD.txt').write_text(f'package={package}\nversion={actual_version}\nvariant={variant}Debug\nTemporary debug signing; mobile is not a stable Next update.\n'+signing)
     print(variant,package,digest)
