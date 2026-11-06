@@ -7,13 +7,13 @@ for variant,package,label in [('mobile','org.example.wikimapreader.next','WikiRe
     apk=pathlib.Path(f'android/app/build/outputs/apk/{variant}/debug/app-{variant}-debug.apk')
     badging=subprocess.check_output([str(aapt),'dump','badging',str(apk)],text=True)
     assert f"package: name='{package}'" in badging,badging[:200]
-    parsed=re.search(r"^package: name='[^']+' versionCode='(\\d+)' versionName='([^']+)'",badging,re.M)
+    parsed=re.search(r"^package: name='[^']+' versionCode='(\d+)' versionName='([^']+)'",badging,re.M)
     assert parsed,"Cannot read APK version from manifest"
     actual_version=parsed.group(2)
     if variant=='mobile':
         assert actual_version==version, f"Mobile version mismatch: {actual_version} != {version}"
     else:
-        assert re.fullmatch(r'\\d+\\.\\d+\\.\\d+-auto\\.\\d+',actual_version),actual_version
+        assert re.fullmatch(r'\d+\.\d+\.\d+-auto\.\d+',actual_version),actual_version
     manifest=subprocess.check_output([str(aapt),'dump','xmltree',str(apk),'AndroidManifest.xml'],text=True)
     assert ('WikiCarService' in manifest)==(variant=='autoDev')
     assert ('androidx.car.app.MAP_TEMPLATES' in manifest)==(variant=='autoDev')
