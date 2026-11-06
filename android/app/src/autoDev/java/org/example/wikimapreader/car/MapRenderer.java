@@ -33,7 +33,7 @@ final class MapRenderer implements SurfaceCallback,AutoCloseable {
  static float surfaceDensity(int dpi){return Math.max(0.75f,Math.min(3f,(dpi>0?dpi:160)/160f));}
  private Rect area(){return mapViewport(visible,stable,width,height);}
  @Override public void onScroll(float x,float y){synchronized(view){view.pan(x,y);}events.changed();draw();}
- @Override public void onScale(float x,float y,float scale){Rect a=area();synchronized(view){view.scale(scale,x-a.left,y-a.top,a.width(),a.height());view.follow=false;}events.changed();draw();}
+ @Override public void onScale(float x,float y,float scale){Rect a=area();synchronized(view){view.scale(scale,x-a.left,y-a.top,a.width(),a.height());}events.changed();draw();}
  @Override public void onClick(float x,float y){double[] p;Rect a=area();synchronized(view){p=view.at(x-a.left,y-a.top,a.width(),a.height());}events.tap(p[0],p[1]);}
  private synchronized int offsetX(){return area().left;}private synchronized int offsetY(){return area().top;}
  synchronized int[] viewSize(){Rect a=area();return new int[]{a.width(),a.height()};}

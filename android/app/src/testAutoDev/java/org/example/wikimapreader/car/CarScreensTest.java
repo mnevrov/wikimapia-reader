@@ -84,6 +84,32 @@ public class CarScreensTest {
   assertFalse(WikiScreen.shouldReloadAfterSuccess(true,false));
   assertTrue(WikiScreen.shouldReloadAfterSuccess(true,true));
  }
+ @Test public void gpsFixRejectsStaleAndVeryImpreciseProviders(){
+  android.location.Location previous=new android.location.Location("gps");
+  previous.setLatitude(55.75);previous.setLongitude(37.61);
+  previous.setAccuracy(15f);previous.setElapsedRealtimeNanos(10_000_000_000L);
+  android.location.Location stale=new android.location.Location("network");
+  stale.setLatitude(55.76);stale.setLongitude(37.62);
+  stale.setAccuracy(100f);stale.setElapsedRealtimeNanos(3_000_000_000L);
+  assertFalse(WikiSession.acceptFix(stale,previous));
+  android.location.Location fresh=new android.location.Location("network");
+  fresh.setLatitude(55.751);fresh.setLongitude(37.611);
+  fresh.setAccuracy(30f);fresh.setElapsedRealtimeNanos(11_000_000_000L);
+  assertTrue(WikiSession.acceptFix(fresh,previous));
+  fresh.setAccuracy(2500f);
+  assertFalse(WikiSession.acceptFix(fresh,previous));
+ }
+ @Test public void carTemplateExplicitlyShowsGpsFollowState(){
+  WikiScreen root=create(7);
+  session.gps=new double[]{55.75,37.61};
+  session.view.follow=true;
+  MapWithContentTemplate content=(MapWithContentTemplate)root.onGetTemplate();
+  Pane pane=((PaneTemplate)content.getContentTemplate()).getPane();
+  assertTrue(pane.getRows().get(0).getTexts().get(0).toString().contains("GPS Follow: вкл"));
+  session.view.follow=false;
+  pane=((PaneTemplate)((MapWithContentTemplate)root.onGetTemplate()).getContentTemplate()).getPane();
+  assertTrue(pane.getRows().get(0).getTexts().get(0).toString().contains("GPS Follow: пауза"));
+ }
  @Test public void oldHostFallback(){assertTrue(create(1).onGetTemplate() instanceof PlaceListMapTemplate);}
  @Test public void recreateRetainsViewport()throws Exception{WikiScreen root=create(7);session.view.lat=59;session.view.lon=30;session.store.viewport(session.view,42);controller.moveToState(Lifecycle.State.DESTROYED);controller=null;assertTrue(create(7).onGetTemplate() instanceof MapWithContentTemplate);assertEquals(59,session.view.lat,0);assertEquals(42,session.store.selected());}
  @Test public void serviceCreatesSession(){assertTrue(new WikiCarService().onCreateSession() instanceof WikiSession);}
@@ -91,5 +117,5 @@ public class CarScreensTest {
  @Test public void searchLoadingBuilds()throws Exception{WikiScreen root=create(7);Class<?> type=Class.forName("org.example.wikimapreader.car.WikiScreen$Search");java.lang.reflect.Constructor<?> constructor=type.getDeclaredConstructors()[0];constructor.setAccessible(true);Screen screen=(Screen)constructor.newInstance(root,context);java.lang.reflect.Field busy=type.getDeclaredField("busy");busy.setAccessible(true);busy.setBoolean(screen,true);assertTrue(screen.onGetTemplate() instanceof SearchTemplate);}
  @Test public void cachedPagesKeepTheirOriginalBounds()throws Exception{WikiScreen root=create(7);session.view.lat=55;session.view.lon=37;session.view.zoom=16;double[] bounds={36.98251,54.98251,37.01749,55.01749};org.json.JSONObject row=new org.json.JSONObject().put("bbox",new org.json.JSONArray(bounds)).put("updated",System.currentTimeMillis()).put("state",new org.json.JSONObject().put("page",2).put("more",true).put("places",new org.json.JSONArray().put(new Place(55,"Cached","",new double[][]{{55,37}}).contour())));session.store.putArea(row);java.lang.reflect.Field visible=WikiScreen.class.getDeclaredField("visible");visible.setAccessible(true);visible.setBoolean(root,true);flag(root,"loading",true);java.lang.reflect.Method load=WikiScreen.class.getDeclaredMethod("load",boolean.class);load.setAccessible(true);load.invoke(root,false);java.lang.reflect.Field loading=WikiScreen.class.getDeclaredField("loading");loading.setAccessible(true);assertFalse(loading.getBoolean(root));java.lang.reflect.Field bbox=WikiScreen.class.getDeclaredField("bbox");bbox.setAccessible(true);assertArrayEquals(bounds,(double[])bbox.get(root),1e-9);java.lang.reflect.Field pages=WikiScreen.class.getDeclaredField("pagePlaces");pages.setAccessible(true);assertEquals(1,((java.util.List<?>)pages.get(root)).size());root.suspend();}
  private void flag(WikiScreen root,String name,boolean value)throws Exception{java.lang.reflect.Field f=WikiScreen.class.getDeclaredField(name);f.setAccessible(true);f.setBoolean(root,value);}
- @Test public void motionCoalescesWithoutCancellingPendingRequest()throws Exception{WikiScreen root=create(7);flag(root,"visible",true);flag(root,"loading",true);root.viewportChanged();org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(2));java.lang.reflect.Field generation=WikiScreen.class.getDeclaredField("generation");generation.setAccessible(true);assertEquals(0,generation.getInt(root));flag(root,"loading",false);flag(root,"blockedError",true);root.viewportChanged();org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(2));assertEquals(0,generation.getInt(root));root.suspend();}
+ @Test public void motionCoalescesAndManualPanRecoversAfterFailure()throws Exception{WikiScreen root=create(7);flag(root,"visible",true);flag(root,"loading",true);root.viewportChanged();org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(2));java.lang.reflect.Field generation=WikiScreen.class.getDeclaredField("generation");generation.setAccessible(true);assertEquals(0,generation.getInt(root));flag(root,"loading",false);flag(root,"blockedError",true);root.viewportChanged();org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(2));assertTrue("Manual map movement can retry after an error",generation.getInt(root)>=1);root.suspend();}
 }

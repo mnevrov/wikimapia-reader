@@ -47,6 +47,48 @@ public class CarSiteSourceTest {
    assertEquals("Тайм-аут Wikimapia в AutoDev",WikiApi.siteError(new java.net.SocketTimeoutException()));
    assertEquals("Данные Wikimapia не загрузились в AutoDev",WikiApi.siteError(new java.io.IOException("private-response-body")));
  }
+ @Test public void firstSuccessfulTileSurvivesNeighborTimeout()throws Exception {
+  JSONObject box=new JSONObject().put("bbox",new org.json.JSONArray()
+   .put(37.61).put(55.75).put(37.635).put(55.77)).put("page",1);
+  java.util.concurrent.atomic.AtomicInteger count=new java.util.concurrent.atomic.AtomicInteger();
+  JSONObject area=CarSiteSource.areaWithReader(box,new java.util.concurrent.atomic.AtomicBoolean(),(id,cancelled)->{
+   if(count.incrementAndGet()==1)return id+"|0|7\n55|100|376100000,376200000,557500000,557600000|16||!Дом|1|??????";
+   throw new java.io.InterruptedIOException("Timeout");
+  });
+  assertTrue("One good tile survives",area.getJSONArray("folder").length()>0);
+  assertFalse("Area must declare incomplete coverage",area.getBoolean("complete"));
+  assertEquals("Часть тайлов Wikimapia недоступна",area.getString("warning"));
+  assertEquals("Stop after second failed tile",3,count.get());
+ }
+ @Test public void noSuccessfulTilesMustStillReportError()throws Exception {
+  JSONObject box=new JSONObject().put("bbox",new org.json.JSONArray()
+   .put(37.61).put(55.75).put(37.635).put(55.77)).put("page",1);
+  try{
+   CarSiteSource.areaWithReader(box,new java.util.concurrent.atomic.AtomicBoolean(),
+    (id,c)->{throw new java.io.IOException("offline");});
+   fail("Expected real site failure");
+  }catch(java.io.IOException expected){assertEquals("offline",expected.getMessage());}
+ }
+ @Test public void loadIsCenteredAndBoundedWithoutRequestAvalanche()throws Exception {
+  JSONObject box=new JSONObject().put("bbox",new org.json.JSONArray()
+   .put(37.60).put(55.74).put(37.634).put(55.774)).put("page",1);
+  java.util.List<String> requested=new java.util.ArrayList<>();
+  JSONObject area=CarSiteSource.areaWithReader(box,new java.util.concurrent.atomic.AtomicBoolean(),(id,cancelled)->{
+   requested.add(id);return id+"|0|7";
+  });
+  assertTrue(requested.size()<=9);
+  assertFalse("Outer unvisited tiles imply partial coverage",area.getBoolean("complete"));
+  assertEquals(0,area.getJSONArray("folder").length());
+ }
+ @Test public void cancellationDoesNotBecomePartialCoverage()throws Exception {
+  JSONObject box=new JSONObject().put("bbox",new org.json.JSONArray()
+   .put(37.61).put(55.75).put(37.635).put(55.77)).put("page",1);
+  java.util.concurrent.atomic.AtomicBoolean cancelled=new java.util.concurrent.atomic.AtomicBoolean(true);
+  try{
+   CarSiteSource.areaWithReader(box,cancelled,(id,c)->id+"|0|7");
+   fail("Expected cancellation");
+  }catch(java.io.InterruptedIOException expected){}
+ }
  @Test public void unknownSourceSchemaDoesNotSilentlyReturnNoObjects()throws Exception {
    try{CarSiteSource.parseTile("bad|0|7","030",new LinkedHashMap<>());fail("expected a schema failure");}
    catch(java.io.IOException expected){}
