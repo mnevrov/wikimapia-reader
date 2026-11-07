@@ -43,3 +43,23 @@ test('GPS Follow keeps automatic Wikimapia area loading active after moving to a
  await expect.poll(()=>bounds.some(b=>b!==first),{timeout:25000}).toBe(true);
  await expect(button).toHaveAttribute('aria-pressed','true');
 });
+
+test('GPS Follow uses only its watcher and never starts a competing one-shot request',async({page,context})=>{
+ await page.route('https://tile.openstreetmap.org/**',route=>route.abort());
+ await context.grantPermissions(['geolocation']);
+ await context.setGeolocation({latitude:55.75,longitude:37.62,accuracy:12});
+ await page.addInitScript(()=>{
+  window.__wikireaderOneShotCalls=0;
+  const original=navigator.geolocation.getCurrentPosition.bind(navigator.geolocation);
+  Object.defineProperty(navigator.geolocation,'getCurrentPosition',{
+   configurable:true,
+   value:(...args)=>{window.__wikireaderOneShotCalls++;return original(...args);}
+  });
+ });
+ await page.goto('/');
+ const button=page.getByRole('button',{name:'Моё местоположение'});
+ await button.click();
+ await expect(button).toHaveAttribute('aria-pressed','true');
+ await expect.poll(()=>page.evaluate(()=>window.__wikireaderOneShotCalls),{timeout:5000}).toBe(0);
+ await expect(page.getByText('Местоположение недоступно. Проверьте разрешение и геопозицию.')).toHaveCount(0);
+});
