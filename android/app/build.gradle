@@ -24,8 +24,8 @@ android {
             dimension "experience"
             applicationId "org.example.wikimapreader.autodev"
             // AutoDev builds are versioned independently of the signed mobile release.
-            versionCode 33
-            versionName "0.14.5-auto.1"
+            versionCode 34
+            versionName "0.14.5-auto.2"
         }
     }
     testOptions { unitTests.includeAndroidResources = true
