@@ -253,4 +253,4 @@ CI проверяет Node/Python/Chromium, native unit tests, APK и lint. Ли
 
 ## Android Auto — тестовая ветка
 
-Сборка AutoDev из [PR #12](https://github.com/mnevrov/wikimapia-reader/pull/12) устанавливается параллельно стабильному WikiReader Next. Не является релизной сборкой. [Документация](docs/android-auto/README.md). Не сливать AutoDev до аппаратной приёмки.
+Android Auto интегрирован в `main` через [PR #52](https://github.com/mnevrov/wikimapia-reader/pull/52). Тестовый flavor AutoDev собирается из того же дерева, устанавливается отдельно от стабильного WikiReader Next и **не является автомобильным релизом**. Аппаратная приёмка до стабильной публикации отслеживается в [#51](https://github.com/mnevrov/wikimapia-reader/issues/51). [Документация](docs/android-auto/README.md).
