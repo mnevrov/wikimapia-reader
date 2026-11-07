@@ -7,7 +7,7 @@
 [Фирменный стиль и иконки Android](docs/BRANDING.md)
 
 Неофициальный Android-клиент для чтения объектов Wikimapia без собственного сервера.
-Новая тестовая сборка называется **WikiReader Next** и устанавливается рядом с 0.4.
+Приложение **WikiReader Next** включает экран телефона и Android Auto в одной APK.
 
 ## Версия 0.15.0 — одно приложение для телефона и Android Auto (кандидат)
 
@@ -216,7 +216,7 @@ npx playwright install chromium
 npm run test:browser
 npm run android:sync
 cd android
-./gradlew --no-daemon testMobileDebugUnitTest testAutoDevDebugUnitTest assembleMobileDebug assembleAutoDevDebug lintMobileDebug lintAutoDevDebug
+./gradlew --no-daemon testDebugUnitTest assembleDebug lintDebug
 ```
 
 Результат единой тестовой сборки для телефона и Android Auto: `android/app/build/outputs/apk/debug/app-debug.apk`. Минимальная версия Android 7.
