@@ -37,7 +37,7 @@ test('permission denial is terminal and releases the temporary watcher',async()=
  const promise=acquirePosition(geo);
  await new Promise(resolve=>setImmediate(resolve));
  listener(null,{code:1,message:'Permission denied'});
- await assert.rejects(promise,/Permission denied/);
+ await assert.rejects(promise,error=>error?.code===1&&/Permission denied/.test(error.message));
  await new Promise(resolve=>setImmediate(resolve));
  assert.deepEqual(cleared,['watch-c']);
 });
