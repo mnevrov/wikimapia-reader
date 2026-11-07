@@ -35,5 +35,27 @@ public class CarDataPlugin extends Plugin {
  @PluginMethod public void gpsStop(PluginCall call){
   CarLocationService.stop(getContext());call.resolve();
  }
+ /** Native Tiles API credentials are never disclosed to JavaScript or logs. */
+ @PluginMethod public void tilesStatus(PluginCall call){io.execute(()->{
+  try{
+   YandexTileSettings s=YandexTileSettings.get(getContext());
+   JSObject out=new JSObject();out.put("configured",s.configured());out.put("provider",s.selected());
+   call.resolve(out);
+  }catch(Exception e){call.reject("Не удалось прочитать настройки Tiles API");}
+ });}
+ @PluginMethod public void tilesSaveKey(PluginCall call){
+  String key=call.getString("key");
+  io.execute(()->{try{YandexTileSettings.get(getContext()).saveKey(key);call.resolve();}
+   catch(Exception e){call.reject("Не удалось сохранить ключ Tiles API");}});
+ }
+ @PluginMethod public void tilesSelect(PluginCall call){
+  String provider=call.getString("provider");
+  io.execute(()->{try{YandexTileSettings.get(getContext()).select(provider);call.resolve();}
+   catch(Exception e){call.reject("Для Яндекса требуется действующий ключ Tiles API");}});
+ }
+ @PluginMethod public void tilesClearKey(PluginCall call){
+  io.execute(()->{try{YandexTileSettings.get(getContext()).clearKey();call.resolve();}
+   catch(Exception e){call.reject("Не удалось удалить ключ Tiles API");}});
+ }
  @Override protected void handleOnDestroy(){for(String id:requests)WikiApi.INSTANCE.cancel("web:"+id);requests.clear();io.shutdown();}
 }
