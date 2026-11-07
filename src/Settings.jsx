@@ -21,6 +21,49 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
   const [carGpsEnabled,setCarGpsEnabled]=useState(false);
   const [carGpsBusy,setCarGpsBusy]=useState(false);
   const [carGpsMessage,setCarGpsMessage]=useState('');
+  const [tilesDraft,setTilesDraft]=useState('');
+  const [carTiles,setCarTiles]=useState({configured:false,provider:'osm'});
+  const [tilesMessage,setTilesMessage]=useState('');
+  const [tilesBusy,setTilesBusy]=useState(false);
+  useEffect(()=>{
+    if(!hasCar())return;
+    let alive=true;
+    car.tilesStatus().then(state=>{if(alive)setCarTiles({configured:Boolean(state.configured),provider:state.provider||'osm'});})
+      .catch(()=>{if(alive)setTilesMessage('Не удалось прочитать настройки автомобильной карты');});
+    return()=>{alive=false;};
+  },[]);
+  const tilesSave=async()=>{
+    if(!hasCar()||tilesBusy||!tilesDraft.trim())return;
+    setTilesBusy(true);
+    try{
+      await car.tilesSaveKey({key:tilesDraft.trim()});setTilesDraft('');
+      const state=await car.tilesStatus();
+      setCarTiles({configured:Boolean(state.configured),provider:state.provider||'osm'});
+      setTilesMessage('Ключ Tiles API зашифрован и сохранён на устройстве');
+    }catch{setTilesMessage('Не удалось сохранить ключ. Проверьте формат ключа Tiles API.');}
+    finally{setTilesBusy(false);}
+  };
+  const tilesSelect=async provider=>{
+    if(!hasCar()||tilesBusy)return;
+    setTilesBusy(true);
+    try{
+      await car.tilesSelect({provider});const state=await car.tilesStatus();
+      setCarTiles({configured:Boolean(state.configured),provider:state.provider||'osm'});
+      setTilesMessage('Подложка Android Auto: '+(provider==='yandex'?'Яндекс Карты':'OpenStreetMap')+'. При необходимости переподключите автомобиль.');
+    }catch{setTilesMessage('Источник не переключён. Для Яндекса нужен отдельный Tiles API ключ.');}
+    finally{setTilesBusy(false);}
+  };
+  const tilesClear=async()=>{
+    if(!hasCar()||tilesBusy)return;
+    setTilesBusy(true);
+    try{
+      await car.tilesClearKey();
+      setCarTiles({configured:false,provider:'osm'});setTilesDraft('');
+      setTilesMessage('Ключ Tiles API удалён, автомобиль использует OSM');
+    }catch{setTilesMessage('Не удалось удалить ключ Tiles API');}
+    finally{setTilesBusy(false);}
+  };
+
   useEffect(()=>{
     if(!hasCar())return;
     let alive=true;
@@ -96,6 +139,26 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
       </button>
       <p className="helper" role="status">{carGpsMessage||(carGpsEnabled?'GPS-служба включена':'GPS-служба выключена')}</p>
       <p className="helper">При отключении GPS службы или завершении поездки можно остановить её здесь. Если обновлений нет, проверьте разрешение геолокации и экономию энергии Android.</p>
+    </section>}
+    {hasCar()&&<section className="settings-group" aria-label="Подложка Android Auto">
+      <h2>Подложка Android Auto</h2>
+      <p className="helper">WikiReader теперь устанавливается одним приложением на телефон и Android Auto. У автомобильного экрана собственный нативный источник. Для Яндекс Карт нужен отдельный <strong>Tiles API</strong> ключ: ключ JavaScript API 3.0 ниже здесь не подходит. Обязательно соблюдайте условия использования Яндекс Карт.</p>
+      <div className="basemap-choice" role="group" aria-label="Источник автомобильной карты">
+        <button type="button" aria-pressed={carTiles.provider==='osm'} disabled={tilesBusy} onClick={()=>tilesSelect('osm')}>OSM</button>
+        <button type="button" aria-pressed={carTiles.provider==='yandex'} disabled={tilesBusy||!carTiles.configured} onClick={()=>tilesSelect('yandex')}>Яндекс Tiles</button>
+      </div>
+      <label htmlFor="car-tiles-api-key">Ключ Яндекс Tiles API</label>
+      <input id="car-tiles-api-key" type="password" autoComplete="off" spellCheck="false" autoCapitalize="none"
+        maxLength={128} value={tilesDraft} placeholder={carTiles.configured?'Новый ключ (старый сохранён)':'Введите ключ Tiles API'}
+        onChange={e=>setTilesDraft(e.target.value)}/>
+      <div className="split-actions">
+        <button type="button" className="secondary" disabled={tilesBusy||!tilesDraft.trim()} onClick={tilesSave}>Сохранить ключ</button>
+        {carTiles.configured&&<button type="button" className="text-button" disabled={tilesBusy} onClick={tilesClear}>Удалить ключ Tiles API</button>}
+      </div>
+      <p className="helper">{carTiles.configured?'Ключ сохранён через Android Keystore; его значение не читается в интерфейс.':'Ключ не настроен — в автомобиле доступна OSM.'}</p>
+      <p className="helper" role="status">{tilesMessage}</p>
+      <p className="helper">Яндекс Tiles API: официальная схема, Web Mercator, изображения 512 px. Логотип и ссылка на Яндекс Карты должны оставаться видимыми и доступными на автомобильном экране. Возможность перехода нужно проверить на реальном Android Auto.</p>
+      <a className="inline-link" href="https://yandex.ru/maps-api/docs/tiles-api/quickstart.html" target="_blank" rel="noopener noreferrer">Получить ключ Tiles API <Icon name="external" size={16}/></a>
     </section>}
     <section className="settings-group yandex-settings" aria-label="Картографическая подложка">
       <h2>Подложка карты</h2>
