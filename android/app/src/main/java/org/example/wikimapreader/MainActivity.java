@@ -3,6 +3,7 @@ package org.example.wikimapreader;
 import android.os.Bundle;
 import android.content.Intent;
 import com.getcapacitor.BridgeActivity;
+import org.example.wikimapreader.car.CarDataPlugin;
 
 public class MainActivity extends BridgeActivity {
     @Override
@@ -11,8 +12,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(WikiReaderSitePlugin.class);
         registerPlugin(CredentialsVaultPlugin.class);
         registerPlugin(WikiReaderTransferPlugin.class);
-        try { registerPlugin((Class<? extends com.getcapacitor.Plugin>) Class.forName("org.example.wikimapreader.car.CarDataPlugin")); }
-        catch (ClassNotFoundException ignored) { /* no Car API in mobile */ }
+        registerPlugin(CarDataPlugin.class);
         super.onCreate(savedInstanceState);
     }
     @Override protected void onNewIntent(Intent intent) {
