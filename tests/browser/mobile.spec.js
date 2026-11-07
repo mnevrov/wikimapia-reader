@@ -57,12 +57,26 @@ test('search shows documented results and opens selected object',async({page})=>
  await page.locator('.search-results button').click();await expect(page.locator('.description')).toHaveText('Found detail',{timeout:15000});
  expect(methods).toEqual(['search','place.getbyid']);
 });
-test('permission denial is handled and geolocation is never requested on launch',async({page})=>{
- await page.addInitScript(()=>{window.geoRequests=0;navigator.geolocation.getCurrentPosition=(_success,error)=>{window.geoRequests++;error({code:1});};});
+test('permission denial in GPS watcher is handled only after explicit tap',async({page})=>{
+ await page.addInitScript(()=>{
+  window.geoWatchRequests=0;window.geoOneShotRequests=0;
+  navigator.geolocation.getCurrentPosition=(_success,error)=>{
+   window.geoOneShotRequests++;error({code:1,message:'Permission denied'});
+  };
+  navigator.geolocation.watchPosition=(_success,error)=>{
+   window.geoWatchRequests++;
+   queueMicrotask(()=>error({code:1,message:'Permission denied'}));
+   return 71;
+  };
+  navigator.geolocation.clearWatch=()=>{};
+ });
  await page.route('https://tile.openstreetmap.org/**',r=>r.abort());await page.goto('/');
- expect(await page.evaluate(()=>window.geoRequests)).toBe(0);
+ expect(await page.evaluate(()=>window.geoWatchRequests)).toBe(0);
+ expect(await page.evaluate(()=>window.geoOneShotRequests)).toBe(0);
  await page.getByRole('button',{name:'Моё местоположение'}).click();
- await expect(page.locator('.status')).toContainText('Местоположение недоступно');expect(await page.evaluate(()=>window.geoRequests)).toBe(1);
+ await expect.poll(()=>page.evaluate(()=>window.geoWatchRequests)).toBe(1);
+ await expect(page.locator('.status')).toContainText('Местоположение недоступно');
+ expect(await page.evaluate(()=>window.geoOneShotRequests)).toBe(0);
 });
 test('auto pan debounces; background cancels queued load and resume reuses covering cache',async({page})=>{
  let requests=0;

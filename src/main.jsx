@@ -25,6 +25,7 @@ import {searchIntent} from './searchIntent.js';
 import {readFavorites,toggleFavorite as updateFavorites} from './favorites.js';
 import {offlineStore} from './offlineStore.js';
 import {nextFollowState,acceptableFix} from './gpsFollow.js';
+import {acquirePosition} from './locationRequest.js';
 import {pickMapFeedback} from './mapStatus.js';
 import {HISTORY_KEY,HISTORY_ENABLED_KEY,readHistory,recordHistory} from './readingHistory.js';
 import SavedLibrary from './SavedLibrary.jsx';
@@ -90,7 +91,7 @@ function App(){
   const [notice,setNotice]=useState('Открываем карту…'),[toast,setToast]=useState('');
   const [favorites,setFavorites]=useState(()=>{try{return readFavorites(localStorage.getItem('wikimapia-reader-favorites'));}catch{return[];}});
   const [query,setQuery]=useState(''),[results,setResults]=useState([]),[searchBusy,setSearchBusy]=useState(false),[searchStatus,setSearchStatus]=useState(''),[placeId,setPlaceId]=useState('55');
-  const detailAbort=useRef(null),searchAbort=useRef(null),request=useRef(0),locationJob=useRef(0);
+  const detailAbort=useRef(null),searchAbort=useRef(null),request=useRef(0),locationJob=useRef(0),locationAbort=useRef(null);
   const apiKey=demo?'':credentials.key;
   useEffect(()=>{if(credentials.key)setDemo(false);},[credentials.key]);
   const closeCard=useCallback(()=>{revokeOffline();offlineAbort.current?.abort();detailAbort.current?.abort();request.current++;setCandidates([]);setSelected(null);setDetails(null);setError('');setBusy(false);setFocus(null);},[]);
@@ -125,10 +126,10 @@ function App(){
   useEffect(()=>{const on=()=>setOnline(true),off=()=>setOnline(false);window.addEventListener('online',on);window.addEventListener('offline',off);return()=>{window.removeEventListener('online',on);window.removeEventListener('offline',off);};},[]);
   useLayoutEffect(()=>{if(screenBody.current){screenBody.current.scrollTop=positions.current[screen]??0;if(restoreFocus.current&&origin.current?.screen===screen){const o=origin.current;screenBody.current.querySelector(`[data-place-id="${o.id}"][data-source="${o.source}"]`)?.focus({preventScroll:true});restoreFocus.current=false;}}},[screen]);
   useEffect(()=>{if(!undo)return;const t=setTimeout(()=>setUndo(null),8000);return()=>clearTimeout(t);},[undo]);
-  useEffect(()=>{if(!active){detailAbort.current?.abort();searchAbort.current?.abort();request.current++;if(busy)setError('Загрузка прервана. Нажмите «Повторить».');setBusy(false);setSearchBusy(false);locationJob.current++;setLocating(false);}},[active]);
+  useEffect(()=>{if(!active){detailAbort.current?.abort();searchAbort.current?.abort();request.current++;if(busy)setError('Загрузка прервана. Нажмите «Повторить».');setBusy(false);setSearchBusy(false);locationJob.current++;locationAbort.current?.abort();setLocating(false);}},[active]);
   useEffect(()=>{if(screen!=='settings')setConfirmForget(false);},[screen]);
   useEffect(()=>{if(screen!=='search'){searchAbort.current?.abort();setSearchBusy(false);}},[screen]);
-  useEffect(()=>()=>{detailAbort.current?.abort();searchAbort.current?.abort();offlineAbort.current?.abort();revokeOffline();},[]);
+  useEffect(()=>()=>{detailAbort.current?.abort();searchAbort.current?.abort();locationAbort.current?.abort();offlineAbort.current?.abort();revokeOffline();},[]);
   useEffect(()=>{
     if(gpsFollow!=='following'||!active||screen!=='map'||!!selected)return;
     let cancelled=false,watchId;
@@ -141,6 +142,7 @@ function App(){
           if(!acceptableFix(p.coords)){if(!gpsWeakFixNotified.current){gpsWeakFixNotified.current=true;setGpsError('Низкая точность GPS · ожидаем сигнал');}return;}
            gpsWeakFixNotified.current=false;
           setGpsError('');
+          setNotice(previous=>/^(Местоположение недоступно|Определяем местоположение)/.test(previous)?'':previous);
           setLocation({lat:p.coords.latitude,lng:p.coords.longitude,accuracy:p.coords.accuracy,at:Date.now()});
         });
         if(cancelled&&watchId)await Geolocation.clearWatch({id:watchId});
@@ -172,16 +174,38 @@ function App(){
     try{localStorage.setItem('wikimapia-reader-favorites',JSON.stringify(next));setFavorites(next);setUndo(null);}catch{setToast('Не удалось вернуть место');}
   };
   const locate=async(centerMap=false)=>{
-    if(locating)return;const token=++locationJob.current;setLocating(true);setNotice('Определяем местоположение…');
-    try{const p=await Geolocation.getCurrentPosition({enableHighAccuracy:false,timeout:12000,maximumAge:60000});if(token!==locationJob.current)return;closeCard();setLocation({lat:p.coords.latitude,lng:p.coords.longitude,accuracy:p.coords.accuracy});if(centerMap)setRecenterLocation({lat:p.coords.latitude,lng:p.coords.longitude,seq:Date.now()});setNotice('Местоположение определено');}
-    catch{if(token===locationJob.current)setNotice('Местоположение недоступно. Проверьте разрешение и геопозицию.');}
-    finally{if(token===locationJob.current)setLocating(false);}
+    if(locating)return;
+    const token=++locationJob.current,controller=new AbortController();
+    locationAbort.current?.abort();locationAbort.current=controller;
+    setLocating(true);setNotice('Определяем местоположение…');
+    try{
+      // Reuse an already received GPS Follow fix instead of racing another native request.
+      const recent=location?.at&&Date.now()-location.at<30000&&
+        acceptableFix({latitude:location.lat,longitude:location.lng,accuracy:location.accuracy});
+      const coords=recent
+        ? {latitude:location.lat,longitude:location.lng,accuracy:location.accuracy}
+        : (await acquirePosition(Geolocation,{signal:controller.signal})).coords;
+      if(token!==locationJob.current||controller.signal.aborted)return;
+      closeCard();
+      setLocation({lat:coords.latitude,lng:coords.longitude,accuracy:coords.accuracy,at:Date.now()});
+      if(centerMap)setRecenterLocation({lat:coords.latitude,lng:coords.longitude,seq:Date.now()});
+      setNotice('Местоположение определено');
+    }catch(error){
+      if(token===locationJob.current&&error?.name!=='AbortError')
+        setNotice('Местоположение недоступно. Проверьте разрешение и геопозицию.');
+    }finally{
+      if(locationAbort.current===controller)locationAbort.current=null;
+      if(token===locationJob.current)setLocating(false);
+    }
   };
   const findNearby=()=>{setListSort('distance');locate(true);};
   const toggleGps=()=>{
      gpsWeakFixNotified.current=false;
     if(gpsFollow==='following'){setGpsFollow(nextFollowState(gpsFollow,'tap'));setGpsError('');return;}
-    setGpsError('');setGpsFollow(nextFollowState(gpsFollow,'tap'));locate();
+    // The long-lived GPS Follow watcher itself provides the first position.
+    // Do not start a competing one-shot request that can show a false failure.
+    setNotice(previous=>/^(Местоположение недоступно|Определяем местоположение)/.test(previous)?'':previous);
+    setGpsError('');setGpsFollow(nextFollowState(gpsFollow,'tap'));
   };
   const saveOffline=async()=>{
     if(!details||demo||offlineBusy||!online)return;
