@@ -72,6 +72,7 @@ jobs:
           cd android
           ./gradlew --no-daemon :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.example.wikimapreader.SiteSourceLiveTest
           ./gradlew --no-daemon :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.example.wikimapreader.car.CarSiteLiveTest
+          ./gradlew --no-daemon :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.example.wikimapreader.car.YandexTileSettingsTest
 
   verify-and-build:
     runs-on: ubuntu-24.04
