@@ -9,6 +9,14 @@
 Неофициальный Android-клиент для чтения объектов Wikimapia без собственного сервера.
 Новая тестовая сборка называется **WikiReader Next** и устанавливается рядом с 0.4.
 
+## Версия 0.15.0 — одно приложение для телефона и Android Auto (кандидат)
+
+- Один Android APK и один идентификатор пакета с двумя экранами: телефон и Android Auto.
+- На автомобильной карте — нативный выбор OSM или официального Яндекс Tiles API. Ключ Tiles API вводится в настройках телефона, отдельно от Яндекс JS API 3.0.
+- Яндекс Tiles API использует 512px тайлы и Web Mercator, защищённое хранение ключа, контроль запросов и возврат на OSM при ошибках.
+- Реальная приёмка автомобильной атрибуции и кликабельности логотипа остаётся обязательной перед стабильным релизом.
+- [Описание версии](docs/releases/0.15.0/RELEASE_NOTES.md) · [Проверки Android Auto](docs/android-auto/CHECKS.md).
+
 ## Версия 0.14.6 — корректное определение геопозиции
 
 - GPS Follow больше не запускает конкурирующий разовый запрос, который мог показать ошибку после получения координат.
@@ -211,7 +219,7 @@ cd android
 ./gradlew --no-daemon testMobileDebugUnitTest testAutoDevDebugUnitTest assembleMobileDebug assembleAutoDevDebug lintMobileDebug lintAutoDevDebug
 ```
 
-Результат для основной мобильной версии в ветке Android Auto: `android/app/build/outputs/apk/mobile/debug/app-mobile-debug.apk`; отдельная автомобильная сборка: `android/app/build/outputs/apk/autoDev/debug/app-autoDev-debug.apk`. Минимальная версия Android 7.
+Результат единой тестовой сборки для телефона и Android Auto: `android/app/build/outputs/apk/debug/app-debug.apk`. Минимальная версия Android 7.
 AndroidKeystore требует проверки на физическом устройстве/эмуляторе. Browser mock native bridge
 и JVM-тесты шифрования её не заменяют. [Проверки 0.7.3](docs/CHECKS-0.7.3.md), [проверки 0.7.1](docs/CHECKS-0.7.1.md), [проверки 0.7](docs/CHECKS-0.7.md), [проверки 0.6.1](docs/CHECKS-0.6.1.md), [проверки 0.6](docs/CHECKS-0.6.md).
 История: [проверки 0.5.1](docs/CHECKS-0.5.1.md), [проверки 0.5](docs/CHECKS-0.5.md).
@@ -253,4 +261,4 @@ CI проверяет Node/Python/Chromium, native unit tests, APK и lint. Ли
 
 ## Android Auto — тестовая ветка
 
-Android Auto интегрирован в `main` через [PR #52](https://github.com/mnevrov/wikimapia-reader/pull/52). Тестовый flavor AutoDev собирается из того же дерева, устанавливается отдельно от стабильного WikiReader Next и **не является автомобильным релизом**. Аппаратная приёмка до стабильной публикации отслеживается в [#51](https://github.com/mnevrov/wikimapia-reader/issues/51). [Документация](docs/android-auto/README.md).
+Android Auto интегрирован в единый Android-пакет 0.15.0. Отдельный flavor AutoDev больше не нужен. До аппаратной приёмки единая APK распространяется только как тестовая сборка. Аппаратная приёмка до стабильной публикации отслеживается в [#51](https://github.com/mnevrov/wikimapia-reader/issues/51). [Документация](docs/android-auto/README.md).
