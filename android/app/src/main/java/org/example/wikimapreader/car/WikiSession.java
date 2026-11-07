@@ -42,6 +42,7 @@ public final class WikiSession extends Session implements DefaultLifecycleObserv
   renderer=new MapRenderer(getCarContext(),view,new MapRenderer.Events(){
    @Override public void changed(){main.post(()->root.viewportChanged());}
    @Override public void tap(double lat,double lon){main.post(()->root.tap(lat,lon));}
+   @Override public void attribution(){main.post(()->root.openYandexAttribution());}
   });
   if(getCarContext().getCarAppApiLevel()>=7)
    getCarContext().getCarService(AppManager.class).setSurfaceCallback(renderer);
