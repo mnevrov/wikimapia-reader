@@ -23,17 +23,15 @@ final class TileSource implements AutoCloseable {
  private final ExecutorService io=Executors.newFixedThreadPool(2);
  private final YandexTileSettings settings;
  private final Runnable stateChanged;
- private final java.util.function.BooleanSupplier hostDark;
  private volatile boolean closed;
  private int epoch, lastRevision=-1;
  private boolean confirmedYandex;
  private long yandexBlockedUntil;
  private String failureReason="";
 
- TileSource(Context context,Runnable stateChanged,java.util.function.BooleanSupplier hostDark){
+ TileSource(Context context,Runnable stateChanged){
   settings=YandexTileSettings.get(context);
   this.stateChanged=stateChanged;
-  this.hostDark=hostDark;
   try{if(HttpResponseCache.getInstalled()==null)
     HttpResponseCache.install(new File(context.getCacheDir(),"osm-http"),32L*1024*1024);}
   catch(IOException ignored){}
@@ -49,21 +47,14 @@ final class TileSource implements AutoCloseable {
  /** Desired provider for scheduling; do not confuse it with confirmed displayed tiles. */
  synchronized String source(){
   syncSettings();
-  String provider=CarBasemapPolicy.effectiveProvider(
-    settings.selected(),hostDark.getAsBoolean(),settings.nightPolicy());
-  return "yandex".equals(provider)&&System.currentTimeMillis()>=yandexBlockedUntil
+  return "yandex".equals(settings.selected())&&System.currentTimeMillis()>=yandexBlockedUntil
    ?"yandex":"osm";
  }
  synchronized boolean displaysYandex(){
   return "yandex".equals(source())&&confirmedYandex;
  }
- synchronized boolean isNightOsm(){
-  return hostDark.getAsBoolean()&&"osm".equals(source());
- }
  synchronized String status(){
   syncSettings();
-  if(CarBasemapPolicy.nightFallback(settings.selected(),hostDark.getAsBoolean(),settings.nightPolicy()))
-   return "Ночь: OSM с цветовым фильтром (Яндекс Tiles — светлая схема)";
   if(!"yandex".equals(settings.selected()))return "Подложка: OpenStreetMap";
   if(System.currentTimeMillis()<yandexBlockedUntil)
    return "Яндекс: "+failureReason+" · резервная OSM";

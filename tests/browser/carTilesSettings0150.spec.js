@@ -4,7 +4,7 @@ import {screen,tiles} from './helpers.js';
 async function nativeCarTiles(page){
  await page.addInitScript(()=>{
   window.CapacitorCustomPlatform={name:'android'};
-  window.__mockCarTiles={configured:false,provider:'osm',key:null,nightPolicy:'auto'};
+  window.__mockCarTiles={configured:false,provider:'osm',key:null};
   const plugin=(name,methods)=>({
    name,methods:methods.map(method=>({name:method,rtype:method==='addListener'?'callback':'promise'}))
   });
@@ -13,19 +13,18 @@ async function nativeCarTiles(page){
     plugin('CredentialsVault',['load','save','clear']),
     plugin('Appearance',['apply']),
     plugin('App',['addListener','removeListener','minimizeApp']),
-    plugin('CarData',['tilesStatus','tilesSaveKey','tilesSelect','tilesSelectNightPolicy','tilesClearKey','gpsStatus','sync','areas'])
+    plugin('CarData',['tilesStatus','tilesSaveKey','tilesSelect','tilesClearKey','gpsStatus','sync','areas'])
    ],
    nativePromise:async(name,method,args)=>{
     if(name==='CredentialsVault')return method==='load'?{key:null}:{};
     if(name==='CarData'){
      const state=window.__mockCarTiles;
      switch(method){
-      case 'tilesStatus':return{configured:state.configured,provider:state.provider,nightPolicy:state.nightPolicy};
+      case 'tilesStatus':return{configured:state.configured,provider:state.provider};
       case 'tilesSaveKey':state.key=args.key;state.configured=true;return{};
       case 'tilesSelect':
        if(args.provider==='yandex'&&!state.configured)throw Error('No Tiles API key');
        state.provider=args.provider;return{};
-      case 'tilesSelectNightPolicy':state.nightPolicy=args.policy;return{};
       case 'tilesClearKey':state.key=null;state.configured=false;state.provider='osm';return{};
       case 'gpsStatus':return{running:false};
       case 'sync':return{favorites:[]};
@@ -76,14 +75,6 @@ test('Android Auto key controls stay separated and responsive before and after s
  await expect(section.getByRole('button',{name:'Удалить сохранённый ключ'})).toBeVisible();
  await section.getByRole('button',{name:'Яндекс Карты'}).click();
  await expect(section.getByRole('button',{name:'Яндекс Карты'})).toHaveAttribute('aria-pressed','true');
- const nightSelect=section.locator('#car-night-policy');
- await expect(nightSelect).toHaveValue('auto');
- await nightSelect.selectOption('keep_yandex');
- await expect(nightSelect).toHaveValue('keep_yandex');
- await expect(section.getByText(/Яндекс остаётся светлым/)).toBeVisible();
- await nightSelect.selectOption('auto');
- await expect(nightSelect).toHaveValue('auto');
-
  await expect(section.locator('#car-tiles-api-key')).toHaveValue('');
  for(const width of [320,390]){
   await page.setViewportSize({width,height:760});

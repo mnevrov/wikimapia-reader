@@ -136,7 +136,6 @@ public final class WikiSession extends Session implements DefaultLifecycleObserv
   if(location!=null)location.removeUpdates(this);
  }
  @Override public void onCarConfigurationChanged(@NonNull Configuration config){
-  super.onCarConfigurationChanged(config);
   if(renderer!=null)renderer.draw();
   if(root!=null)root.refresh();
  }

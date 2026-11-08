@@ -21,11 +21,6 @@ public final class YandexTileSettingsTest {
    assertTrue(settings.configured());
    settings.select("yandex");
    assertEquals("yandex",settings.selected());
-   settings.selectNightPolicy(CarBasemapPolicy.KEEP_YANDEX);
-   assertEquals(CarBasemapPolicy.KEEP_YANDEX,settings.nightPolicy());
-   settings.selectNightPolicy(CarBasemapPolicy.AUTO_NIGHT);
-   assertEquals(CarBasemapPolicy.AUTO_NIGHT,settings.nightPolicy());
-
    String record=ctx.getSharedPreferences("car-tiles-v1",Context.MODE_PRIVATE)
     .getString("key","");
    assertFalse("Plaintext credential must not be stored",record.contains(fake));

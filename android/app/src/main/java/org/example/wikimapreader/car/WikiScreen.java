@@ -233,17 +233,6 @@ public final class WikiScreen extends Screen implements DefaultLifecycleObserver
     list.addItem(new Row.Builder().setTitle("Яндекс Карты недоступны")
      .addText(settings.configured()?"Требуется Car App API 7+":"Добавьте Tiles API ключ в настройках телефона").build());
    }
-   list.addItem(new Row.Builder()
-    .setTitle("Ночь: "+(CarBasemapPolicy.AUTO_NIGHT.equals(settings.nightPolicy())?"стилизация OSM":"оставить Яндекс"))
-    .addText("Нажмите, чтобы сменить режим")
-    .setOnClickListener(()->{
-     String next=CarBasemapPolicy.AUTO_NIGHT.equals(settings.nightPolicy())
-       ?CarBasemapPolicy.KEEP_YANDEX:CarBasemapPolicy.AUTO_NIGHT;
-     settings.selectNightPolicy(next);
-     if(session.renderer!=null)session.renderer.draw();
-     WikiScreen.this.invalidate();
-     invalidate();
-    }).build());
    list.addItem(new Row.Builder().setTitle("Обновить контуры")
     .setOnClickListener(()->{getScreenManager().pop();load(false,true);}).build());
    list.addItem(new Row.Builder().setTitle("Открыть Яндекс Карты")

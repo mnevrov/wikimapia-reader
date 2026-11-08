@@ -86,17 +86,6 @@ public final class YandexTileSettings {
   cachedKey=null;settingsRevision++;
   try{keyStore().deleteEntry(ALIAS);}catch(Exception ignored){}
  }
- /** Night mode controls provider selection, not the contents of Yandex tiles. */
- public synchronized String nightPolicy(){
-  String policy=preferences.getString("nightPolicy",CarBasemapPolicy.AUTO_NIGHT);
-  return CarBasemapPolicy.validNightPolicy(policy)?policy:CarBasemapPolicy.AUTO_NIGHT;
- }
- public synchronized void selectNightPolicy(String policy){
-  if(!CarBasemapPolicy.validNightPolicy(policy))throw new IllegalArgumentException("Unsupported night policy");
-  if(!preferences.edit().putString("nightPolicy",policy).commit())
-   throw new IllegalStateException("Unable to save night policy");
-  settingsRevision++;
- }
  public synchronized String selected(){
   return "yandex".equals(preferences.getString("provider","osm"))&&configured()?"yandex":"osm";
  }

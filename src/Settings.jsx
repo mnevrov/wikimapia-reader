@@ -22,13 +22,13 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
   const [carGpsBusy,setCarGpsBusy]=useState(false);
   const [carGpsMessage,setCarGpsMessage]=useState('');
   const [tilesDraft,setTilesDraft]=useState('');
-  const [carTiles,setCarTiles]=useState({configured:false,provider:'osm',nightPolicy:'auto'});
+  const [carTiles,setCarTiles]=useState({configured:false,provider:'osm'});
   const [tilesMessage,setTilesMessage]=useState('');
   const [tilesBusy,setTilesBusy]=useState(false);
   useEffect(()=>{
     if(!hasCar())return;
     let alive=true;
-    car.tilesStatus().then(state=>{if(alive)setCarTiles({configured:Boolean(state.configured),provider:state.provider||'osm',nightPolicy:state.nightPolicy||'auto'});})
+    car.tilesStatus().then(state=>{if(alive)setCarTiles({configured:Boolean(state.configured),provider:state.provider||'osm'});})
       .catch(()=>{if(alive)setTilesMessage('Не удалось прочитать настройки автомобильной карты');});
     return()=>{alive=false;};
   },[]);
@@ -38,7 +38,7 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
     try{
       await car.tilesSaveKey({key:tilesDraft.trim()});setTilesDraft('');
       const state=await car.tilesStatus();
-      setCarTiles({configured:Boolean(state.configured),provider:state.provider||'osm',nightPolicy:state.nightPolicy||'auto'});
+      setCarTiles({configured:Boolean(state.configured),provider:state.provider||'osm'});
       setTilesMessage('Ключ Tiles API зашифрован и сохранён на устройстве');
     }catch{setTilesMessage('Не удалось сохранить ключ. Проверьте формат ключа Tiles API.');}
     finally{setTilesBusy(false);}
@@ -48,21 +48,9 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
     setTilesBusy(true);
     try{
       await car.tilesSelect({provider});const state=await car.tilesStatus();
-      setCarTiles({configured:Boolean(state.configured),provider:state.provider||'osm',nightPolicy:state.nightPolicy||'auto'});
+      setCarTiles({configured:Boolean(state.configured),provider:state.provider||'osm'});
       setTilesMessage('Подложка Android Auto: '+(provider==='yandex'?'Яндекс Карты':'OpenStreetMap')+'. При необходимости переподключите автомобиль.');
     }catch{setTilesMessage('Источник не переключён. Для Яндекса нужен отдельный Tiles API ключ.');}
-    finally{setTilesBusy(false);}
-  };
-  const tilesNightSelect=async policy=>{
-    if(!hasCar()||tilesBusy||policy===carTiles.nightPolicy)return;
-    setTilesBusy(true);
-    try{
-      await car.tilesSelectNightPolicy({policy});
-      setCarTiles(previous=>({...previous,nightPolicy:policy}));
-      setTilesMessage(policy==='auto'
-        ?'Ночью OSM с локальной цветовой стилизацией; днём — выбранная подложка.'
-        :'Яндекс остаётся светлым даже ночью. Изменение применяется в автомобиле.');
-    }catch{setTilesMessage('Не удалось изменить ночной режим карты');}
     finally{setTilesBusy(false);}
   };
   const tilesClear=async()=>{
@@ -70,7 +58,7 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
     setTilesBusy(true);
     try{
       await car.tilesClearKey();
-      setCarTiles(previous=>({...previous,configured:false,provider:'osm'}));setTilesDraft('');
+      setCarTiles({configured:false,provider:'osm'});setTilesDraft('');
       setTilesMessage('Ключ Tiles API удалён, автомобиль использует OSM');
     }catch{setTilesMessage('Не удалось удалить ключ Tiles API');}
     finally{setTilesBusy(false);}
@@ -164,15 +152,6 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
           ?'Ключ сохранён · выбрана '+(carTiles.provider==='yandex'?'подложка Яндекса':'OpenStreetMap')
           :'Для Яндекса нужен отдельный ключ Tiles API'}
       </p>
-      <div className="car-night-policy">
-        <label htmlFor="car-night-policy">Ночной режим</label>
-        <select id="car-night-policy" disabled={tilesBusy} value={carTiles.nightPolicy}
-          onChange={e=>tilesNightSelect(e.target.value)}>
-          <option value="auto">Авто: ночью стилизация OSM</option>
-          <option value="keep_yandex">Всегда выбранная подложка</option>
-        </select>
-        <p className="helper">Tiles API Яндекса предоставляет только светлую схему. Автоматический режим ночью перекрашивает стандартные тайлы OSM. Это временный фильтр, а не отдельный полноценный ночной стиль. Яндекс днём остаётся без изменений.</p>
-      </div>
       <div className="car-tiles-credentials">
         <label htmlFor="car-tiles-api-key">Ключ Яндекс Tiles API</label>
         <input id="car-tiles-api-key" type="password" autoComplete="off" spellCheck="false" autoCapitalize="none"
