@@ -1,3 +1,4 @@
+import {expandSettings} from './helpers.js';
 import {test,expect} from '@playwright/test';
 import {screen,tiles} from './helpers.js';
 
@@ -59,7 +60,7 @@ async function assertLayout(page){
 
 test('Android Auto key controls stay separated and responsive before and after saving',async({page})=>{
  await tiles(page);await nativeCarTiles(page);
- await page.goto('/');await screen(page,'Настройки');
+ await page.goto('/');await screen(page,'Настройки');await expandSettings(page,'android-auto');await expandSettings(page,'car-key');
  const section=page.locator('.car-tiles-settings');
  await expect(section).toBeVisible();
  await expect(section.getByText('Для Яндекса нужен отдельный ключ Tiles API')).toBeVisible();
