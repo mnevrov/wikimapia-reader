@@ -8,6 +8,10 @@ tag=${1:?tag required}
 [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
 version=${tag#v}
 apk="WikiReader-Next-$version.apk"
+# A signed beta is a GitHub prerelease, never a Latest/stable release.
+[[ ! -f "docs/releases/$version/HOLD_RELEASE.md" ]] || { echo "Stable release held"; exit 1; }
+beta=false
+if [[ -f "docs/releases/$version/BETA_RELEASE.md" ]]; then beta=true; fi
 cd release-dist
 sha256sum --check SHA256SUMS.txt
 # Never attach a newly built APK to a tag that points at different source.
@@ -34,7 +38,11 @@ if gh release view "$tag" --json isDraft,targetCommitish > existing.json 2>/dev/
     [[ "$target" == "$RELEASE_TARGET_SHA" ]] || { echo 'Existing draft has different source'; exit 1; }
   fi
 else
-  gh release create "$tag" --target "$RELEASE_TARGET_SHA" --draft --title "WikiReader Next $version" --notes-file RELEASE_NOTES.md
+  if [[ "$beta" == true ]]; then
+    gh release create "$tag" --target "$RELEASE_TARGET_SHA" --draft --prerelease --title "WikiReader Next $version Beta" --notes-file RELEASE_NOTES.md
+  else
+    gh release create "$tag" --target "$RELEASE_TARGET_SHA" --draft --title "WikiReader Next $version" --notes-file RELEASE_NOTES.md
+  fi
   draft=true
 fi
 if [[ "$draft" == true ]]; then
@@ -44,5 +52,11 @@ mkdir -p verify-download
 gh release download "$tag" --pattern "$apk" --pattern SHA256SUMS.txt --dir verify-download
 cmp SHA256SUMS.txt verify-download/SHA256SUMS.txt
 (cd verify-download && sha256sum --check SHA256SUMS.txt)
-if [[ "$draft" == true ]]; then gh release edit "$tag" --draft=false --latest; fi
+if [[ "$draft" == true ]]; then
+  if [[ "$beta" == true ]]; then
+    gh release edit "$tag" --draft=false --prerelease
+  else
+    gh release edit "$tag" --draft=false --latest
+  fi
+fi
 gh release view "$tag" --json url,assets --jq '{url:.url,assets:[.assets[]|{name,url}]}'
