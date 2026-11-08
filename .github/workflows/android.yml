@@ -204,6 +204,9 @@ jobs:
           if tuple(map(int,current.split('.')))<=tuple(map(int,old.split('.'))):
               print(f'No version increase: {old} -> {current}')
               raise SystemExit(0)
+          if pathlib.Path(f'docs/releases/{current}/HOLD_RELEASE.md').is_file():
+              print(f'Stable release {current} held: Android Auto host acceptance pending')
+              raise SystemExit(0)
           assert pathlib.Path(f'docs/releases/{current}/RELEASE_NOTES.md').is_file(), 'Release notes missing'
           lock=json.loads(pathlib.Path('package-lock.json').read_text())
           assert lock['version']==current and lock['packages']['']['version']==current, 'Lock version mismatch'
