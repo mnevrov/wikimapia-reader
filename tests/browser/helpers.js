@@ -1,9 +1,17 @@
 import {expect} from '@playwright/test';
+export async function expandSettings(page,id){
+ const section=page.locator('[data-settings-section="'+id+'"]');
+ await expect(section).toBeVisible();
+ if(await section.getAttribute('open')===null){
+  await section.locator(':scope > summary').click();
+ }
+ return section;
+}
 export async function map(page){await page.getByRole('navigation').getByRole('button',{name:'Карта',exact:true}).click();}
 export async function screen(page,name){await page.getByRole('navigation').getByRole('button',{name,exact:true}).click();}
 export async function connect(page,key='local-test'){
  if(!page._siteBridge)await page.route('https://wikimapia.org/**',r=>r.abort());
- await screen(page,'Настройки');await page.locator('#api-key').fill(key);await page.getByRole('button',{name:'Сохранить и подключить'}).click();await expect(page.locator('.app-screen')).toHaveCount(0);
+ await screen(page,'Настройки');await expandSettings(page,'connection');await page.locator('#api-key').fill(key);await page.getByRole('button',{name:'Сохранить и подключить'}).click();await expect(page.locator('.app-screen')).toHaveCount(0);
 }
 export async function openId(page,id=55){await screen(page,'Поиск');await page.locator('.id-disclosure summary').click();await page.locator('#place-id').fill(String(id));await page.getByRole('button',{name:'Открыть по ID',exact:true}).click();}
 export async function tiles(page){await page.addInitScript(()=>localStorage.setItem('wikireader-demo-mode','true'));await page.route('https://wikimapia.org/**',r=>r.abort());await page.route('https://tile.openstreetmap.org/**',r=>r.abort());await page.route('https://photos.wikimapia.org/**',r=>r.abort());}
