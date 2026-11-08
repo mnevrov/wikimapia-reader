@@ -234,7 +234,7 @@ public final class WikiScreen extends Screen implements DefaultLifecycleObserver
      .addText(settings.configured()?"Требуется Car App API 7+":"Добавьте Tiles API ключ в настройках телефона").build());
    }
    list.addItem(new Row.Builder()
-    .setTitle("Ночь: "+(CarBasemapPolicy.AUTO_NIGHT.equals(settings.nightPolicy())?"тёмная OSM":"оставить Яндекс"))
+    .setTitle("Ночь: "+(CarBasemapPolicy.AUTO_NIGHT.equals(settings.nightPolicy())?"стилизация OSM":"оставить Яндекс"))
     .addText("Нажмите, чтобы сменить режим")
     .setOnClickListener(()->{
      String next=CarBasemapPolicy.AUTO_NIGHT.equals(settings.nightPolicy())
