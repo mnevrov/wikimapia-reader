@@ -1,3 +1,4 @@
+import {expandSettings} from './helpers.js';
 import {test,expect} from '@playwright/test';
 import {connect,openId,screen} from './helpers.js';
 const photo='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg==';
@@ -37,6 +38,6 @@ test('failed media download retains partial text and allows removal',async({page
   await expect(page.locator('.offline-card-status')).toContainText('частично');
   await page.getByRole('button',{name:'Удалить офлайн-копию'}).click();
   await expect(page.getByRole('button',{name:'Сохранить для чтения без сети'})).toBeVisible();
-  await screen(page,'Настройки');
+  await screen(page,'Настройки');await expandSettings(page,'storage');
   await expect(page.getByRole('region',{name:'Офлайн-хранилище'})).toContainText('0 объектов');
 });
