@@ -16,18 +16,19 @@ final class CarPlaceCard {
  final long id;
  final String title,description;
  final List<Comment> comments;
- final int photoCount;
+ final int photoCount,commentCount;
  final boolean photosKnown,commentsKnown;
 
  private CarPlaceCard(long id,String title,String description,List<Comment> comments,
-                      int photoCount,boolean photosKnown,boolean commentsKnown) {
+                      int photoCount,int commentCount,boolean photosKnown,boolean commentsKnown) {
   this.id=id;this.title=title;this.description=description;
   this.comments=Collections.unmodifiableList(comments);
-  this.photoCount=photoCount;this.photosKnown=photosKnown;this.commentsKnown=commentsKnown;
+  this.photoCount=photoCount;this.commentCount=commentCount;
+  this.photosKnown=photosKnown;this.commentsKnown=commentsKnown;
  }
  static CarPlaceCard fallback(Place place) {
   return new CarPlaceCard(place.id,place.title,clean(place.description,6000),
-   new ArrayList<>(),0,false,false);
+   new ArrayList<>(),0,0,false,false);
  }
  static CarPlaceCard from(JSONObject payload,Place fallback) {
   JSONObject place=payload.optJSONObject("place");
@@ -54,7 +55,10 @@ final class CarPlaceCard {
    String date=clean(value(c,"dateLabel","date_label"),100);
    comments.add(new Comment(author.isEmpty()?"Участник Wikimapia":author,text,date));
   }
-  return new CarPlaceCard(id,title,description,comments,photos==null?0:photos.length(),photosKnown,commentsKnown);
+  int photoTotal=photos==null?0:photos.length(),commentTotal=rawComments==null?0:rawComments.length();
+  return new CarPlaceCard(id,title,description,comments,
+   Math.max(photoTotal,place.optInt("photos_count",photoTotal)),
+   Math.max(comments.size(),place.optInt("comments_count",commentTotal)),photosKnown,commentsKnown);
  }
  private static String value(JSONObject o,String... names){
   for(String name:names){Object value=o.opt(name);if(value instanceof String&&!((String)value).isEmpty())return (String)value;}
@@ -88,7 +92,7 @@ final class CarPlaceCard {
  }
  String mediaSummary(){
   String photo=photosKnown?("Фото: "+photoCount):"Фото: нет данных";
-  String comment=commentsKnown?("Комментарии: "+comments.size()):"Комментарии: нет данных";
+  String comment=commentsKnown?("Комментарии: "+commentCount):"Комментарии: нет данных";
   return photo+" · "+comment;
  }
 }
