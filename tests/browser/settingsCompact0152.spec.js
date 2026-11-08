@@ -26,13 +26,13 @@ test('everyday map controls appear first; infrequent groups start collapsed',asy
  }
  await expect(page.locator('#api-key')).not.toBeVisible();
  await expect(page.locator('.cache-stats')).not.toBeVisible();
- await expect(page.getByRole('button',{name:'Открыть деморежим'})).not.toBeVisible();
+ await expect(page.getByRole('button',{name:/Открыть деморежим|Вернуться к реальным данным/})).not.toBeVisible();
  await expandSettings(page,'connection');
  await expect(page.locator('#api-key')).toBeVisible();
  await expandSettings(page,'storage');
  await expect(page.locator('.cache-settings')).toBeVisible();
  await expandSettings(page,'advanced');
- await expect(page.getByRole('button',{name:'Открыть деморежим'})).toBeVisible();
+ await expect(page.getByRole('button',{name:/Открыть деморежим|Вернуться к реальным данным/})).toBeVisible();
 });
 
 test('map source credentials are progressive disclosure and remain accessible by keyboard',async({page})=>{
