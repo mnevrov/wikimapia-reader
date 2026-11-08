@@ -41,6 +41,7 @@ repositories {
 dependencies {
     implementation "androidx.car.app:app:1.8.0-rc01"
     implementation "androidx.car.app:app-projected:1.8.0-rc01"
+    implementation "org.jsoup:jsoup:1.18.3"
     testImplementation "androidx.car.app:app-testing:1.8.0-rc01"
     testImplementation "org.robolectric:robolectric:4.16"
     implementation fileTree(include: ['*.jar'], dir: 'libs')
