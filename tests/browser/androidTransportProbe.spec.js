@@ -1,3 +1,4 @@
+import {expandSettings} from './helpers.js';
 import {test,expect} from '@playwright/test';
 import {nativeVault,screen,tiles} from './helpers.js';
 
@@ -16,7 +17,7 @@ test('explicit Android transport diagnostics make only two spaced requests and n
     return r.fulfill({json:{folder:[{id:77,title:'Test',polygon}],found:1}});
   });
   await page.goto('/');
-  await screen(page,'Настройки');
+  await screen(page,'Настройки');await expandSettings(page,'advanced');
   const panel=page.getByLabel('Проверка сетевого подключения Android');
   const run=panel.getByRole('button',{name:'Проверить два HTTP-транспорта'});
   await expect(run).toBeVisible();
@@ -59,7 +60,7 @@ test('known API quota code is shown safely and second request is skipped',async(
     return route.fulfill({json:{debug:{code:1004,message:'Key limit has been reached; private-test-api-key'}}});
   });
   await page.goto('/');
-  await screen(page,'Настройки');
+  await screen(page,'Настройки');await expandSettings(page,'advanced');
   const panel=page.getByLabel('Проверка сетевого подключения Android');
   await panel.getByRole('button',{name:'Проверить два HTTP-транспорта'}).click();
   await expect(panel.getByText('код API 1004',{exact:false})).toBeVisible({timeout:25000});
