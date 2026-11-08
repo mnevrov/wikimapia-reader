@@ -68,7 +68,7 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
     if(!hasCar())return;
     let alive=true;
     car.gpsStatus().then(r=>{if(alive)setCarGpsEnabled(Boolean(r.running));})
-      .catch(()=>{if(alive)setCarGpsMessage('Статус GPS AutoDev не получен');});
+      .catch(()=>{if(alive)setCarGpsMessage('Статус GPS Android Auto не получен');});
     return()=>{alive=false;};
   },[]);
   const toggleCarGps=async()=>{
@@ -90,7 +90,7 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
           :'Не удалось запустить GPS. Проверьте разрешение местоположения и ограничения батареи.');
       }
     }catch{
-      setCarGpsMessage('Разрешите геопозицию и запустите GPS из открытого AutoDev на телефоне');
+      setCarGpsMessage('Разрешите геопозицию и запустите GPS из открытого WikiReader на телефоне');
     }finally{setCarGpsBusy(false);}
   };
 
@@ -133,32 +133,43 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
     <section className="settings-group"><h2>Карта</h2><label className="setting-row" htmlFor="auto-load"><span><strong>Автозагрузка области</strong><small>После остановки карты, с учётом лимита API</small></span><input id="auto-load" type="checkbox" checked={auto} onChange={e=>setAuto(e.target.checked)}/></label><p className="helper">Объекты загружаются при перемещении карты. В плотных областях после первых трёх страниц появится кнопка «Догрузить область». Одно нажатие запустит последовательную загрузку с прогрессом.</p><label className="density-setting" htmlFor="density-setting">Плотность контуров<select id="density-setting" value={density} onChange={e=>setDensity(e.target.value)}><option value="auto">Автоматически</option><option value="detailed">Подробно</option><option value="calm">Спокойный вид</option></select></label><p className="helper">«Автоматически» уменьшает контраст контуров в плотных областях. Объекты остаются доступными для выбора.</p></section>
     {hasCar()&&<section className="settings-group" aria-label="Android Auto GPS Follow">
       <h2>GPS Follow в Android Auto</h2>
-      <p className="helper">Android Auto работает в фоновом режиме телефона. Для надёжного слежения во время движения запустите GPS-службу здесь, пока AutoDev открыт на телефоне, затем подключите автомобиль. Показывается системное уведомление о геолокации.</p>
+      <p className="helper">Android Auto работает в фоновом режиме телефона. Для надёжного слежения во время движения запустите GPS-службу здесь, пока WikiReader открыт на телефоне, затем подключите автомобиль. Показывается системное уведомление о геолокации.</p>
       <button type="button" className="secondary" onClick={toggleCarGps} disabled={carGpsBusy}>
         {carGpsBusy?'Применяем…':carGpsEnabled?'Остановить GPS Follow для Android Auto':'Включить GPS Follow для Android Auto'}
       </button>
       <p className="helper" role="status">{carGpsMessage||(carGpsEnabled?'GPS-служба включена':'GPS-служба выключена')}</p>
       <p className="helper">При отключении GPS службы или завершении поездки можно остановить её здесь. Если обновлений нет, проверьте разрешение геолокации и экономию энергии Android.</p>
     </section>}
-    {hasCar()&&<section className="settings-group" aria-label="Подложка Android Auto">
+    {hasCar()&&<section className="settings-group car-tiles-settings" aria-label="Подложка Android Auto">
       <h2>Подложка Android Auto</h2>
-      <p className="helper">WikiReader теперь устанавливается одним приложением на телефон и Android Auto. У автомобильного экрана собственный нативный источник. Для Яндекс Карт нужен отдельный <strong>Tiles API</strong> ключ: ключ JavaScript API 3.0 ниже здесь не подходит. Обязательно соблюдайте условия использования Яндекс Карт.</p>
-      <div className="basemap-choice" role="group" aria-label="Источник автомобильной карты">
-        <button type="button" aria-pressed={carTiles.provider==='osm'} disabled={tilesBusy} onClick={()=>tilesSelect('osm')}>OSM</button>
-        <button type="button" aria-pressed={carTiles.provider==='yandex'} disabled={tilesBusy||!carTiles.configured} onClick={()=>tilesSelect('yandex')}>Яндекс Tiles</button>
+      <p className="helper car-tiles-intro">Выберите карту для экрана автомобиля. Настройки подложки на телефоне находятся ниже.</p>
+      <div className="basemap-choice car-tiles-choice" role="group" aria-label="Источник автомобильной карты">
+        <button type="button" aria-pressed={carTiles.provider==='osm'} disabled={tilesBusy} onClick={()=>tilesSelect('osm')}>OpenStreetMap</button>
+        <button type="button" aria-pressed={carTiles.provider==='yandex'} disabled={tilesBusy||!carTiles.configured} onClick={()=>tilesSelect('yandex')}>Яндекс Карты</button>
       </div>
-      <label htmlFor="car-tiles-api-key">Ключ Яндекс Tiles API</label>
-      <input id="car-tiles-api-key" type="password" autoComplete="off" spellCheck="false" autoCapitalize="none"
-        maxLength={128} value={tilesDraft} placeholder={carTiles.configured?'Новый ключ (старый сохранён)':'Введите ключ Tiles API'}
-        onChange={e=>setTilesDraft(e.target.value)}/>
-      <div className="split-actions">
-        <button type="button" className="secondary" disabled={tilesBusy||!tilesDraft.trim()} onClick={tilesSave}>Сохранить ключ</button>
-        {carTiles.configured&&<button type="button" className="text-button" disabled={tilesBusy} onClick={tilesClear}>Удалить ключ Tiles API</button>}
+      <p className="car-tiles-current">
+        {carTiles.configured
+          ?'Ключ сохранён · выбрана '+(carTiles.provider==='yandex'?'подложка Яндекса':'OpenStreetMap')
+          :'Для Яндекса нужен отдельный ключ Tiles API'}
+      </p>
+      <div className="car-tiles-credentials">
+        <label htmlFor="car-tiles-api-key">Ключ Яндекс Tiles API</label>
+        <input id="car-tiles-api-key" type="password" autoComplete="off" spellCheck="false" autoCapitalize="none"
+          maxLength={128} value={tilesDraft}
+          placeholder={carTiles.configured?'Новый ключ (старый сохранён)':'Вставьте ключ Tiles API'}
+          onChange={e=>setTilesDraft(e.target.value)}/>
+        <button type="button" className="secondary car-tiles-save" disabled={tilesBusy||!tilesDraft.trim()} onClick={tilesSave}>
+          {tilesBusy?'Сохраняем…':'Сохранить ключ'}
+        </button>
+        {carTiles.configured&&<button type="button" className="text-button car-tiles-remove" disabled={tilesBusy} onClick={tilesClear}>Удалить сохранённый ключ</button>}
+        {tilesMessage&&<p className="helper car-tiles-message" role="status">{tilesMessage}</p>}
       </div>
-      <p className="helper">{carTiles.configured?'Ключ сохранён через Android Keystore; его значение не читается в интерфейс.':'Ключ не настроен — в автомобиле доступна OSM.'}</p>
-      <p className="helper" role="status">{tilesMessage}</p>
-      <p className="helper">Яндекс Tiles API: официальная схема, Web Mercator, изображения 512 px. Логотип и ссылка на Яндекс Карты должны оставаться видимыми и доступными на автомобильном экране. Возможность перехода нужно проверить на реальном Android Auto.</p>
-      <a className="inline-link" href="https://yandex.ru/maps-api/docs/tiles-api/quickstart.html" target="_blank" rel="noopener noreferrer">Получить ключ Tiles API <Icon name="external" size={16}/></a>
+      <details className="car-tiles-help">
+        <summary>Как получить ключ и условия использования</summary>
+        <p className="helper">Для автомобиля нужен ключ <strong>Yandex Tiles API</strong>. Ключ JavaScript API 3.0 для карты телефона сюда не подходит. Ключ автомобиля хранится в Android Keystore и не показывается повторно.</p>
+        <p className="helper">Логотип Яндекса должен быть виден и вести на Яндекс Карты; работу ссылки ещё необходимо подтвердить на автомобильном экране.</p>
+        <a className="inline-link" href="https://yandex.ru/maps-api/docs/tiles-api/quickstart.html" target="_blank" rel="noopener noreferrer">Получить ключ Tiles API <Icon name="external" size={16}/></a>
+      </details>
     </section>}
     <section className="settings-group yandex-settings" aria-label="Картографическая подложка">
       <h2>Подложка карты</h2>
