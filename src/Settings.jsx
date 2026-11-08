@@ -60,7 +60,7 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
       await car.tilesSelectNightPolicy({policy});
       setCarTiles(previous=>({...previous,nightPolicy:policy}));
       setTilesMessage(policy==='auto'
-        ?'Ночью используется тёмная OSM; днём — выбранная подложка.'
+        ?'Ночью OSM с локальной цветовой стилизацией; днём — выбранная подложка.'
         :'Яндекс остаётся светлым даже ночью. Изменение применяется в автомобиле.');
     }catch{setTilesMessage('Не удалось изменить ночной режим карты');}
     finally{setTilesBusy(false);}
@@ -168,10 +168,10 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
         <label htmlFor="car-night-policy">Ночной режим</label>
         <select id="car-night-policy" disabled={tilesBusy} value={carTiles.nightPolicy}
           onChange={e=>tilesNightSelect(e.target.value)}>
-          <option value="auto">Авто: ночью тёмная OSM</option>
+          <option value="auto">Авто: ночью стилизация OSM</option>
           <option value="keep_yandex">Всегда выбранная подложка</option>
         </select>
-        <p className="helper">Tiles API Яндекса предоставляет только светлую схему. Автоматический режим использует тёмную OSM по сигналу Android Auto, сохраняя Яндекс днём.</p>
+        <p className="helper">Tiles API Яндекса предоставляет только светлую схему. Автоматический режим ночью перекрашивает стандартные тайлы OSM. Это временный фильтр, а не отдельный полноценный ночной стиль. Яндекс днём остаётся без изменений.</p>
       </div>
       <div className="car-tiles-credentials">
         <label htmlFor="car-tiles-api-key">Ключ Яндекс Tiles API</label>
