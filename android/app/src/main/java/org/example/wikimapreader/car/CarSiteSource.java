@@ -277,7 +277,8 @@ final class CarSiteSource {
   JSONObject place=new JSONObject().put("id",id).put("title",title).put("description",description)
    .put("photos",photos).put("comments",comments)
    .put("photos_count",photoCount).put("comments_count",commentCount).put("source","site");
-  return new JSONObject().put("place",place).put("blocks",blocks).put("source","site");
+  // Keep the legacy top-level website response for the existing live Auto protocol.
+  return place.put("blocks",blocks);
  }
  private static String photoUrl(String candidate){
   try {
