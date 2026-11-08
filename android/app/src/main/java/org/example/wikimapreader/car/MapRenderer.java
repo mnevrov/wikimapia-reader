@@ -12,7 +12,7 @@ final class MapRenderer implements SurfaceCallback,AutoCloseable {
  private volatile boolean closed;private Surface surface;private int width=800,height=480,surfaceDpi=160;private Rect visible=new Rect(),stable=new Rect();
  private List<Place> places=Collections.emptyList();private long selected;private double[] gps;
  private volatile RectF attributionBounds=new RectF();
- MapRenderer(CarContext c,Viewport v,Events e){context=c;view=v;events=e;tiles=new TileSource(c,e::tilesState);}
+ MapRenderer(CarContext c,Viewport v,Events e){context=c;view=v;events=e;tiles=new TileSource(c,e::tilesState,c::isDarkMode);}
  String tileStatus(){return tiles.status();}
  synchronized void update(List<Place> p,long selected,double[] gps){places=new ArrayList<>(p);this.selected=selected;this.gps=gps;draw();}
  @Override public synchronized void onSurfaceAvailable(SurfaceContainer c){if(surface!=null&&surface!=c.getSurface())surface.release();surface=c.getSurface();width=c.getWidth();height=c.getHeight();surfaceDpi=c.getDpi();draw();}
@@ -42,7 +42,11 @@ final class MapRenderer implements SurfaceCallback,AutoCloseable {
  void zoom(int delta){synchronized(view){view.zoom=Math.max(10,Math.min(19,view.zoom+delta));}events.changed();draw();}
  void draw(){if(closed||!queued.compareAndSet(false,true))return;try{render.execute(()->{queued.set(false);if(!closed)frame();});}catch(RejectedExecutionException ignored){queued.set(false);}}
  private synchronized void frame(){if(surface==null||!surface.isValid())return;Viewport v;synchronized(view){v=new Viewport(view.lat,view.lon,view.zoom);}Canvas c=null;try{c=surface.lockCanvas(null);boolean dark=context.isDarkMode();c.drawColor(dark?Color.rgb(23,29,34):Color.rgb(230,235,238));Rect a=area();c.save();c.translate(a.left,a.top);int w=a.width(),h=a.height(),z=(int)Math.floor(v.zoom),n=1<<z;double tileSize=256*Math.pow(2,v.zoom-z),cx=Geo.x(v.lon)*n,cy=Geo.y(v.lat)*n;Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
- if(dark){ColorMatrix matrix=new ColorMatrix(new float[]{.45f,0,0,0,0,0,.48f,0,0,0,0,0,.52f,0,0,0,0,0,1,0});paint.setColorFilter(new ColorMatrixColorFilter(matrix));}
+ // Darken only OSM with a contrast-preserving, readable night palette.
+ // Yandex Tiles API serves a light scheme; the old 0.45x color matrix made
+ // its labels and roads washed out and altered the provider's raster data.
+ if(tiles.isNightOsm())
+  paint.setColorFilter(new ColorMatrixColorFilter(new ColorMatrix(CarBasemapPolicy.osmNightMatrix())));
  int[] xs=tileSpan(width,a.left,w,cx,tileSize),ys=tileSpan(height,a.top,h,cy,tileSize);
  // Request the centre of the visible map first; a small pending queue must
  // not get filled with covered/offscreen outer-edge tiles.
@@ -62,17 +66,17 @@ final class MapRenderer implements SurfaceCallback,AutoCloseable {
  if(tiles.displaysYandex()){
   // Small, correctly proportioned logotype within the safe corner,
   // away from Android Auto's bottom chrome and left-hand status panel.
-  int logoWidth=Math.max(54,Math.round(Math.min(94*density,hud.width()*0.18f)));
+  int logoWidth=Math.max(42,Math.round(Math.min(62*density,hud.width()*0.11f)));
   int logoHeight=Math.round(logoWidth*135f/350f);
-  float inset=8*density;
+  float inset=6*density;
   float left=Math.max(0,hud.right-a.left-logoWidth-inset);
   float top=Math.max(0,hud.top-a.top+inset);
   left=Math.min(left,Math.max(0,w-logoWidth));
   top=Math.min(top,Math.max(0,h-logoHeight));
   android.graphics.drawable.Drawable logo=context.getDrawable(org.example.wikimapreader.R.drawable.yandex_tiles_attribution);
   if(logo!=null){
-   // Preserve the original SVG aspect ratio; avoid oversized white banner.
-   paint.setColor(Color.WHITE);c.drawRoundRect(new RectF(left,top,left+logoWidth,top+logoHeight),4*density,4*density,paint);
+   // No added bright panel, opacity filter or distortion: keep the original
+   // logo color/geometry, just display it at a smaller size in a map corner.
    logo.setBounds(Math.round(left),Math.round(top),Math.round(left)+logoWidth,Math.round(top)+logoHeight);
    logo.draw(c);
    attributionBounds=new RectF(a.left+left,a.top+top,a.left+left+logoWidth,a.top+top+logoHeight);
