@@ -114,7 +114,7 @@ public final class WikiScreen extends Screen implements DefaultLifecycleObserver
    pane.addRow(new Row.Builder().setTitle("Wikimapia #"+previewPlace.id)
     .addText(previewCard==null?"Сведения загружаются":previewCard.mediaSummary()).build());
    pane.addAction(new Action.Builder().setTitle("Подробнее")
-    .setIcon(icon(org.example.wikimapreader.R.drawable.car_search))
+    .setIcon(icon(org.example.wikimapreader.R.drawable.car_info))
     .setOnClickListener(()->{previewExpanded=true;invalidate();}).build());
    if(previewPlace.point()!=null){
     pane.addAction(new Action.Builder().setTitle("Маршрут")
