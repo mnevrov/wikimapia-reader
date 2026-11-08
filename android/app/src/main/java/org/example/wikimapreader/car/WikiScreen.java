@@ -67,7 +67,10 @@ public final class WikiScreen extends Screen implements DefaultLifecycleObserver
   boolean follow;
   synchronized(session.view){follow=session.view.follow;}
   String prefix=session.gps==null?session.gpsStatus:follow?"GPS Follow: вкл":"GPS Follow: пауза";
-  return prefix+" · "+(blockedError?"Обновите область":loading?"Загрузка объектов":status);
+  String contour=blockedError?"Контуры Wikimapia: ошибка · обновите область"
+   :loading?"Контуры Wikimapia: загрузка…"
+   :"Контуры Wikimapia: "+status;
+  return prefix+" · "+contour;
  }
  /** Rasterize source vectors at 96px to avoid host-side mdpi resource upscaling. */
  private CarIcon icon(int id){
@@ -93,7 +96,7 @@ public final class WikiScreen extends Screen implements DefaultLifecycleObserver
    .addAction(action("Поиск",org.example.wikimapreader.R.drawable.car_search,()->getScreenManager().push(new Search(getCarContext()))))
    .addAction(action("Избранное",org.example.wikimapreader.R.drawable.car_favorite,this::favorites))
    .addAction(action(showNearby?"Скрыть список":"Объекты рядом",org.example.wikimapreader.R.drawable.car_nearby,this::toggleNearby))
-   .addAction(action(more?"Ещё":"Обновить",org.example.wikimapreader.R.drawable.car_refresh,()->load(more,true))).build();
+   .addAction(action("Подложка карты",org.example.wikimapreader.R.drawable.car_layers,()->getScreenManager().push(new Basemaps(getCarContext())))).build();
   if(getCarContext().getCarAppApiLevel()<7)
    return new PlaceListMapTemplate.Builder().setTitle("WikiReader").setHeaderAction(Action.APP_ICON)
     .setItemList(rows(nearest(),true)).setActionStrip(top).build();
@@ -115,7 +118,7 @@ public final class WikiScreen extends Screen implements DefaultLifecycleObserver
   }else if(showNearby){
    ItemList.Builder nearby=new ItemList.Builder()
     .addItem(new Row.Builder().setTitle(loading?"Загрузка области":status)
-     .addText(session.gpsStatus).build());
+     .addText(session.gpsStatus).addText(session.renderer==null?"Подложка: ожидание":session.renderer.tileStatus()).build());
    int shown=1;for(Item item:rows(nearest(),false,true).getItems()){
     if(shown++>=limit())break;
     nearby.addItem(item);
@@ -124,7 +127,8 @@ public final class WikiScreen extends Screen implements DefaultLifecycleObserver
   }else{
    Pane pane=new Pane.Builder().addRow(new Row.Builder()
     .setTitle(places.isEmpty()?"Карта Wikimapia":"Объектов в области: "+places.size())
-    .addText(mapStatus()).build()).build();
+    .addText(mapStatus())
+     .addText(session.renderer==null?"Подложка: ожидание":session.renderer.tileStatus()).build()).build();
    content=new PaneTemplate.Builder(pane).setHeader(header).build();
   }
   return new MapWithContentTemplate.Builder().setContentTemplate(content)
@@ -191,6 +195,53 @@ public final class WikiScreen extends Screen implements DefaultLifecycleObserver
  private static double area(Place p){double sum=0;for(int i=0,j=p.coords.length-1;i<p.coords.length;j=i++)sum+=Geo.delta(p.coords[j][1],p.coords[0][1])*p.coords[i][0]-Geo.delta(p.coords[i][1],p.coords[0][1])*p.coords[j][0];return Math.abs(sum);}
  private void favorites(){List<Place> list=new ArrayList<>();JSONArray a=session.store.favorites();for(int i=0;i<a.length();i++)try{JSONObject f=a.getJSONObject(i);if(!f.optString("source").equals("wikimapia"))continue;long id=f.getLong("id");Place found=null;for(Place p:places)if(p.id==id)found=p;list.add(found!=null?found:new Place(id,f.optString("title"),"",new double[0][]));}catch(Exception ignored){}getScreenManager().push(new Places(getCarContext(),"Избранное",list));}
  private void detail(Place p){selected=p.id;persist();refresh();getScreenManager().push(new Detail(getCarContext(),p));}
+
+ /** Open the official linked map address, without ever including private tile credentials. */
+ void openYandexAttribution(){
+  try{
+   Intent intent=new Intent(Intent.ACTION_VIEW,Uri.parse("https://yandex.ru/maps/"));
+   intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+   getCarContext().startActivity(intent);
+  }catch(RuntimeException error){
+   status="Откройте Яндекс Карты на телефоне при остановке";
+   invalidate();
+  }
+ }
+ private final class Basemaps extends Screen {
+  Basemaps(CarContext c){super(c);}
+  private void select(String provider){
+   try{
+    YandexTileSettings.get(getCarContext()).select(provider);
+    if(session.renderer!=null)session.renderer.draw();
+    WikiScreen.this.invalidate();
+    getScreenManager().pop();
+   }catch(Exception e){invalidate();}
+  }
+  @NonNull @Override public Template onGetTemplate(){
+   YandexTileSettings settings=YandexTileSettings.get(getCarContext());
+   String source=settings.selected();
+   ItemList.Builder list=new ItemList.Builder();
+   list.addItem(new Row.Builder().setTitle("Состояние подложки")
+    .addText(session.renderer==null?"Нет карты":session.renderer.tileStatus()).build());
+   list.addItem(new Row.Builder().setTitle(("osm".equals(source)?"✓ ":"")+"OpenStreetMap")
+    .setOnClickListener(()->select("osm")).build());
+   if(getCarContext().getCarAppApiLevel()>=7&&settings.configured()){
+    list.addItem(new Row.Builder().setTitle(("yandex".equals(source)?"✓ ":"")+"Яндекс Карты")
+     .addText("Tiles API · схема · 512 px")
+     .setOnClickListener(()->select("yandex")).build());
+   }else{
+    list.addItem(new Row.Builder().setTitle("Яндекс Карты недоступны")
+     .addText(settings.configured()?"Требуется Car App API 7+":"Добавьте Tiles API ключ в настройках телефона").build());
+   }
+   list.addItem(new Row.Builder().setTitle("Обновить контуры")
+    .setOnClickListener(()->{getScreenManager().pop();load(false,true);}).build());
+   list.addItem(new Row.Builder().setTitle("Открыть Яндекс Карты")
+    .addText("Официальный сайт · на стоянке")
+    .setOnClickListener(ParkedOnlyOnClickListener.create(WikiScreen.this::openYandexAttribution)).build());
+   return new ListTemplate.Builder().setTitle("Подложка карты").setHeaderAction(Action.BACK)
+    .setSingleList(list.build()).build();
+  }
+ }
  private class Places extends Screen {final String title;final List<Place> data;Places(CarContext c,String title,List<Place> data){super(c);this.title=title;this.data=data;}@NonNull @Override public Template onGetTemplate(){return new ListTemplate.Builder().setTitle(title).setHeaderAction(Action.BACK).setSingleList(rows(data,false)).build();}}
  private class Detail extends Screen implements DefaultLifecycleObserver {Place place;String message="Краткие сведения · полная карточка на телефоне";final String id="detail:"+UUID.randomUUID();boolean active;
  Detail(CarContext c,Place p){super(c);place=p;getLifecycle().addObserver(this);}

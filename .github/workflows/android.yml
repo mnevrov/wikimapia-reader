@@ -45,7 +45,7 @@ jobs:
       - run: npm run android:sync
       - name: Assemble Android instrumentation tests
         working-directory: android
-        run: ./gradlew --no-daemon :app:assembleMobileDebugAndroidTest :app:assembleAutoDevDebugAndroidTest
+        run: ./gradlew --no-daemon :app:assembleDebugAndroidTest
       - name: Install emulator for website transport verification
         run: |
           sdkmanager 'emulator' 'system-images;android-30;default;x86_64'
@@ -70,8 +70,9 @@ jobs:
           timeout 180 adb wait-for-device
           timeout 180 bash -c 'until [[ "$(adb shell getprop sys.boot_completed | tr -d "\r")" == 1 ]]; do sleep 2; done'
           cd android
-          ./gradlew --no-daemon :app:connectedMobileDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.example.wikimapreader.SiteSourceLiveTest
-          ./gradlew --no-daemon :app:connectedAutoDevDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.example.wikimapreader.car.CarSiteLiveTest
+          ./gradlew --no-daemon :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.example.wikimapreader.SiteSourceLiveTest
+          ./gradlew --no-daemon :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.example.wikimapreader.car.CarSiteLiveTest
+          ./gradlew --no-daemon :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.example.wikimapreader.car.YandexTileSettingsTest
 
   verify-and-build:
     runs-on: ubuntu-24.04
@@ -102,7 +103,7 @@ jobs:
         run: npm run android:sync
       - name: Build and lint APK
         working-directory: android
-        run: ./gradlew --no-daemon testMobileDebugUnitTest testAutoDevDebugUnitTest assembleMobileDebug assembleAutoDevDebug lintMobileDebug lintAutoDevDebug
+        run: ./gradlew --no-daemon testDebugUnitTest assembleDebug lintDebug
       - name: Yandex branding regression (fail fast)
         run: npx playwright test tests/browser/yandexSafeBranding094.spec.js
       - name: Mobile browser tests (mock API)
@@ -111,14 +112,8 @@ jobs:
         run: python3 scripts/check-auto-apks.py
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: WikiReader-mobile-${{ github.sha }}
-          path: apk-dist/mobile/*
-          retention-days: 30
-          if-no-files-found: error
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        with:
-          name: WikiReader-AutoDev-${{ github.sha }}
-          path: apk-dist/autoDev/*
+          name: WikiReader-unified-${{ github.sha }}
+          path: apk-dist/unified/*
           retention-days: 30
           if-no-files-found: error
 
@@ -208,6 +203,9 @@ jobs:
           assert re.fullmatch(semver,current) and re.fullmatch(semver,old), 'Invalid release version'
           if tuple(map(int,current.split('.')))<=tuple(map(int,old.split('.'))):
               print(f'No version increase: {old} -> {current}')
+              raise SystemExit(0)
+          if pathlib.Path(f'docs/releases/{current}/HOLD_RELEASE.md').is_file():
+              print(f'Stable release {current} held: Android Auto host acceptance pending')
               raise SystemExit(0)
           assert pathlib.Path(f'docs/releases/{current}/RELEASE_NOTES.md').is_file(), 'Release notes missing'
           lock=json.loads(pathlib.Path('package-lock.json').read_text())

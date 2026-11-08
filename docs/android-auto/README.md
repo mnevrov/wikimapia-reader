@@ -1,4 +1,20 @@
-# Android Auto — WikiReader Next / AutoDev 0.14.5-auto.2
+# Android Auto — единый WikiReader Next 0.15.0
+
+## Архитектура 0.15.0 — один пакет (кандидат)
+
+**Новое состояние:** с 0.15.0 телефонный WebView и Android Auto CarAppService входят в **одну APK** с applicationId `org.example.wikimapreader.next`. Старый отдельный AutoDev 0.14.5-auto.2 больше не нужен для новых установок. По решению пользователя миграция данных между пакетами не выполняется.
+
+Сборка в `main` исходников: `cd android && ./gradlew --no-daemon testDebugUnitTest assembleDebug lintDebug`. APK: `android/app/build/outputs/apk/debug/app-debug.apk`. Для стабильной публикации требуется прежняя штатная подпись через `scripts/prepare-release.sh`.
+
+Телефон использует Яндекс JavaScript API 3.0, а автомобильный Surface — **официальный Yandex Tiles API**; ключи совершенно разные. В `Настройки → Подложка Android Auto` сохранить отдельный Tiles API ключ и выбрать Яндекс; по умолчанию OSM. Ключ хранится шифрованным в Android Keystore, без сохранения на диске URL, содержащих ключ. Тайлы загружаются с `projection=web_mercator`, `scale=2`, с ограничением запросов и возвратом к OSM при проблемах.
+
+Яндекс требует видимый официальный логотип, ведущий по нажатию на главную страницу Яндекс Карт. Native Surface содержит SVG-derived VectorDrawable логотип и обработчик нажатия; на host без `SurfaceCallback.onClick` переход может не работать. **До проверки на реальном головном устройстве и подтверждения соответствия атрибуции выпуск Android Auto 0.15.0 считать экспериментальным**. Тесты и выпуск — [матрица #51](https://github.com/mnevrov/wikimapia-reader/issues/51), подложка — [задача #42](https://github.com/mnevrov/wikimapia-reader/issues/42).
+
+### Исторические заметки
+
+Ниже зафиксировано поведение старого двухпакетного AutoDev 0.14.x — оно оставлено только как архив опыта разработки.
+
+
 
 **Исходный код Android Auto интегрирован в `main` через [PR #52](https://github.com/mnevrov/wikimapia-reader/pull/52). AutoDev остаётся отдельной экспериментальной APK. Стабильная публикация Android Auto запрещена до аппаратной приёмки по [#51](https://github.com/mnevrov/wikimapia-reader/issues/51).**
 

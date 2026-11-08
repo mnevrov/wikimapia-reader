@@ -5,6 +5,7 @@ tag=${1:?release tag required}
 version=$(node -p 'require("./package.json").version')
 [[ "$tag" == "v$version" ]] || { echo 'Tag does not match package version'; exit 1; }
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Stable semantic version required'; exit 1; }
+[[ ! -f "docs/releases/$version/HOLD_RELEASE.md" ]] || { echo "Release $version held pending Android Auto hardware acceptance"; exit 1; }
 python3 - "$version" <<'PY'
 import json,re,sys,pathlib
 v=sys.argv[1]
@@ -25,7 +26,7 @@ printf '%s' "$NEXT_KEYSTORE_BASE64" | base64 --decode > "$private_dir/signing.jk
 chmod 600 "$private_dir/signing.jks"
 mkdir -p release-dist
 apk="WikiReader-Next-$version.apk"
-"$build_tools/zipalign" -f -P 16 4 android/app/build/outputs/apk/mobile/debug/app-mobile-debug.apk "$private_dir/aligned.apk"
+"$build_tools/zipalign" -f -P 16 4 android/app/build/outputs/apk/debug/app-debug.apk "$private_dir/aligned.apk"
 java -jar "$build_tools/lib/apksigner.jar" sign --ks "$private_dir/signing.jks" --ks-key-alias wikireader-next --ks-pass env:NEXT_STORE_PASSWORD --key-pass env:NEXT_KEY_PASSWORD --out "release-dist/$apk" "$private_dir/aligned.apk"
 java -jar "$build_tools/lib/apksigner.jar" verify --verbose --print-certs "release-dist/$apk" > "$private_dir/verify.txt"
 python3 - "$private_dir/verify.txt" <<'PYCERT'
@@ -43,7 +44,7 @@ assert f"versionName='{v}'" in s
 gradle=pathlib.Path('android/app/build.gradle').read_text()
 code=re.search(r'versionCode\s+(\d+)',gradle)[1]
 assert f"versionCode='{code}'" in s
-with zipfile.ZipFile(sys.argv[3]) as signed, zipfile.ZipFile('android/app/build/outputs/apk/mobile/debug/app-mobile-debug.apk') as raw:
+with zipfile.ZipFile(sys.argv[3]) as signed, zipfile.ZipFile('android/app/build/outputs/apk/debug/app-debug.apk') as raw:
     assert not any(n.endswith('.jks') for n in signed.namelist())
     for n in raw.namelist():
         if n.startswith('assets/'):

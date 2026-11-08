@@ -7,8 +7,8 @@ android {
         applicationId "org.example.wikimapreader"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 34
-        versionName "0.14.6"
+        versionCode 35
+        versionName "0.15.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -17,17 +17,6 @@ android {
         }
     }
     buildFeatures { buildConfig = true }
-    flavorDimensions += "experience"
-    productFlavors {
-        mobile { dimension "experience" }
-        autoDev {
-            dimension "experience"
-            applicationId "org.example.wikimapreader.autodev"
-            // AutoDev builds are versioned independently of the signed mobile release.
-            versionCode 34
-            versionName "0.14.5-auto.2"
-        }
-    }
     testOptions { unitTests.includeAndroidResources = true
         unitTests.all { systemProperty "wikireader.fixtures", rootProject.file("../tests/fixtures").absolutePath } }
     buildTypes {
@@ -50,10 +39,10 @@ repositories {
 }
 
 dependencies {
-    autoDevImplementation "androidx.car.app:app:1.8.0-rc01"
-    autoDevImplementation "androidx.car.app:app-projected:1.8.0-rc01"
-    testAutoDevImplementation "androidx.car.app:app-testing:1.8.0-rc01"
-    testAutoDevImplementation "org.robolectric:robolectric:4.16"
+    implementation "androidx.car.app:app:1.8.0-rc01"
+    implementation "androidx.car.app:app-projected:1.8.0-rc01"
+    testImplementation "androidx.car.app:app-testing:1.8.0-rc01"
+    testImplementation "org.robolectric:robolectric:4.16"
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"

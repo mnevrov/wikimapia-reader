@@ -63,3 +63,24 @@ test('GPS Follow uses only its watcher and never starts a competing one-shot req
  await expect.poll(()=>page.evaluate(()=>window.__wikireaderOneShotCalls),{timeout:5000}).toBe(0);
  await expect(page.getByText('Местоположение недоступно. Проверьте разрешение и геопозицию.')).toHaveCount(0);
 });
+
+test('GPS Follow displays an approximate first fix and refines zoom without travelling',async({page,context})=>{
+ await page.addInitScript(()=>localStorage.setItem('wikimapia-reader-auto','false'));
+ await context.grantPermissions(['geolocation']);
+ await context.setGeolocation({latitude:56.1,longitude:38.1,accuracy:1700});
+ await page.route('https://tile.openstreetmap.org/**',route=>route.abort());
+ await page.goto('/');
+ const button=page.getByRole('button',{name:'Моё местоположение'});
+ await button.click();
+ await expect(button).toHaveAttribute('aria-pressed','true');
+ const view=()=>page.evaluate(()=>{
+  try{return JSON.parse(localStorage.getItem('wikimapia-reader-view'));}catch{return null;}
+ });
+ await expect.poll(async()=>(await view())?.lat,{timeout:20000}).toBeCloseTo(56.1,2);
+ await expect.poll(async()=>(await view())?.zoom).toBeLessThanOrEqual(11);
+ // Same coordinates, dramatically better accuracy. The map must zoom in even
+ // though the movement throttle sees zero distance and <3 seconds elapsed.
+ await context.setGeolocation({latitude:56.1,longitude:38.1,accuracy:16});
+ await expect.poll(async()=>(await view())?.zoom,{timeout:15000}).toBeGreaterThanOrEqual(17);
+ await expect(button).toHaveAttribute('aria-pressed','true');
+});

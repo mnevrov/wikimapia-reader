@@ -15,7 +15,7 @@ test('GPS warning has content height on Yandex and OSM, including short screens'
  await tiles(page);await context.grantPermissions(['geolocation']);
  await context.setGeolocation({latitude:55.75,longitude:37.61,accuracy:2000});
  await page.goto('/');await page.getByRole('button',{name:'Моё местоположение'}).click();
- const notice=page.locator('.gps-feedback');await expect(notice).toContainText('Низкая точность');
+ const notice=page.locator('.gps-feedback');await expect(notice).toContainText('Примерная геопозиция');
  for(const [width,height] of [[390,844],[320,640],[844,390]]){
   await page.setViewportSize({width,height});
   for(const yandex of [false,true]){

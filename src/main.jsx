@@ -25,7 +25,7 @@ import {searchIntent} from './searchIntent.js';
 import {readFavorites,toggleFavorite as updateFavorites} from './favorites.js';
 import {car,hasCar,persistFavorites,syncFavorites,watchFavorites} from './carBridge.js';
 import {offlineStore} from './offlineStore.js';
-import {nextFollowState,acceptableFix} from './gpsFollow.js';
+import {nextFollowState,acceptableFix,usableFix} from './gpsFollow.js';
 import {acquirePosition} from './locationRequest.js';
 import {pickMapFeedback} from './mapStatus.js';
 import {HISTORY_KEY,HISTORY_ENABLED_KEY,readHistory,recordHistory} from './readingHistory.js';
@@ -151,13 +151,35 @@ function App(){
     let cancelled=false,watchId;
     const start=async()=>{
       try{
-        watchId=await Geolocation.watchPosition({enableHighAccuracy:false,timeout:15000,maximumAge:12000,minimumUpdateInterval:3000},(p,error)=>{
+        watchId=await Geolocation.watchPosition({
+          enableHighAccuracy:true,
+          // Capacitor 8 uses timeout as the location wait deadline, not the update interval.
+          timeout:30000,interval:2500,minimumUpdateInterval:1000,maximumAge:15000
+        },(p,error)=>{
           if(cancelled)return;
-          if(error){setGpsError('Местоположение недоступно · проверьте разрешение или сигнал GPS.');if(error.code===1||/permission|denied|разрешен/i.test(String(error.message||'')))setGpsFollow('off');return;}
-          if(!p?.coords||!Number.isFinite(p.coords.latitude)||!Number.isFinite(p.coords.longitude))return;
-          if(!acceptableFix(p.coords)){if(!gpsWeakFixNotified.current){gpsWeakFixNotified.current=true;setGpsError('Низкая точность GPS · ожидаем сигнал');}return;}
-           gpsWeakFixNotified.current=false;
-          setGpsError('');
+          if(error){
+            const denied=error.code===1||error.code==='OS-PLUG-GLOC-0003'
+              ||/permission|denied|разрешен/i.test(String(error.message||''));
+            if(denied){
+              setGpsError('Разрешите доступ к геопозиции в настройках Android.');
+              setGpsFollow('off');
+            }else{
+              // A timeout must not switch Follow off: GPS may become available later.
+              setGpsError('Ожидаем сигнал GPS · проверьте геопозицию на телефоне.');
+            }
+            return;
+          }
+          if(!usableFix(p?.coords)){
+            if(!gpsWeakFixNotified.current){
+              gpsWeakFixNotified.current=true;
+              setGpsError('Точность геопозиции слишком низкая · ожидаем сигнал');
+            }
+            return;
+          }
+          gpsWeakFixNotified.current=false;
+          setGpsError(p.coords.accuracy>250
+            ?'Примерная геопозиция (±'+Math.ceil(p.coords.accuracy)+' м) · уточняем GPS'
+            :'');
           setNotice(previous=>/^(Местоположение недоступно|Определяем местоположение)/.test(previous)?'':previous);
           setLocation({lat:p.coords.latitude,lng:p.coords.longitude,accuracy:p.coords.accuracy,at:Date.now()});
         });
