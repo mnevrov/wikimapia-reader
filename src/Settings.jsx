@@ -129,7 +129,6 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
         <button type="button" aria-pressed={basemap==='yandex'} disabled={!YANDEX_KEY_PATTERN.test(yandexKey)||!yandexReferer} onClick={()=>setBasemap('yandex')}>Яндекс Карты</button>
       </div>
       </div>
-      <div className="settings-field-title">Тема</div>
       <fieldset className="theme-choice settings-theme-row"><legend>Оформление</legend><div>{[['dark','Чёрная'],['light','Светлая'],['system','Как в системе']].map(([value,label])=><button key={value} aria-pressed={theme===value} onClick={()=>setTheme(value)}>{label}</button>)}</div></fieldset>
       <div className="settings-map-actions">
  <label className="setting-row" htmlFor="auto-load">
@@ -243,7 +242,7 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
       {apiReportStatus&&<p className="helper" role="status">{apiReportStatus}</p>}
       {Capacitor.isNativePlatform()&&credentials.key&&!demo&&<div className="transport-diagnostic" aria-label="Проверка сетевого подключения Android">
         <h3>Резервный API: диагностика Android</h3>
-        <p className="helper">Основное чтение работает с сайтом без ключа. Эта проверка запускается только вручную и касается дополнительного API. Не более двух запросов на публичной тестовой области, интервал не менее 6 секунд. При отказе по квоте или ключу второй запрос пропускается. Никаких ключей, адресов запросов и координат в отчёте нет.</p>
+        <p className="helper">Проверка резервного API выполняется вручную, без передачи ключа в отчёте.</p>
         <button className="secondary" type="button" disabled={transportBusy} onClick={startTransportProbe}>{transportBusy?'Проверяем соединение…':'Проверить два HTTP-транспорта'}</button>
         {transportProgress&&<p className="helper" role="status">{transportProgress}</p>}
         {transportReport&&<div className="transport-results" role="group" aria-label="Результаты теста транспорта">
