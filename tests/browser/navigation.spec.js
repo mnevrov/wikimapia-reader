@@ -1,3 +1,4 @@
+import {expandSettings} from './helpers.js';
 import {test,expect} from '@playwright/test';
 import {tiles,connect,nativeVault} from './helpers.js';
 const polygon=[{x:37.617,y:55.751},{x:37.619,y:55.751},{x:37.619,y:55.753}];
@@ -27,7 +28,7 @@ test('saved contours survive reload and can be cleared from settings',async({pag
  let requests=0;await page.route('https://api.wikimapia.org/**',r=>{requests++;return r.fulfill({json:{folder:[{id:1,name:'Saved area',polygon}],found:1}});});
  await tiles(page);await nativeVault(page,{key:'cache-test-key',calls:[]});await page.goto('/');await expect(page.locator('path.leaflet-interactive')).toHaveCount(1);
  await page.reload();await expect(page.locator('path.leaflet-interactive')).toHaveCount(1);expect(requests).toBe(1);
- await screen(page,'Настройки');await page.getByRole('button',{name:'Очистить кэш областей'}).click();await expect(page.locator('.toast')).toContainText('Кэш областей очищен');
+ await screen(page,'Настройки');await expandSettings(page,'storage');await page.getByRole('button',{name:'Очистить кэш областей'}).click();await expect(page.locator('.toast')).toContainText('Кэш областей очищен');
  await map(page);await expect.poll(()=>requests,{timeout:15000}).toBe(2);
 });
 test('failing next page retries that page twice without replaying page one forever',async({page})=>{
