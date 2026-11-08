@@ -63,7 +63,7 @@ final class TileSource implements AutoCloseable {
  synchronized String status(){
   syncSettings();
   if(CarBasemapPolicy.nightFallback(settings.selected(),hostDark.getAsBoolean(),settings.nightPolicy()))
-   return "Ночь: тёмная OSM (Яндекс Tiles — только светлая схема)";
+   return "Ночь: OSM с цветовым фильтром (Яндекс Tiles — светлая схема)";
   if(!"yandex".equals(settings.selected()))return "Подложка: OpenStreetMap";
   if(System.currentTimeMillis()<yandexBlockedUntil)
    return "Яндекс: "+failureReason+" · резервная OSM";
