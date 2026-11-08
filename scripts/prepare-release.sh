@@ -5,6 +5,7 @@ tag=${1:?release tag required}
 version=$(node -p 'require("./package.json").version')
 [[ "$tag" == "v$version" ]] || { echo 'Tag does not match package version'; exit 1; }
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Stable semantic version required'; exit 1; }
+[[ ! -f "docs/releases/$version/HOLD_RELEASE.md" ]] || { echo "Release $version held pending Android Auto hardware acceptance"; exit 1; }
 python3 - "$version" <<'PY'
 import json,re,sys,pathlib
 v=sys.argv[1]
