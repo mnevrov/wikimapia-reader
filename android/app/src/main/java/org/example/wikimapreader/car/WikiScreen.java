@@ -70,8 +70,7 @@ public final class WikiScreen extends Screen implements DefaultLifecycleObserver
   String contour=blockedError?"Контуры Wikimapia: ошибка · обновите область"
    :loading?"Контуры Wikimapia: загрузка…"
    :"Контуры Wikimapia: "+status;
-  String tiles=session.renderer==null?"Подложка: ожидание":session.renderer.tileStatus();
-  return prefix+" · "+contour+"\n"+tiles;
+  return prefix+" · "+contour;
  }
  /** Rasterize source vectors at 96px to avoid host-side mdpi resource upscaling. */
  private CarIcon icon(int id){
@@ -128,7 +127,8 @@ public final class WikiScreen extends Screen implements DefaultLifecycleObserver
   }else{
    Pane pane=new Pane.Builder().addRow(new Row.Builder()
     .setTitle(places.isEmpty()?"Карта Wikimapia":"Объектов в области: "+places.size())
-    .addText(mapStatus()).build()).build();
+    .addText(mapStatus())
+     .addText(session.renderer==null?"Подложка: ожидание":session.renderer.tileStatus()).build()).build();
    content=new PaneTemplate.Builder(pane).setHeader(header).build();
   }
   return new MapWithContentTemplate.Builder().setContentTemplate(content)
