@@ -57,7 +57,7 @@ final class MapRenderer implements SurfaceCallback,AutoCloseable {
  if(gps!=null){float[] xy=v.point(gps[0],gps[1],w,h);paint.setStyle(Paint.Style.FILL);paint.setColor(Color.WHITE);c.drawCircle(xy[0],xy[1],9*density,paint);paint.setColor(Color.rgb(25,120,250));c.drawCircle(xy[0],xy[1],6*density,paint);}
  // Attribution is shown only for a confirmed Yandex raster tile, not
  // merely because a provider was selected in settings.
- Rect hud=mapViewport(stable,visible,width,height);float density=surfaceDensity(surfaceDpi);
+ Rect hud=mapViewport(stable,visible,width,height);
  paint.setStyle(Paint.Style.FILL);
  if(tiles.displaysYandex()){
   // Small, correctly proportioned logotype within the safe corner,
