@@ -78,7 +78,7 @@ final class CarPlaceCard {
   String withoutScripts=value.replaceAll("(?is)<(?:script|style)\\b[^>]*>.*?</(?:script|style)>","");
   String plain=Html.fromHtml(withoutScripts,Html.FROM_HTML_MODE_LEGACY).toString()
    .replace('\u00a0',' ').replaceAll("[\\p{Cntrl}&&[^\\n]]"," ")
-   .replaceAll("[ \\t]+"," ").replaceAll(" *\\n *","\\n").replaceAll("\\n{3,}","\\n\\n").trim();
+   .replaceAll("[ \\t]+"," ").replaceAll(" *\\n *","\n").replaceAll("\\n{3,}","\n\n").trim();
   if(plain.length()>maximum)return plain.substring(0,maximum-1)+"…";
   return plain;
  }
