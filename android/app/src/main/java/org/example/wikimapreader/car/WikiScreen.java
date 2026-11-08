@@ -21,10 +21,11 @@ public final class WikiScreen extends Screen implements DefaultLifecycleObserver
  private final ExecutorService io=Executors.newSingleThreadExecutor();private List<Place> places=new ArrayList<>();private List<Place> pagePlaces=new ArrayList<>();
  private String status="Сохранённые контуры · данные могут быть устаревшими",requestId="car:"+UUID.randomUUID();private boolean visible,loading,more,viewportDirty,blockedError,showNearby;private volatile int generation;private int page;private double[] bbox;private long selected;
  private Place previewPlace;private String previewText="";
+ private CarPlaceCard previewCard;private boolean previewExpanded;
  private List<Place> previewHits=Collections.emptyList();private int previewIndex,previewGeneration;
  private final String previewRequestId="preview:"+UUID.randomUUID();
- private final Map<Long,String> previewCache=new LinkedHashMap<Long,String>(32,.75f,true){
-  @Override protected boolean removeEldestEntry(Map.Entry<Long,String> entry){return size()>32;}
+ private final Map<Long,CarPlaceCard> previewCache=new LinkedHashMap<Long,CarPlaceCard>(32,.75f,true){
+  @Override protected boolean removeEldestEntry(Map.Entry<Long,CarPlaceCard> entry){return size()>32;}
  };
  private final Runnable refreshRequest=()->load(false);
  private double lastLoadLat=Double.NaN,lastLoadLon=Double.NaN,lastLoadZoom=Double.NaN;
@@ -95,25 +96,35 @@ public final class WikiScreen extends Screen implements DefaultLifecycleObserver
   ActionStrip top=new ActionStrip.Builder()
    .addAction(action("Поиск",org.example.wikimapreader.R.drawable.car_search,()->getScreenManager().push(new Search(getCarContext()))))
    .addAction(action("Избранное",org.example.wikimapreader.R.drawable.car_favorite,this::favorites))
-   .addAction(action(showNearby?"Скрыть список":"Объекты рядом",org.example.wikimapreader.R.drawable.car_nearby,this::toggleNearby))
+   .addAction(previewPlace!=null?action("Закрыть карточку",org.example.wikimapreader.R.drawable.car_close,this::clearPreview)
+    :action(showNearby?"Скрыть список":"Объекты рядом",org.example.wikimapreader.R.drawable.car_nearby,this::toggleNearby))
    .addAction(action("Подложка карты",org.example.wikimapreader.R.drawable.car_layers,()->getScreenManager().push(new Basemaps(getCarContext())))).build();
   if(getCarContext().getCarAppApiLevel()<7)
    return new PlaceListMapTemplate.Builder().setTitle("WikiReader").setHeaderAction(Action.APP_ICON)
     .setItemList(rows(nearest(),true)).setActionStrip(top).build();
   Header header=new Header.Builder().setTitle("WikiReader").setStartHeaderAction(Action.APP_ICON).build();
   Template content;
-  if(previewPlace!=null&&!showNearby){
+  if(previewPlace!=null&&!showNearby&&previewExpanded){
+   content=new ListTemplate.Builder().setHeader(header)
+    .setSingleList(objectRows(previewPlace,previewCard,previewText,true)).build();
+  }else if(previewPlace!=null&&!showNearby){
    Pane.Builder pane=new Pane.Builder().addRow(new Row.Builder()
-    .setTitle(previewPlace.title)
+    .setTitle(previewCard!=null?previewCard.title:previewPlace.title)
     .addText(previewText+(previewHits.size()>1?" · "+(previewIndex+1)+"/"+previewHits.size():"")).build());
+   pane.addRow(new Row.Builder().setTitle("Wikimapia #"+previewPlace.id)
+    .addText(previewCard==null?"Сведения загружаются":previewCard.mediaSummary()).build());
+   pane.addAction(new Action.Builder().setTitle("Подробнее")
+    .setIcon(icon(org.example.wikimapreader.R.drawable.car_search))
+    .setOnClickListener(()->{previewExpanded=true;invalidate();}).build());
    if(previewPlace.point()!=null){
     pane.addAction(new Action.Builder().setTitle("Маршрут")
      .setIcon(icon(org.example.wikimapreader.R.drawable.car_route))
      .setOnClickListener(this::navigatePreview).build());
+   }else{
+    pane.addAction(new Action.Builder().setTitle("Закрыть")
+     .setIcon(icon(org.example.wikimapreader.R.drawable.car_close))
+     .setOnClickListener(this::clearPreview).build());
    }
-   pane.addAction(new Action.Builder().setTitle("Закрыть")
-    .setIcon(icon(org.example.wikimapreader.R.drawable.car_close))
-    .setOnClickListener(this::clearPreview).build());
    content=new PaneTemplate.Builder(pane.build()).setHeader(header).build();
   }else if(showNearby){
    ItemList.Builder nearby=new ItemList.Builder()
@@ -155,35 +166,34 @@ public final class WikiScreen extends Screen implements DefaultLifecycleObserver
  }
  private void clearPreview(){
   previewGeneration++;WikiApi.INSTANCE.cancel(previewRequestId);
-  previewPlace=null;previewHits=Collections.emptyList();previewText="";
+  previewPlace=null;previewCard=null;previewExpanded=false;previewHits=Collections.emptyList();previewText="";
   selected=0;persist();refresh();
  }
  private void showPreview(List<Place> hits,int index){
   if(hits.isEmpty()){clearPreview();return;}
   previewGeneration++;WikiApi.INSTANCE.cancel(previewRequestId);
   previewHits=new ArrayList<>(hits);previewIndex=index;previewPlace=hits.get(index);
-  selected=previewPlace.id;showNearby=false;
-  String cached=previewCache.get(previewPlace.id),description=shortPreview(previewPlace.description);
-  previewText=cached!=null?cached:description.isEmpty()?"Загружаем краткое описание":description;
+  previewExpanded=false;selected=previewPlace.id;showNearby=false;
+  previewCard=previewCache.get(previewPlace.id);
+  String description=previewCard==null?CarPlaceCard.clean(previewPlace.description,6000):previewCard.description;
+  previewText=description.isEmpty()?"Загружаем описание объекта":shortPreview(description);
   persist();refresh();
-  if(cached!=null||!description.isEmpty())return;
+  if(previewCard!=null)return;
   final int requestGeneration=previewGeneration;final long id=previewPlace.id;
   try{
    JSONObject opts=new JSONObject().put("id",id);
    WikiApi.INSTANCE.request(previewRequestId,new CredentialRepository(getCarContext()),"place.getbyid",opts,
     (data,error)->main.post(()->{
      if(requestGeneration!=previewGeneration||previewPlace==null||previewPlace.id!=id)return;
-     String detail="";
      if(error==null)try{
-      JSONObject raw=data.optJSONObject("place");
-      Place loaded=Place.from(raw!=null?raw:data);
-      detail=shortPreview(loaded.description);
-     }catch(Exception ignored){}
-     previewText=detail.isEmpty()?"Краткое описание недоступно":detail;
-     if(!detail.isEmpty())previewCache.put(id,detail);
+      CarPlaceCard details=CarPlaceCard.from(data,previewPlace);
+      previewCard=details;previewCache.put(id,details);
+      previewText=details.description.isEmpty()?"Описание не добавлено":shortPreview(details.description);
+     }catch(Exception ignored){previewText="Не удалось разобрать карточку объекта";}
+     else if(description.isEmpty())previewText=error;
      invalidate();
     }));
-  }catch(Exception ignored){previewText="Краткое описание недоступно";invalidate();}
+  }catch(Exception ignored){previewText="Не удалось загрузить карточку объекта";invalidate();}
  }
  private void navigatePreview(){
   if(previewPlace==null)return;
