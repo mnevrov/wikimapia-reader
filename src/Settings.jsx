@@ -132,7 +132,7 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
       <fieldset className="theme-choice settings-theme-row"><legend>Оформление</legend><div>{[['dark','Чёрная'],['light','Светлая'],['system','Как в системе']].map(([value,label])=><button key={value} aria-pressed={theme===value} onClick={()=>setTheme(value)}>{label}</button>)}</div></fieldset>
       <div className="settings-map-actions">
  <label className="setting-row" htmlFor="auto-load">
-   <span><strong>Автозагрузка объектов</strong><small>При перемещении карты</small></span>
+   <span><strong>Автозагрузка области</strong><small>При перемещении карты</small></span>
    <input id="auto-load" type="checkbox" checked={auto} onChange={e=>setAuto(e.target.checked)}/>
  </label>
  <label className="setting-row settings-select-row" htmlFor="density-setting">
