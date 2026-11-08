@@ -55,7 +55,7 @@ final class CarPlaceCard {
    String date=clean(value(c,"dateLabel","date_label"),100);
    comments.add(new Comment(author.isEmpty()?"Участник Wikimapia":author,text,date));
   }
-  int photoTotal=photos==null?0:photos.length(),commentTotal=rawComments==null?0:rawComments.length();
+  int photoTotal=photos==null?0:photos.length(),commentTotal=comments.size();
   return new CarPlaceCard(id,title,description,comments,
    Math.max(photoTotal,place.optInt("photos_count",photoTotal)),
    Math.max(comments.size(),place.optInt("comments_count",commentTotal)),photosKnown,commentsKnown);
