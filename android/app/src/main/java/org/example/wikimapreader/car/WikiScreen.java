@@ -67,7 +67,11 @@ public final class WikiScreen extends Screen implements DefaultLifecycleObserver
   boolean follow;
   synchronized(session.view){follow=session.view.follow;}
   String prefix=session.gps==null?session.gpsStatus:follow?"GPS Follow: вкл":"GPS Follow: пауза";
-  return prefix+" · "+(blockedError?"Обновите область":loading?"Загрузка объектов":status);
+  String contour=blockedError?"Контуры Wikimapia: ошибка · обновите область"
+   :loading?"Контуры Wikimapia: загрузка…"
+   :"Контуры Wikimapia: "+status;
+  String tiles=session.renderer==null?"Подложка: ожидание":session.renderer.tileStatus();
+  return prefix+" · "+contour+"\n"+tiles;
  }
  /** Rasterize source vectors at 96px to avoid host-side mdpi resource upscaling. */
  private CarIcon icon(int id){
@@ -115,7 +119,7 @@ public final class WikiScreen extends Screen implements DefaultLifecycleObserver
   }else if(showNearby){
    ItemList.Builder nearby=new ItemList.Builder()
     .addItem(new Row.Builder().setTitle(loading?"Загрузка области":status)
-     .addText(session.gpsStatus).build());
+     .addText(session.gpsStatus).addText(session.renderer==null?"Подложка: ожидание":session.renderer.tileStatus()).build());
    int shown=1;for(Item item:rows(nearest(),false,true).getItems()){
     if(shown++>=limit())break;
     nearby.addItem(item);
@@ -217,6 +221,8 @@ public final class WikiScreen extends Screen implements DefaultLifecycleObserver
    YandexTileSettings settings=YandexTileSettings.get(getCarContext());
    String source=settings.selected();
    ItemList.Builder list=new ItemList.Builder();
+   list.addItem(new Row.Builder().setTitle("Состояние подложки")
+    .addText(session.renderer==null?"Нет карты":session.renderer.tileStatus()).build());
    list.addItem(new Row.Builder().setTitle(("osm".equals(source)?"✓ ":"")+"OpenStreetMap")
     .setOnClickListener(()->select("osm")).build());
    if(getCarContext().getCarAppApiLevel()>=7&&settings.configured()){
