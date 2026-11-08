@@ -4,8 +4,14 @@ import android.text.Html;
 import org.example.wikimapreader.SiteHttp;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
 import java.io.IOException;
 import java.net.URLEncoder;
+import java.net.URI;
+import java.util.HashSet;
+import java.util.Set;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Locale;
@@ -221,11 +227,67 @@ final class CarSiteSource {
   long id=opts.getLong("id");if(id<1||id>9007199254740991L)throw new IOException("Invalid place id");
   SiteHttp.Result response=checked("https://wikimapia.org/"+id+"/ru/",null,cancelled);
   if(!response.url.matches("https://wikimapia\\.org/"+id+"/(?:ru/.*)?"))throw new IOException("Wrong place page");
-  Matcher title=H1.matcher(response.text);if(!title.find())throw new IOException("Unknown place page");
-  String name=plain(title.group(1));if(name.isEmpty())throw new IOException("No place title");
-  Matcher desc=DESCRIPTION.matcher(response.text);String text=desc.find()?plain(desc.group(1)):"";
-  if(text.matches("(?is).*RK\\s*n\\.?\\s*22.*"))text="";
-  return new JSONObject().put("id",id).put("title",name).put("description",text).put("source","site");
+  return parseDetail(id,response.text);
+ }
+ /** The same public HTML blocks as the phone parser. Never run page scripts. */
+ static JSONObject parseDetail(long id,String html)throws Exception {
+  if(id<1||id>9007199254740991L||html==null||html.length()>4194304)throw new IOException("Invalid place page");
+  Document doc=Jsoup.parse(html);
+  Element heading=doc.selectFirst("h1");
+  if(heading==null)throw new IOException("Unknown place page");
+  String title=heading.text().trim();
+  if(title.isEmpty())throw new IOException("No place title");
+  Element desc=doc.selectFirst("#place-description");
+  String description=desc==null?"":desc.text().trim();
+  if(description.matches("(?is).*RK\\s*n\\.?\\s*22.*"))description="";
+  Element photoRoot=doc.selectFirst("#place-photos"),commentRoot=doc.selectFirst("#comments");
+  JSONArray photos=new JSONArray(),comments=new JSONArray();
+  Set<String> photoIds=new HashSet<>(),commentIds=new HashSet<>();
+  int photoCount=0,commentCount=0;
+  boolean badPhoto=false,badComment=false;
+  for(Element link:doc.select("#place-photos a.thumb-link")){
+   String url=photoUrl(link.hasAttr("data-full-url")?link.attr("data-full-url"):link.attr("href"));
+   if(url==null){badPhoto=true;continue;}
+   String key=link.hasAttr("data-id")?link.attr("data-id"):url;
+   if(!photoIds.add(key))continue;
+   photoCount++;
+   if(photos.length()<40)photos.put(new JSONObject().put("url",url).put("author",link.attr("data-user-name")));
+  }
+  for(Element row:doc.select("#comments li.comment")){
+   String commentId=row.id();
+   if(!commentId.matches("comment-[0-9]+")){badComment=true;continue;}
+   if(!commentIds.add(commentId))continue;
+   Element text=row.selectFirst(".comment-content");
+   if(text==null){badComment=true;continue;}
+   if(text.attr("style").replace(" ","").contains("display:none"))continue;
+   String value=text.text().trim();if(value.isEmpty())continue;
+   commentCount++;
+   Element author=row.selectFirst("[id^=comment-creator-]"),when=row.selectFirst(".time, time");
+   String by=author==null?"Участник Wikimapia":author.text().trim();
+   String date=when==null?"":when.text().trim();
+   if(comments.length()<8)comments.put(new JSONObject().put("author",by)
+    .put("text",value.length()>1000?value.substring(0,999)+"…":value)
+    .put("dateLabel",date.length()>100?date.substring(0,100):date));
+  }
+  if(photoRoot!=null&&!photoRoot.children().isEmpty()&&photoRoot.select("a.thumb-link").isEmpty())badPhoto=true;
+  if(commentRoot!=null&&!commentRoot.children().isEmpty()&&commentRoot.select("li.comment,ul.comments-root,ul.comments-list,#more-comments,#comments-form-toggle").isEmpty())badComment=true;
+  JSONObject blocks=new JSONObject()
+   .put("photos",photoRoot==null||badPhoto?"unavailable":photos.length()>0?"ok":"empty")
+   .put("comments",commentRoot==null||badComment?"unavailable":comments.length()>0?"ok":"empty");
+  JSONObject place=new JSONObject().put("id",id).put("title",title).put("description",description)
+   .put("photos",photos).put("comments",comments)
+   .put("photos_count",photoCount).put("comments_count",commentCount).put("source","site");
+  // Keep the legacy top-level website response for the existing live Auto protocol.
+  return place.put("blocks",blocks);
+ }
+ private static String photoUrl(String candidate){
+  try {
+   URI u=new URI(candidate);
+   if(!("https".equalsIgnoreCase(u.getScheme())||"http".equalsIgnoreCase(u.getScheme()))
+       ||!"photos.wikimapia.org".equalsIgnoreCase(u.getHost())||u.getUserInfo()!=null
+       ||u.getPort()!=-1||!u.getPath().matches("/p/(?:[0-9]{2}/){4}[0-9]{2}_(?:big|full|[0-9]+)\\.jpg"))return null;
+   return "https://photos.wikimapia.org"+u.getPath();
+  }catch(Exception e){return null;}
  }
  private static String attr(String tag,String key){
   Pattern p=Pattern.compile(String.format(Locale.ROOT,ATTR.pattern(),Pattern.quote(key)));

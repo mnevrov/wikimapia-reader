@@ -30,6 +30,25 @@ public class CarScreensTest {
   Pane empty=((PaneTemplate)((MapWithContentTemplate)root.onGetTemplate()).getContentTemplate()).getPane();
   assertFalse(empty.getRows().get(0).getTitle().toString().equals("Дом"));
  }
+ @Test public void mapPreviewExpandsIntoRichListWithoutLosingMap()throws Exception{
+  WikiScreen root=create(7);
+  java.lang.reflect.Field places=WikiScreen.class.getDeclaredField("places");places.setAccessible(true);
+  places.set(root,java.util.Arrays.asList(new Place(55,"Дом","<p>История квартала</p>",
+   new double[][]{{55,37},{55,37.02},{55.02,37.02},{55.02,37}})));
+  root.tap(55.01,37.01);
+  java.lang.reflect.Field expanded=WikiScreen.class.getDeclaredField("previewExpanded");
+  expanded.setAccessible(true);expanded.setBoolean(root,true);
+  java.lang.reflect.Field details=WikiScreen.class.getDeclaredField("previewCard");
+  details.setAccessible(true);
+  details.set(root,CarPlaceCard.from(new org.json.JSONObject("{\"id\":55,\"title\":\"Дом\",\"description\":\"Памятник архитектуры\",\"photos\":[{\"url\":\"https://photos.wikimapia.org/p/12/34/56/78/90_big.jpg\"}],\"comments\":[{\"text\":\"Имеет историческое значение\",\"author\":\"Читатель\"}]}"),
+   new Place(55,"Дом","",new double[0][])));
+  MapWithContentTemplate template=(MapWithContentTemplate)root.onGetTemplate();
+  assertTrue("Rich card must keep the map surface",template.getContentTemplate() instanceof ListTemplate);
+  ItemList rows=((ListTemplate)template.getContentTemplate()).getSingleList();
+  assertNotNull(rows);assertTrue(rows.getItems().size()>=4);
+  assertEquals("Дом",((Row)rows.getItems().get(0)).getTitle().toString());
+  assertEquals("Описание",((Row)rows.getItems().get(1)).getTitle().toString());
+ }
  @Test public void overlappingPolygonsCycleInPlaceWithoutScreenNavigation()throws Exception{
   WikiScreen root=create(7);
   double[][] shape={{55.0,37.0},{55.0,37.02},{55.02,37.02},{55.02,37.0}};
