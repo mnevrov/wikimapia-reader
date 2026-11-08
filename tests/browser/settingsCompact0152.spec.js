@@ -12,7 +12,7 @@ test('everyday map controls appear first; infrequent groups start collapsed',asy
  await expect(map).toBeVisible();
  await expect(map.getByRole('button',{name:'OpenStreetMap'})).toBeVisible();
  await expect(map.getByRole('button',{name:'Светлая',exact:true})).toBeVisible();
- await expect(map.getByLabel('Автозагрузка объектов')).toBeVisible();
+ await expect(map.getByLabel('Автозагрузка области')).toBeVisible();
  await expect(map.locator('#density-setting')).toBeVisible();
 
  const sections=await page.locator('[data-settings-section="map"], .settings-accordion').evaluateAll(nodes=>
@@ -72,11 +72,11 @@ test('compact settings avoid horizontal overflow at narrow and enlarged font siz
 
 test('changing map preferences still persists across reopen',async({page})=>{
  await page.getByRole('button',{name:'Светлая',exact:true}).click();
- await page.getByLabel('Автозагрузка объектов').uncheck();
+ await page.getByLabel('Автозагрузка области').uncheck();
  await page.locator('#density-setting').selectOption('calm');
  await page.reload();
  await screen(page,'Настройки');
  await expect(page.getByRole('button',{name:'Светлая',exact:true})).toHaveAttribute('aria-pressed','true');
- await expect(page.getByLabel('Автозагрузка объектов')).not.toBeChecked();
+ await expect(page.getByLabel('Автозагрузка области')).not.toBeChecked();
  await expect(page.locator('#density-setting')).toHaveValue('calm');
 });
