@@ -167,12 +167,13 @@ export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refr
     else{accuracyRef.current.setLatLng(point);accuracyRef.current.setRadius(radius);}
     if(!gpsFollowing)return;
     const previous=lastFollow.current;
-    if(previous){
+    const precisionImproved=previous&&previous.accuracy>250&&radius<=250;
+    if(previous&&!precisionImproved){
       if(!followMovement(map.distance([previous.lat,previous.lng],point),Date.now()-previous.at,radius))return;
     }
     const currentZoom=map.getZoom();
     map.setView(point,followZoom(radius,currentZoom,Boolean(previous)),{animate:!!previous&&!reduceMotion,duration:.55});
-    lastFollow.current={lat:location.lat,lng:location.lng,at:Date.now()};
+    lastFollow.current={lat:location.lat,lng:location.lng,accuracy:radius,at:Date.now()};
   },[location,gpsFollowing]);
   const yandexActive=useYandexUnderlay({
     mapRef,hostRef:yandexHost,selected:basemap==='yandex',
