@@ -8,7 +8,7 @@ import {hitTestPlaces} from './geometry.js';
 import {DEMO_AREA} from './demo.js';
 import {visibleInMap,contourStyle} from './mapPresentation.js';
 import {useYandexUnderlay} from './useYandexUnderlay.js';
-import {followMovement} from './gpsFollow.js';
+import {followMovement,followZoom} from './gpsFollow.js';
 
 function initialView() {
   try {
@@ -162,7 +162,7 @@ export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refr
     if(!Number.isFinite(point[0])||!Number.isFinite(point[1]))return;
     if(!markerRef.current)markerRef.current=L.circleMarker(point,{radius:7,color:'#fff',weight:3,fillColor:'#2d86ff',fillOpacity:1}).addTo(map);
     else markerRef.current.setLatLng(point);
-    const radius=Math.max(1,Math.min(Number(location.accuracy)||100,1000));
+    const radius=Math.max(1,Math.min(Number(location.accuracy)||100,5000));
     if(!accuracyRef.current)accuracyRef.current=L.circle(point,{radius,color:'#2d86ff',weight:1,fillOpacity:.08}).addTo(map);
     else{accuracyRef.current.setLatLng(point);accuracyRef.current.setRadius(radius);}
     if(!gpsFollowing)return;
@@ -171,7 +171,7 @@ export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refr
       if(!followMovement(map.distance([previous.lat,previous.lng],point),Date.now()-previous.at,radius))return;
     }
     const currentZoom=map.getZoom();
-    map.setView(point,Math.max(17,currentZoom),{animate:!!previous&&!reduceMotion,duration:.55});
+    map.setView(point,followZoom(radius,currentZoom,Boolean(previous)),{animate:!!previous&&!reduceMotion,duration:.55});
     lastFollow.current={lat:location.lat,lng:location.lng,at:Date.now()};
   },[location,gpsFollowing]);
   const yandexActive=useYandexUnderlay({
