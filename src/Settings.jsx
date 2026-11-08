@@ -142,7 +142,7 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
    </select>
  </label>
 </div>
-      <details className="settings-subsection settings-map-credentials" data-settings-section="phone-key">
+      <details className="settings-subsection settings-map-credentials" data-settings-section="phone-key" open={Boolean(yandexDiagnostic)||undefined}>
         <summary>Ключ Яндекс Карт для телефона {yandexKey?'· сохранён':'· не добавлен'}</summary>
         <div className="settings-subsection-content yandex-settings">
           <p className="helper">Используется только для Яндекс Карт на телефоне. Нужен JavaScript API 3.0.</p>
