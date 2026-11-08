@@ -9,6 +9,34 @@ import java.util.LinkedHashMap;
 import static org.junit.Assert.*;
 @RunWith(RobolectricTestRunner.class) @Config(sdk=35)
 public class CarSiteSourceTest {
+ @Test public void siteDetailExtractsPublicBlocksWithoutRunningScripts()throws Exception{
+  String html="<html><h1>Исторический дом</h1><div id='place-description'><p>Строение 1920 года</p></div>"
+    +"<div id='place-photos'><a class='thumb-link' data-id='5' data-full-url='https://photos.wikimapia.org/p/12/34/56/78/90_big.jpg'>Фото</a></div>"
+    +"<div id='comments'><ul><li class='comment' id='comment-9'><span id='comment-creator-9'>Гость</span>"
+    +"<span class='time'>12 июня</span><div class='comment-content'>Новая информация</div></li></ul></div>"
+    +"<script>globalThis.evil = true</script></html>";
+  JSONObject response=CarSiteSource.parseDetail(55,html);
+  JSONObject place=response.getJSONObject("place");
+  assertEquals("Исторический дом",place.getString("title"));
+  assertEquals("Строение 1920 года",place.getString("description"));
+  assertEquals(1,place.getJSONArray("photos").length());
+  assertEquals(1,place.getJSONArray("comments").length());
+  assertEquals("Гость",place.getJSONArray("comments").getJSONObject(0).getString("author"));
+  assertFalse(response.toString().contains("globalThis.evil"));
+ }
+ @Test public void siteDetailDoesNotInventMissingMediaBlocks()throws Exception{
+  JSONObject result=CarSiteSource.parseDetail(55,"<h1>Дом</h1><div id='place-description'>Есть описание</div>");
+  assertEquals("unavailable",result.getJSONObject("blocks").getString("photos"));
+  assertEquals("unavailable",result.getJSONObject("blocks").getString("comments"));
+ }
+ @Test public void photoUrlsRejectOffDomainOrUnrecognizedPaths()throws Exception{
+  String html="<h1>Дом</h1><div id='place-photos'>"
+   +"<a class='thumb-link' data-full-url='https://example.com/secret.jpg'></a>"
+   +"<a class='thumb-link' data-full-url='https://photos.wikimapia.org/other.jpg'></a></div>";
+  JSONObject result=CarSiteSource.parseDetail(55,html);
+  assertEquals(0,result.getJSONObject("place").getJSONArray("photos").length());
+  assertEquals("unavailable",result.getJSONObject("blocks").getString("photos"));
+ }
  @Test public void siteTileAddressUsesTheSameQuadkeyAsWeb()throws Exception {
    assertEquals("03021323233220",CarSiteSource.tileId(4952,2561,13));
    assertEquals("https://wikimapia.org/z1/itiles/030/213/232/332/20.xy",CarSiteSource.tilePath("03021323233220"));
