@@ -1,3 +1,4 @@
+import {expandSettings} from './helpers.js';
 import {test,expect} from '@playwright/test';
 import fs from 'node:fs';
 import {clickContour,tiles,connect,openId,screen,map} from './helpers.js';
@@ -11,7 +12,7 @@ test('demo card tabs reading mode and close',async({page})=>{
 });
 test('typing key never requests data; web key stays out of persistent storage',async({page})=>{
  const methods=[];await page.route('https://api.wikimapia.org/**',r=>{methods.push(new URL(r.request().url()).searchParams.get('function'));return r.fulfill({json:detail});});
- await page.goto('/');await screen(page,'Настройки');await page.locator('#api-key').pressSequentially('private-test-key');expect(methods).toHaveLength(0);
+ await page.goto('/');await screen(page,'Настройки');await expandSettings(page,'connection');await page.locator('#api-key').pressSequentially('private-test-key');expect(methods).toHaveLength(0);
  await page.getByRole('button',{name:'Сохранить и подключить'}).click();await openId(page);
  await expect(page.locator('.sheet h2')).toHaveText('Eiffel Tower');await expect(page.locator('.description')).toContainText('Champ de Mars');
  expect(methods).toEqual(['place.getbyid']);expect(await page.evaluate(()=>JSON.stringify(localStorage))).not.toContain('private-test-key');
@@ -22,7 +23,7 @@ test('ambiguous area response never reports zero successfully',async({page})=>{
 });
 test('late detail ignored after switching to demo from navigation',async({page})=>{
  let deliver;const held=new Promise(r=>deliver=r);await page.route('https://api.wikimapia.org/**',async r=>{await held;await r.fulfill({json:detail});});
- await page.goto('/');await connect(page);await openId(page);await screen(page,'Настройки');await page.getByRole('button',{name:'Открыть деморежим'}).click();deliver();
+ await page.goto('/');await connect(page);await openId(page);await screen(page,'Настройки');await expandSettings(page,'connection');await expandSettings(page,'advanced');await page.getByRole('button',{name:'Открыть деморежим'}).click();deliver();
  await expect(page.locator('.status')).toContainText('Демо');await expect(page.locator('.sheet')).toHaveCount(0);
 });
 test('box contour leads to real-shaped detail',async({page})=>{
