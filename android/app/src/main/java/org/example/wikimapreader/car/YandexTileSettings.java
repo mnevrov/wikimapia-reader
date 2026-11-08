@@ -23,6 +23,7 @@ public final class YandexTileSettings {
  private final Context app;
  private final SharedPreferences preferences;
  private volatile String cachedKey;
+ private int settingsRevision;
 
  public static synchronized YandexTileSettings get(Context context){
   if(instance==null)instance=new YandexTileSettings(context);
@@ -46,6 +47,8 @@ public final class YandexTileSettings {
   return generator.generateKey();
  }
  static boolean valid(String value){return value!=null&&value.matches("[A-Za-z0-9_\\-]{16,128}");}
+ /** Nonsecret generation to discard stale tile responses after key/provider changes. */
+ public synchronized int revision(){return settingsRevision;}
  public synchronized boolean configured(){
   return getKey()!=null;
  }
@@ -75,12 +78,12 @@ public final class YandexTileSettings {
   System.arraycopy(iv,0,record,1,iv.length);System.arraycopy(encrypted,0,record,13,encrypted.length);
   if(!preferences.edit().putString("key",Base64.encodeToString(record,Base64.NO_WRAP)).commit())
    throw new java.io.IOException("Unable to persist key");
-  cachedKey=value;
+  cachedKey=value;settingsRevision++;
  }
  public synchronized void clearKey()throws Exception{
   if(!preferences.edit().remove("key").putString("provider","osm").commit())
    throw new java.io.IOException("Unable to clear Tiles API key");
-  cachedKey=null;
+  cachedKey=null;settingsRevision++;
   try{keyStore().deleteEntry(ALIAS);}catch(Exception ignored){}
  }
  public synchronized String selected(){
@@ -93,5 +96,6 @@ public final class YandexTileSettings {
    throw new IllegalStateException("Tiles API key is missing");
   if(!preferences.edit().putString("provider",provider).commit())
    throw new IllegalStateException("Cannot save map provider");
+  settingsRevision++;
  }
 }
