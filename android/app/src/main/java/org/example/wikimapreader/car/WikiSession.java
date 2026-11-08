@@ -50,6 +50,14 @@ public final class WikiSession extends Session implements DefaultLifecycleObserv
   return root;
  }
 
+ @Override public void onCarConfigurationChanged(@NonNull Configuration configuration){
+  super.onCarConfigurationChanged(configuration);
+  // Android Auto owns day/night transitions; redraw from the car context,
+  // not the phone theme or wall-clock time.
+  if(renderer!=null)renderer.draw();
+  if(root!=null)root.refresh();
+ }
+
  @Override public void onStart(@NonNull LifecycleOwner owner){
   CarLocationService.subscribe(serviceObserver);
   startLocation();
