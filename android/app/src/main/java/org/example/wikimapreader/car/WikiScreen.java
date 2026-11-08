@@ -245,19 +245,22 @@ public final class WikiScreen extends Screen implements DefaultLifecycleObserver
    description.isEmpty()?(card==null?state:"Описание не добавлено"):CarPlaceCard.excerpt(description,230)).build());
   if(point!=null)items.add(new Row.Builder().setTitle("Маршрут к объекту")
    .setOnClickListener(()->navigate(p)).build());
-  if(card!=null&&card.commentsKnown){
-   String subtitle=card.comments.isEmpty()?"Нет комментариев":
+  if(card!=null){
+   String subtitle=!card.commentsKnown?"Сведения временно недоступны":
+    card.comments.isEmpty()?"Нет комментариев":
     CarPlaceCard.excerpt(card.comments.get(0).text,130);
-   Row.Builder row=new Row.Builder().setTitle("Комментарии: "+card.comments.size()).addText(subtitle);
+   Row.Builder row=new Row.Builder()
+    .setTitle(card.commentsKnown?"Комментарии: "+card.commentCount:"Комментарии: нет данных").addText(subtitle);
    if(!card.comments.isEmpty())row.setOnClickListener(()->getScreenManager().push(
     new Comments(getCarContext(),card)));
    items.add(row.build());
-  }
-  if(card!=null&&card.photosKnown){
-   Row.Builder row=new Row.Builder().setTitle("Фотографии: "+card.photoCount)
-    .addText(card.photoCount>0?"Смотреть на телефоне, когда остановитесь":"Фотографии не добавлены");
-   if(card.photoCount>0)row.setOnClickListener(ParkedOnlyOnClickListener.create(()->openPhone(p)));
-   items.add(row.build());
+   Row.Builder photos=new Row.Builder()
+    .setTitle(card.photosKnown?"Фотографии: "+card.photoCount:"Фотографии: нет данных")
+    .addText(!card.photosKnown?"Сведения временно недоступны":
+     card.photoCount>0?"Смотреть на телефоне, когда остановитесь":"Фотографии не добавлены");
+   if(card.photoCount>0&&card.photosKnown)
+    photos.setOnClickListener(ParkedOnlyOnClickListener.create(()->openPhone(p)));
+   items.add(photos.build());
   }
   items.add(new Row.Builder().setTitle(isFavorite(p.id)?"Удалить из избранного":"В избранное")
    .setOnClickListener(()->toggleFavorite(p)).build());
@@ -318,7 +321,7 @@ public final class WikiScreen extends Screen implements DefaultLifecycleObserver
      .setOnClickListener(ParkedOnlyOnClickListener.create(()->getScreenManager().push(
       new FullDescription(getCarContext(),comment.author,comment.text)))).build());
    }
-   return new ListTemplate.Builder().setTitle("Комментарии · "+card.comments.size())
+   return new ListTemplate.Builder().setTitle("Комментарии · "+card.commentCount)
     .setHeaderAction(Action.BACK).setSingleList(list.build()).build();
   }
  }
