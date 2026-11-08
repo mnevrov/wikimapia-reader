@@ -203,6 +203,125 @@ public final class WikiScreen extends Screen implements DefaultLifecycleObserver
   catch(RuntimeException e){previewText="Совместимый навигатор не найден";invalidate();}
  }
  private static double area(Place p){double sum=0;for(int i=0,j=p.coords.length-1;i<p.coords.length;j=i++)sum+=Geo.delta(p.coords[j][1],p.coords[0][1])*p.coords[i][0]-Geo.delta(p.coords[i][1],p.coords[0][1])*p.coords[j][0];return Math.abs(sum);}
+ private void openPhone(Place p){
+  try{
+   session.store.pending(p.id);
+   Intent intent=new Intent(getCarContext(),MainActivity.class)
+    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_SINGLE_TOP);
+   getCarContext().startActivity(intent);
+  }catch(Exception ignored){}
+ }
+ private void navigate(Place p){
+  double[] q=p.point();if(q==null)return;
+  try{getCarContext().startCarApp(new Intent(CarContext.ACTION_NAVIGATE,Uri.parse("geo:"+q[0]+","+q[1])));}
+  catch(RuntimeException ignored){}
+ }
+ private boolean isFavorite(long id){
+  JSONArray list=session.store.favorites();
+  for(int i=0;i<list.length();i++){
+   JSONObject f=list.optJSONObject(i);
+   if(f!=null&&f.optLong("id")==id&&"wikimapia".equals(f.optString("source")))return true;
+  }
+  return false;
+ }
+ private void toggleFavorite(Place p){
+  io.execute(()->{try{session.store.toggle(p);}catch(Exception ignored){}
+   main.post(this::invalidate);});
+ }
+ private void fullDescription(Place p,CarPlaceCard card){
+  String text=card==null?CarPlaceCard.clean(p.description,6000):card.description;
+  if(!text.isEmpty())getScreenManager().push(new FullDescription(getCarContext(),p.title,text));
+ }
+ private ItemList objectRows(Place p,CarPlaceCard card,String state,boolean onMap){
+  String description=card==null?CarPlaceCard.clean(p.description,6000):card.description;
+  String title=card==null?p.title:card.title;
+  List<Row> items=new ArrayList<>();
+  StringBuilder identity=new StringBuilder("Wikimapia #"+p.id);
+  double[] point=p.point();
+  if(session.gps!=null&&point!=null)identity.append(" · ").append(Math.round(Geo.distance(
+   session.gps[0],session.gps[1],point[0],point[1]))).append(" м");
+  items.add(new Row.Builder().setTitle(title).addText(identity.toString()).build());
+  items.add(new Row.Builder().setTitle("Описание").addText(
+   description.isEmpty()?(card==null?state:"Описание не добавлено"):CarPlaceCard.excerpt(description,230)).build());
+  if(point!=null)items.add(new Row.Builder().setTitle("Маршрут к объекту")
+   .setOnClickListener(()->navigate(p)).build());
+  if(card!=null&&card.commentsKnown){
+   String subtitle=card.comments.isEmpty()?"Нет комментариев":
+    CarPlaceCard.excerpt(card.comments.get(0).text,130);
+   Row.Builder row=new Row.Builder().setTitle("Комментарии: "+card.comments.size()).addText(subtitle);
+   if(!card.comments.isEmpty())row.setOnClickListener(()->getScreenManager().push(
+    new Comments(getCarContext(),card)));
+   items.add(row.build());
+  }
+  if(card!=null&&card.photosKnown){
+   Row.Builder row=new Row.Builder().setTitle("Фотографии: "+card.photoCount)
+    .addText(card.photoCount>0?"Смотреть на телефоне, когда остановитесь":"Фотографии не добавлены");
+   if(card.photoCount>0)row.setOnClickListener(ParkedOnlyOnClickListener.create(()->openPhone(p)));
+   items.add(row.build());
+  }
+  items.add(new Row.Builder().setTitle(isFavorite(p.id)?"Удалить из избранного":"В избранное")
+   .setOnClickListener(()->toggleFavorite(p)).build());
+  if(!description.isEmpty())items.add(new Row.Builder().setTitle("Читать полное описание (на стоянке)")
+   .setOnClickListener(ParkedOnlyOnClickListener.create(()->fullDescription(p,card))).build());
+  items.add(new Row.Builder().setTitle("Открыть карточку на телефоне (на стоянке)")
+   .setOnClickListener(ParkedOnlyOnClickListener.create(()->openPhone(p))).build());
+  if(onMap)items.add(new Row.Builder().setTitle("Свернуть карточку")
+   .setOnClickListener(()->{previewExpanded=false;invalidate();}).build());
+  int count=Math.max(2,limit());
+  ItemList.Builder list=new ItemList.Builder();
+  if(items.size()<=count){for(Row row:items)list.addItem(row);}
+  else{
+   for(int i=0;i<Math.min(count-1,items.size());i++)list.addItem(items.get(i));
+   list.addItem(new Row.Builder().setTitle("Дополнительные сведения и действия")
+    .setOnClickListener(()->getScreenManager().push(
+     new More(getCarContext(),p,card,onMap))).build());
+  }
+  return list.build();
+ }
+ private final class More extends Screen{
+  final Place place;final CarPlaceCard card;final boolean fromMap;
+  More(CarContext c,Place p,CarPlaceCard d,boolean fromMap){super(c);place=p;card=d;this.fromMap=fromMap;}
+  @NonNull @Override public Template onGetTemplate(){
+   ItemList.Builder list=new ItemList.Builder();
+   list.addItem(new Row.Builder().setTitle(isFavorite(place.id)?"Удалить из избранного":"В избранное")
+    .setOnClickListener(()->toggleFavorite(place)).build());
+   String text=card==null?CarPlaceCard.clean(place.description,6000):card.description;
+   if(!text.isEmpty())list.addItem(new Row.Builder().setTitle("Читать полное описание (на стоянке)")
+    .setOnClickListener(ParkedOnlyOnClickListener.create(()->fullDescription(place,card))).build());
+   list.addItem(new Row.Builder().setTitle("Открыть на телефоне (на стоянке)")
+    .setOnClickListener(ParkedOnlyOnClickListener.create(()->openPhone(place))).build());
+   if(fromMap)list.addItem(new Row.Builder().setTitle("Свернуть карточку")
+    .setOnClickListener(()->{previewExpanded=false;getScreenManager().pop();invalidate();}).build());
+   return new ListTemplate.Builder().setTitle("Действия с объектом").setHeaderAction(Action.BACK)
+    .setSingleList(list.build()).build();
+  }
+ }
+ private static final class FullDescription extends Screen{
+  final String title,description;
+  FullDescription(CarContext c,String title,String description){super(c);this.title=title;this.description=description;}
+  @NonNull @Override public Template onGetTemplate(){
+   return new LongMessageTemplate.Builder(description).setTitle(title)
+    .setHeaderAction(Action.BACK).build();
+  }
+ }
+ private final class Comments extends Screen{
+  final CarPlaceCard card;
+  Comments(CarContext c,CarPlaceCard d){super(c);card=d;}
+  @NonNull @Override public Template onGetTemplate(){
+   ItemList.Builder list=new ItemList.Builder();
+   int max=limit();
+   for(int i=0;i<Math.min(max,card.comments.size());i++){
+    CarPlaceCard.Comment comment=card.comments.get(i);
+    String author=comment.author+(comment.date.isEmpty()?"":" · "+comment.date);
+    list.addItem(new Row.Builder().setTitle(author)
+     .addText(CarPlaceCard.excerpt(comment.text,200))
+     .setOnClickListener(ParkedOnlyOnClickListener.create(()->getScreenManager().push(
+      new FullDescription(getCarContext(),comment.author,comment.text)))).build());
+   }
+   return new ListTemplate.Builder().setTitle("Комментарии · "+card.comments.size())
+    .setHeaderAction(Action.BACK).setSingleList(list.build()).build();
+  }
+ }
  private void favorites(){List<Place> list=new ArrayList<>();JSONArray a=session.store.favorites();for(int i=0;i<a.length();i++)try{JSONObject f=a.getJSONObject(i);if(!f.optString("source").equals("wikimapia"))continue;long id=f.getLong("id");Place found=null;for(Place p:places)if(p.id==id)found=p;list.add(found!=null?found:new Place(id,f.optString("title"),"",new double[0][]));}catch(Exception ignored){}getScreenManager().push(new Places(getCarContext(),"Избранное",list));}
  private void detail(Place p){selected=p.id;persist();refresh();getScreenManager().push(new Detail(getCarContext(),p));}
 
@@ -253,11 +372,33 @@ public final class WikiScreen extends Screen implements DefaultLifecycleObserver
   }
  }
  private class Places extends Screen {final String title;final List<Place> data;Places(CarContext c,String title,List<Place> data){super(c);this.title=title;this.data=data;}@NonNull @Override public Template onGetTemplate(){return new ListTemplate.Builder().setTitle(title).setHeaderAction(Action.BACK).setSingleList(rows(data,false)).build();}}
- private class Detail extends Screen implements DefaultLifecycleObserver {Place place;String message="Краткие сведения · полная карточка на телефоне";final String id="detail:"+UUID.randomUUID();boolean active;
- Detail(CarContext c,Place p){super(c);place=p;getLifecycle().addObserver(this);}
- @Override public void onStart(@NonNull LifecycleOwner o){active=true;try{JSONObject opts=new JSONObject().put("id",place.id);WikiApi.INSTANCE.request(id,new CredentialRepository(getCarContext()),"place.getbyid",opts,(data,error)->main.post(()->{if(!active)return;if(error==null)try{JSONObject item=data.optJSONObject("place");Place loaded=Place.from(item!=null?item:data);place=new Place(loaded.id,loaded.title,loaded.description,loaded.coords.length>=3?loaded.coords:place.coords);message=place.description.isEmpty()?"Описание отсутствует":place.description.replaceAll("<[^>]*>"," ").replaceAll("\\s+"," ").trim();if(message.length()>160)message=message.substring(0,157)+"…";}catch(Exception e){message="Неполные сведения";}else message=error;invalidate();}));}catch(Exception ignored){}}
- @Override public void onStop(@NonNull LifecycleOwner o){active=false;WikiApi.INSTANCE.cancel(id);}
- @NonNull @Override public Template onGetTemplate(){ItemList.Builder list=new ItemList.Builder().addItem(new Row.Builder().setTitle(place.title).addText(message).build()).addItem(new Row.Builder().setTitle("Добавить / убрать избранное").setOnClickListener(()->io.execute(()->{try{session.store.toggle(place);main.post(()->{message="Избранное обновлено";invalidate();});}catch(Exception e){main.post(()->{message="Избранное не сохранено";invalidate();});}})).build());if(place.point()!=null)list.addItem(new Row.Builder().setTitle("Маршрут").setOnClickListener(()->{double[] q=place.point();try{getCarContext().startCarApp(new Intent(CarContext.ACTION_NAVIGATE,Uri.parse("geo:"+q[0]+","+q[1])));}catch(RuntimeException e){message="Нет совместимого навигатора";invalidate();}}).build());list.addItem(new Row.Builder().setTitle("Открыть на телефоне (на стоянке)").setOnClickListener(ParkedOnlyOnClickListener.create(()->{try{session.store.pending(place.id);Intent intent=new Intent(getCarContext(),MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_SINGLE_TOP);getCarContext().startActivity(intent);message="Откройте Auto Dev на телефоне";}catch(Exception e){message="Откройте Auto Dev на телефоне";}invalidate();})).build());return new ListTemplate.Builder().setTitle("Wikimapia #"+place.id).setHeaderAction(Action.BACK).setSingleList(list.build()).build();}}
+ private class Detail extends Screen implements DefaultLifecycleObserver {
+  Place place;CarPlaceCard card;String message="Загружаем сведения об объекте";
+  final String id="detail:"+UUID.randomUUID();boolean active;
+  Detail(CarContext c,Place p){super(c);place=p;getLifecycle().addObserver(this);}
+  @Override public void onStart(@NonNull LifecycleOwner o){
+   active=true;
+   try{JSONObject opts=new JSONObject().put("id",place.id);
+    WikiApi.INSTANCE.request(id,new CredentialRepository(getCarContext()),"place.getbyid",opts,
+     (data,error)->main.post(()->{
+      if(!active)return;
+      if(error==null)try{
+       CarPlaceCard loaded=CarPlaceCard.from(data,place);
+       card=loaded;
+       place=new Place(place.id,loaded.title,loaded.description,place.coords);
+       message="";
+      }catch(Exception ignored){message="Не удалось разобрать сведения об объекте";}
+      else message=error;
+      invalidate();
+     }));
+   }catch(Exception ignored){message="Не удалось загрузить сведения об объекте";}
+  }
+  @Override public void onStop(@NonNull LifecycleOwner o){active=false;WikiApi.INSTANCE.cancel(id);}
+  @NonNull @Override public Template onGetTemplate(){
+   return new ListTemplate.Builder().setTitle("Wikimapia #"+place.id)
+    .setHeaderAction(Action.BACK).setSingleList(objectRows(place,card,message,false)).build();
+  }
+ }
  private class Search extends Screen implements DefaultLifecycleObserver {List<Place> results=new ArrayList<>();JSONArray locations=new JSONArray();String query="",error="Название, ID или ссылка Wikimapia";boolean busy,active;final String id="search:"+UUID.randomUUID();
  Search(CarContext c){super(c);getLifecycle().addObserver(this);}
  @Override public void onStart(@NonNull LifecycleOwner o){active=true;}@Override public void onStop(@NonNull LifecycleOwner o){active=false;busy=false;WikiApi.INSTANCE.cancel(id);}
