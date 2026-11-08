@@ -54,6 +54,16 @@ test('compact settings avoid horizontal overflow at narrow and enlarged font siz
   await page.setViewportSize({width:size,height:700});
   await expect(page.locator('.settings-primary')).toBeVisible();
   const width=await page.evaluate(()=>({view:innerWidth,html:document.documentElement.scrollWidth}));
+  if(width.html>width.view+1){
+   const overflowing=await page.evaluate(()=>[...document.querySelectorAll('.settings-compact *')]
+    .filter(element=>{
+      const box=element.getBoundingClientRect();
+      return box.width>0&&box.right>innerWidth+1&&getComputedStyle(element).display!=='none';
+    })
+    .slice(0,12).map(element=>({tag:element.tagName,selector:element.className?.toString()?.slice(0,60),
+      text:element.textContent?.trim()?.slice(0,45),right:Math.round(element.getBoundingClientRect().right)})));
+   console.log('Settings overflow elements:',JSON.stringify(overflowing));
+  }
   expect(width.html).toBeLessThanOrEqual(width.view+1);
   const controls=page.locator('.settings-primary .basemap-choice button');
   for(const button of await controls.all()){
