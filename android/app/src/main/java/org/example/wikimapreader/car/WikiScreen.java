@@ -226,7 +226,10 @@ public final class WikiScreen extends Screen implements DefaultLifecycleObserver
  }
  private void toggleFavorite(Place p){
   io.execute(()->{try{session.store.toggle(p);}catch(Exception ignored){}
-   main.post(this::invalidate);});
+   main.post(()->{
+    try{getScreenManager().getTop().invalidate();}
+    catch(RuntimeException ignored){invalidate();}
+   });});
  }
  private void fullDescription(Place p,CarPlaceCard card){
   String text=card==null?CarPlaceCard.clean(p.description,6000):card.description;
