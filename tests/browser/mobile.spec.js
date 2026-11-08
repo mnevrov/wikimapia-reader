@@ -75,7 +75,7 @@ test('permission denial in GPS watcher is handled only after explicit tap',async
  expect(await page.evaluate(()=>window.geoOneShotRequests)).toBe(0);
  await page.getByRole('button',{name:'Моё местоположение'}).click();
  await expect.poll(()=>page.evaluate(()=>window.geoWatchRequests)).toBe(1);
- await expect(page.locator('.status')).toContainText('Местоположение недоступно');
+ await expect(page.locator('.status')).toContainText('Разрешите доступ к геопозиции');
  expect(await page.evaluate(()=>window.geoOneShotRequests)).toBe(0);
 });
 test('auto pan debounces; background cancels queued load and resume reuses covering cache',async({page})=>{
