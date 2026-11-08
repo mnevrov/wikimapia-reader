@@ -403,3 +403,19 @@ main:not(.has-screen):has(.undo-toast) .toast{visibility:hidden}
 @media(prefers-reduced-motion:reduce){
  .settings-compact .settings-accordion>summary::after{transition:none}
 }
+
+
+/* Prevent intrinsic text widths from widening the narrow settings viewport. */
+.settings-compact,.settings-compact .settings-primary,.settings-compact .settings-accordion,
+.settings-compact .settings-accordion-body,.settings-compact .settings-subsection{
+ min-width:0;max-width:100%;
+}
+.settings-compact .basemap-choice{grid-template-columns:repeat(2,minmax(0,1fr))}
+.settings-compact .basemap-choice button{min-width:0;white-space:normal;overflow-wrap:anywhere}
+.settings-compact .theme-choice>div{grid-template-columns:repeat(3,minmax(0,1fr))}
+.settings-compact .theme-choice button{min-width:0;white-space:normal;overflow-wrap:anywhere}
+.settings-compact .settings-map-actions .setting-row{gap:8px}
+.settings-compact .settings-select-row select{width:48%;min-width:0;max-width:48%;flex-shrink:0}
+.settings-compact .settings-accordion>summary>span,
+.settings-compact .settings-accordion>summary>small,
+.settings-compact .settings-subsection>summary{overflow-wrap:anywhere}
