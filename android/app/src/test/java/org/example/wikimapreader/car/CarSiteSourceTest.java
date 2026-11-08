@@ -16,7 +16,7 @@ public class CarSiteSourceTest {
     +"<span class='time'>12 июня</span><div class='comment-content'>Новая информация</div></li></ul></div>"
     +"<script>globalThis.evil = true</script></html>";
   JSONObject response=CarSiteSource.parseDetail(55,html);
-  JSONObject place=response.getJSONObject("place");
+  JSONObject place=response;
   assertEquals("Исторический дом",place.getString("title"));
   assertEquals("Строение 1920 года",place.getString("description"));
   assertEquals(1,place.getJSONArray("photos").length());
@@ -34,7 +34,7 @@ public class CarSiteSourceTest {
    +"<a class='thumb-link' data-full-url='https://example.com/secret.jpg'></a>"
    +"<a class='thumb-link' data-full-url='https://photos.wikimapia.org/other.jpg'></a></div>";
   JSONObject result=CarSiteSource.parseDetail(55,html);
-  assertEquals(0,result.getJSONObject("place").getJSONArray("photos").length());
+  assertEquals(0,result.getJSONArray("photos").length());
   assertEquals("unavailable",result.getJSONObject("blocks").getString("photos"));
  }
  @Test public void siteTileAddressUsesTheSameQuadkeyAsWeb()throws Exception {
