@@ -13,7 +13,7 @@ export default function OfflineSettings({epoch,onChange}){
   };
   return <section className="settings-group offline-settings" aria-label="Офлайн-хранилище">
     <h2>Офлайн-чтение</h2>
-    <p className="helper">Здесь хранятся только выбранные карточки Wikimapia, отдельно от кэша контуров и настроек подключения. Подложка карты не сохраняется.</p>
+    <p className="helper">Сохранённые карточки и фото, без подложки карты.</p>
     {error&&<p role="alert" className="error">{error}</p>}
     {snapshot&&<>
       <div className="offline-stats"><strong>{size(snapshot.bytes)} из {snapshot.preferences.limitMB} МБ</strong><span>{snapshot.count} объектов · Текст: {size(snapshot.textBytes)} · Фото: {size(snapshot.mediaBytes)}</span></div>
@@ -27,7 +27,7 @@ export default function OfflineSettings({epoch,onChange}){
           {[7,30,90,365].map(x=><option key={x} value={x}>{x} дней</option>)}
         </select>
       </label>
-      <p className="helper">После окончания срока карточка помечается устаревшей, но не удаляется автоматически. Для обновления откройте объект онлайн и сохраните повторно.</p>
+      <p className="helper">По истечении срока данные помечаются устаревшими, но не удаляются.</p>
       {!!snapshot.count&&(!confirm?<button className="danger-button" disabled={busy} onClick={()=>setConfirm(true)}><Icon name="trash" size={18}/>Очистить офлайн-хранилище…</button>:<div role="group" className="cache-confirm" aria-label="Подтверждение очистки офлайн"><p>Удалить все {snapshot.count} сохранённых объектов, включая фотографии? Избранное и кэш карты останутся.</p><div className="split-actions"><button className="danger-button" disabled={busy} onClick={()=>action(()=>offlineStore.clear())}>Удалить всё</button><button className="secondary" onClick={()=>setConfirm(false)}>Отмена</button></div></div>)}
     </>}
   </section>;
