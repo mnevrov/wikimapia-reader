@@ -187,7 +187,7 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - name: Determine version increase
+      - name: Determine version increase or authorized retry
         id: version
         env:
           PREVIOUS_MAIN_SHA: ${{ github.event.before }}
@@ -201,9 +201,16 @@ jobs:
           old=json.loads(subprocess.check_output(['git','show',f'{previous}:package.json'],text=True))['version']
           semver=r'\d+\.\d+\.\d+'
           assert re.fullmatch(semver,current) and re.fullmatch(semver,old), 'Invalid release version'
-          if tuple(map(int,current.split('.')))<=tuple(map(int,old.split('.'))):
-              print(f'No version increase: {old} -> {current}')
-              raise SystemExit(0)
+          new_version=tuple(map(int,current.split('.')))
+          old_version=tuple(map(int,old.split('.')))
+          if new_version<old_version:
+              raise SystemExit(f'Version decreased: {old} -> {current}')
+          if new_version==old_version:
+              marker=pathlib.Path(f'docs/releases/{current}/RETRY_RELEASE.md')
+              if not marker.is_file():
+                  print(f'No version increase and no explicit retry marker: {old} -> {current}')
+                  raise SystemExit(0)
+              print(f'Explicit retry of unpublished release: {current}')
           if pathlib.Path(f'docs/releases/{current}/HOLD_RELEASE.md').is_file():
               print(f'Stable release {current} held: Android Auto host acceptance pending')
               raise SystemExit(0)
