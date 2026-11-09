@@ -19,6 +19,13 @@ apply from: "variables.gradle"
 
 allprojects {
     repositories {
+        // Restricted fallback for a 56 MB Kotlin artifact: Maven Central intermittently
+        // redirects to GitHub Releases and fails with HTTP 504 on clean CI runners.
+        // Scope tightly to the one module; all other artifacts remain on trusted defaults.
+        maven {
+            url 'https://maven.wso2.org/nexus/content/repositories/central/'
+            content { includeModule 'org.jetbrains.kotlin', 'kotlin-compiler-embeddable' }
+        }
         google()
         mavenCentral()
     }
