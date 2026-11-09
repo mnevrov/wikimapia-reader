@@ -1,3 +1,4 @@
+import {expandSettings} from './helpers.js';
 import {test,expect} from '@playwright/test';
 import {tiles,screen,map} from './helpers.js';
 
@@ -29,7 +30,7 @@ test('Yandex attribution is SDK-owned and not duplicated by WikiReader',async({p
  });
  await page.goto('/');
  await screen(page,'Настройки');
- await page.locator('#yandex-api-key').fill('00000000-1111-4222-8333-444444444444');
+ await expandSettings(page,'phone-key');await page.locator('#yandex-api-key').fill('00000000-1111-4222-8333-444444444444');
  await page.locator('#yandex-referer').check();
  await page.getByRole('button',{name:'Яндекс Карты'}).click();
  await map(page);

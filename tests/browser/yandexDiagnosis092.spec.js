@@ -1,3 +1,4 @@
+import {expandSettings} from './helpers.js';
 import {test,expect} from '@playwright/test';
 import {tiles,screen,map} from './helpers.js';
 
@@ -7,7 +8,7 @@ async function setup(page,handler){
  await page.route('https://api-maps.yandex.ru/v3/**',handler);
  await page.goto('/');
  await screen(page,'Настройки');
- await page.locator('#yandex-api-key').fill(key);
+ await expandSettings(page,'phone-key');await page.locator('#yandex-api-key').fill(key);
  await page.locator('#yandex-referer').check();
  await page.getByRole('button',{name:'Яндекс Карты'}).click();
  await map(page);

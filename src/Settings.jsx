@@ -120,29 +120,65 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
   };
   useEffect(()=>{setEditing(false);setDraft('');setConfirmForget(false);},[credentials.key]);
   const submit=async e=>{e.preventDefault();if(await onApply(draft)){setDraft('');setEditing(false);}};
-  return <div className="settings-panel screen-body">
-    <section className="settings-group"><h2>Подключение к Wikimapia</h2>
-      <div className="connection-card"><span className="connection-icon"><Icon name="key"/></span><div><strong>{credentials.key?(credentials.saved?'Ключ сохранён на устройстве':'Ключ действует в этой вкладке'):'Чтение с сайта'}</strong><p>{credentials.saved?'Будет восстановлен при следующем запуске.':credentials.key?'В браузере постоянное хранение отключено.':'Ключ необязателен: сайт используется первым, API дополняет недоступные данные.'}</p></div>{credentials.saved&&<Icon name="check"/>}</div>
-      {credentials.error&&<div className="error" role="alert"><p>{credentials.error}</p>{!credentials.key&&<button className="secondary" disabled={credentials.busy} onClick={onForget}>Удалить сохранённую запись</button>}</div>}
-      <Motion open={!credentials.key||editing} kind="disclosure"><form className="credential-form" onSubmit={submit}><label htmlFor="api-key">API-ключ Wikimapia — необязательно</label><input id="api-key" type="password" autoComplete="off" autoCapitalize="none" spellCheck="false" maxLength={4096} value={draft} onChange={e=>setDraft(e.target.value)} placeholder="Вставьте ключ Wikimapia"/><button className="primary" disabled={credentials.busy||!draft.trim()}>{credentials.busy?'Сохраняем…':'Сохранить и подключить'}</button>{editing&&<button type="button" className="text-button" onClick={()=>{setEditing(false);setDraft('');}}>Отмена</button>}</form></Motion>
-      {credentials.key&&!editing&&<div className="split-actions"><button className="secondary" disabled={credentials.busy} onClick={()=>{setConfirmForget(false);setEditing(true);}}>Заменить ключ</button><button className="danger-button" disabled={credentials.busy} onClick={()=>setConfirmForget(true)}><Icon name="trash" size={18}/>Удалить ключ</button></div>}
-      <Motion open={confirmForget} kind="disclosure"><div className="confirm-delete" role="group" aria-label="Удаление API-ключа"><p>Удалить ключ с этого устройства? Чтение с сайта, избранное и кэш останутся доступны.</p><div className="split-actions"><button className="secondary" autoFocus onClick={()=>setConfirmForget(false)}>Отмена</button><button className="danger-button" disabled={credentials.busy} onClick={onForget}>Удалить с устройства</button></div></div></Motion>
-      <p className="helper">{credentials.persistentSupported?'Ключ хранится зашифрованным только на этом устройстве. После удаления приложения его нужно ввести заново.':'В браузере ключ действует до закрытия страницы. Для сохранения используйте Android-приложение.'}</p>
-      <a className="inline-link" href="https://wikimapia.org/api?action=create_key" target="_blank" rel="noreferrer">Получить API-ключ <Icon name="external" size={16}/></a>
+  return <div className="settings-panel screen-body settings-compact">
+    <section className="settings-group settings-primary" data-settings-section="map">
+      <h2>Карта и оформление</h2>
+      <div className="settings-field-title">Подложка телефона</div>
+      <div className="yandex-settings"><div className="basemap-choice" role="group" aria-label="Источник карты">
+        <button type="button" aria-pressed={basemap==='osm'} onClick={()=>setBasemap('osm')}>OpenStreetMap</button>
+        <button type="button" aria-pressed={basemap==='yandex'} disabled={!YANDEX_KEY_PATTERN.test(yandexKey)||!yandexReferer} onClick={()=>setBasemap('yandex')}>Яндекс Карты</button>
+      </div>
+      </div>
+      <fieldset className="theme-choice settings-theme-row"><legend>Оформление</legend><div>{[['dark','Чёрная'],['light','Светлая'],['system','Как в системе']].map(([value,label])=><button key={value} aria-pressed={theme===value} onClick={()=>setTheme(value)}>{label}</button>)}</div></fieldset>
+      <div className="settings-map-actions">
+ <label className="setting-row" htmlFor="auto-load">
+   <span><strong>Автозагрузка области</strong><small>При перемещении карты</small></span>
+   <input id="auto-load" type="checkbox" checked={auto} onChange={e=>setAuto(e.target.checked)}/>
+ </label>
+ <label className="setting-row settings-select-row" htmlFor="density-setting">
+   <span><strong>Контуры</strong></span>
+   <select id="density-setting" value={density} onChange={e=>setDensity(e.target.value)}>
+     <option value="auto">Автоматически</option><option value="detailed">Подробно</option><option value="calm">Спокойный вид</option>
+   </select>
+ </label>
+</div>
+      <details className="settings-subsection settings-map-credentials" data-settings-section="phone-key" open={Boolean(yandexDiagnostic)||undefined}>
+        <summary>Ключ Яндекс Карт для телефона {yandexKey?'· сохранён':'· не добавлен'}</summary>
+        <div className="settings-subsection-content yandex-settings">
+          <p className="helper">Используется только для Яндекс Карт на телефоне. Нужен JavaScript API 3.0.</p>
+          <label htmlFor="yandex-api-key">Ключ Яндекс JavaScript API 3.0</label>
+      <input id="yandex-api-key" type="password" autoComplete="off" spellCheck="false" autoCapitalize="none" maxLength={64} value={yandexKey} placeholder="Вставьте ключ JS API" onChange={e=>setYandexKey(e.target.value.trim())}/>
+      <label className="setting-row yandex-confirm" htmlFor="yandex-referer">
+        <span><strong>HTTP Referer ограничен</strong><small>Обязательно для ключа JS API</small></span>
+        <input id="yandex-referer" type="checkbox" checked={yandexReferer} onChange={e=>setYandexReferer(e.target.checked)}/>
+      </label>
+      {yandexDiagnostic&&<div className="yandex-diagnostic" role="status" aria-label="Диагностика подключения Яндекс Карт">
+        <strong>Ошибка Яндекс Карт: {yandexDiagnostic.code}</strong>
+        <p>{yandexDiagnostic.title}. {yandexDiagnostic.help}</p>
+        {yandexDiagnostic.previous&&<p>Предыдущий сбой: <code>{yandexDiagnostic.previous}</code></p>}
+        {yandexDiagnostic.retrySeconds>0&&<p>Повтор доступен примерно через {yandexDiagnostic.retrySeconds} с.</p>}
+        <p>Адрес страницы WebView: <code>{yandexDiagnostic.origin}</code></p>
+        <p>Сеть: {yandexDiagnostic.online?'Android сообщает, что подключение есть':'Android сообщает об отсутствии подключения'}. Адрес страницы не подтверждает фактический заголовок HTTP Referer.</p>
+        <button className="secondary" type="button" onClick={copyYandexReport}>Скопировать диагностику</button>
+        {reportStatus&&<p>{reportStatus}</p>}
+      </div>}
+      <button className="text-button" type="button" disabled={!yandexKey} onClick={()=>{setBasemap('osm');setYandexKey('');setYandexReferer(false);}}>Удалить ключ карты с устройства</button>
+    
+        </div>
+      </details>
     </section>
-    <section className="settings-group"><h2>Карта</h2><label className="setting-row" htmlFor="auto-load"><span><strong>Автозагрузка области</strong><small>После остановки карты, с учётом лимита API</small></span><input id="auto-load" type="checkbox" checked={auto} onChange={e=>setAuto(e.target.checked)}/></label><p className="helper">Объекты загружаются при перемещении карты. В плотных областях после первых трёх страниц появится кнопка «Догрузить область». Одно нажатие запустит последовательную загрузку с прогрессом.</p><label className="density-setting" htmlFor="density-setting">Плотность контуров<select id="density-setting" value={density} onChange={e=>setDensity(e.target.value)}><option value="auto">Автоматически</option><option value="detailed">Подробно</option><option value="calm">Спокойный вид</option></select></label><p className="helper">«Автоматически» уменьшает контраст контуров в плотных областях. Объекты остаются доступными для выбора.</p></section>
-    {hasCar()&&<section className="settings-group" aria-label="Android Auto GPS Follow">
-      <h2>GPS Follow в Android Auto</h2>
-      <p className="helper">Android Auto работает в фоновом режиме телефона. Для надёжного слежения во время движения запустите GPS-службу здесь, пока WikiReader открыт на телефоне, затем подключите автомобиль. Показывается системное уведомление о геолокации.</p>
+    {hasCar()&&<details className="settings-group settings-accordion" data-settings-section="android-auto">
+      <summary><span>Android Auto</span><small>{carGpsEnabled?'GPS включён':'GPS выключен'} · {carTiles.provider==='yandex'?'Яндекс':'OSM'}</small></summary>
+      <div className="settings-accordion-body settings-inner">
+       <section className="settings-group" aria-label="Android Auto GPS Follow">
+      <h2>GPS Follow</h2>
       <button type="button" className="secondary" onClick={toggleCarGps} disabled={carGpsBusy}>
-        {carGpsBusy?'Применяем…':carGpsEnabled?'Остановить GPS Follow для Android Auto':'Включить GPS Follow для Android Auto'}
+        {carGpsBusy?'Применяем…':carGpsEnabled?'Остановить GPS Follow':'Включить GPS Follow'}
       </button>
       <p className="helper" role="status">{carGpsMessage||(carGpsEnabled?'GPS-служба включена':'GPS-служба выключена')}</p>
-      <p className="helper">При отключении GPS службы или завершении поездки можно остановить её здесь. Если обновлений нет, проверьте разрешение геолокации и экономию энергии Android.</p>
-    </section>}
-    {hasCar()&&<section className="settings-group car-tiles-settings" aria-label="Подложка Android Auto">
-      <h2>Подложка Android Auto</h2>
-      <p className="helper car-tiles-intro">Выберите карту для экрана автомобиля. Настройки подложки на телефоне находятся ниже.</p>
+    </section>
+       <section className="settings-group car-tiles-settings" aria-label="Подложка Android Auto">
+      <h2>Карта автомобиля</h2>
       <div className="basemap-choice car-tiles-choice" role="group" aria-label="Источник автомобильной карты">
         <button type="button" aria-pressed={carTiles.provider==='osm'} disabled={tilesBusy} onClick={()=>tilesSelect('osm')}>OpenStreetMap</button>
         <button type="button" aria-pressed={carTiles.provider==='yandex'} disabled={tilesBusy||!carTiles.configured} onClick={()=>tilesSelect('yandex')}>Яндекс Карты</button>
@@ -152,6 +188,8 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
           ?'Ключ сохранён · выбрана '+(carTiles.provider==='yandex'?'подложка Яндекса':'OpenStreetMap')
           :'Для Яндекса нужен отдельный ключ Tiles API'}
       </p>
+      <details className="settings-subsection" data-settings-section="car-key">
+        <summary>Ключ Яндекс Tiles API {carTiles.configured? "· сохранён": "· не добавлен"}</summary>
       <div className="car-tiles-credentials">
         <label htmlFor="car-tiles-api-key">Ключ Яндекс Tiles API</label>
         <input id="car-tiles-api-key" type="password" autoComplete="off" spellCheck="false" autoCapitalize="none"
@@ -170,36 +208,33 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
         <p className="helper">Логотип Яндекса должен быть виден и вести на Яндекс Карты; работу ссылки ещё необходимо подтвердить на автомобильном экране.</p>
         <a className="inline-link" href="https://yandex.ru/maps-api/docs/tiles-api/quickstart.html" target="_blank" rel="noopener noreferrer">Получить ключ Tiles API <Icon name="external" size={16}/></a>
       </details>
-    </section>}
-    <section className="settings-group yandex-settings" aria-label="Картографическая подложка">
-      <h2>Подложка карты</h2>
-      <div className="basemap-choice" role="group" aria-label="Источник карты">
-        <button type="button" aria-pressed={basemap==='osm'} onClick={()=>setBasemap('osm')}>OpenStreetMap</button>
-        <button type="button" aria-pressed={basemap==='yandex'} disabled={!YANDEX_KEY_PATTERN.test(yandexKey)||!yandexReferer} onClick={()=>setBasemap('yandex')}>Яндекс Карты</button>
-      </div>
-      <p className="helper">Цвет карты Яндекса автоматически следует оформлению приложения: чёрная тема — ночная карта, светлая — дневная, «Как в системе» — по системной теме. Объекты, поиск и карточки загружаются из Wikimapia. При ошибке вернётся OpenStreetMap.</p>
-      <label htmlFor="yandex-api-key">Ключ Яндекс JavaScript API 3.0</label>
-      <input id="yandex-api-key" type="password" autoComplete="off" spellCheck="false" autoCapitalize="none" maxLength={64} value={yandexKey} placeholder="Вставьте ключ JS API" onChange={e=>setYandexKey(e.target.value.trim())}/>
-      <label className="setting-row yandex-confirm" htmlFor="yandex-referer">
-        <span><strong>Ограничение HTTP Referer настроено</strong><small>Обязательное условие для работы ключа JS API. Для Android WebView проверьте адрес источника запросов. Не используйте ключ без ограничения.</small></span>
-        <input id="yandex-referer" type="checkbox" checked={yandexReferer} onChange={e=>setYandexReferer(e.target.checked)}/>
-      </label>
-      {yandexDiagnostic&&<div className="yandex-diagnostic" role="status" aria-label="Диагностика подключения Яндекс Карт">
-        <strong>Ошибка Яндекс Карт: {yandexDiagnostic.code}</strong>
-        <p>{yandexDiagnostic.title}. {yandexDiagnostic.help}</p>
-        {yandexDiagnostic.previous&&<p>Предыдущий сбой: <code>{yandexDiagnostic.previous}</code></p>}
-        {yandexDiagnostic.retrySeconds>0&&<p>Повтор доступен примерно через {yandexDiagnostic.retrySeconds} с.</p>}
-        <p>Адрес страницы WebView: <code>{yandexDiagnostic.origin}</code></p>
-        <p>Сеть: {yandexDiagnostic.online?'Android сообщает, что подключение есть':'Android сообщает об отсутствии подключения'}. Адрес страницы не подтверждает фактический заголовок HTTP Referer.</p>
-        <button className="secondary" type="button" onClick={copyYandexReport}>Скопировать диагностику</button>
-        {reportStatus&&<p>{reportStatus}</p>}
-      </div>}
-      <p className="helper">Ключ JS API хранится в настройках данного устройства, не попадает в GitHub и не используется без выбора Яндекса. Обычные просмотры карты бесплатны; геокодирование, панорамы и поиск Яндекса не вызываются. <a href="https://yandex.ru/maps-api/docs/js-api/limit.html" target="_blank" rel="noopener noreferrer">Настройка ключа <Icon name="external" size={14}/></a> · <a href="https://yandex.ru/legal/maps_termsofuse/" target="_blank" rel="noopener noreferrer">Условия Яндекс Карт</a></p>
-      <button className="text-button" type="button" disabled={!yandexKey} onClick={()=>{setBasemap('osm');setYandexKey('');setYandexReferer(false);}}>Удалить ключ карты с устройства</button>
+      </details>
     </section>
-    <section className="settings-group" aria-label="Диагностика API Wikimapia">
+      </div>
+    </details>}
+    <details className="settings-group settings-accordion" data-settings-section="connection">
+      <summary><span>Подключение к Wikimapia</span><small>{credentials.key?'API-ключ подключён':'Работает без API-ключа'}</small></summary>
+      <div className="settings-accordion-body settings-inner"><section className="settings-group"><h2>Wikimapia</h2>
+      <div className="connection-card"><span className="connection-icon"><Icon name="key"/></span><div><strong>{credentials.key?(credentials.saved?'Ключ сохранён на устройстве':'Ключ действует в этой вкладке'):'Чтение с сайта'}</strong><p>{credentials.saved?'Будет восстановлен при следующем запуске.':credentials.key?'В браузере постоянное хранение отключено.':'Сайт доступен без ключа. API подключается при необходимости.'}</p></div>{credentials.saved&&<Icon name="check"/>}</div>
+      {credentials.error&&<div className="error" role="alert"><p>{credentials.error}</p>{!credentials.key&&<button className="secondary" disabled={credentials.busy} onClick={onForget}>Удалить сохранённую запись</button>}</div>}
+      <Motion open={!credentials.key||editing} kind="disclosure"><form className="credential-form" onSubmit={submit}><label htmlFor="api-key">API-ключ Wikimapia — необязательно</label><input id="api-key" type="password" autoComplete="off" autoCapitalize="none" spellCheck="false" maxLength={4096} value={draft} onChange={e=>setDraft(e.target.value)} placeholder="Вставьте ключ Wikimapia"/><button className="primary" disabled={credentials.busy||!draft.trim()}>{credentials.busy?'Сохраняем…':'Сохранить и подключить'}</button>{editing&&<button type="button" className="text-button" onClick={()=>{setEditing(false);setDraft('');}}>Отмена</button>}</form></Motion>
+      {credentials.key&&!editing&&<div className="split-actions"><button className="secondary" disabled={credentials.busy} onClick={()=>{setConfirmForget(false);setEditing(true);}}>Заменить ключ</button><button className="danger-button" disabled={credentials.busy} onClick={()=>setConfirmForget(true)}><Icon name="trash" size={18}/>Удалить ключ</button></div>}
+      <Motion open={confirmForget} kind="disclosure"><div className="confirm-delete" role="group" aria-label="Удаление API-ключа"><p>Удалить ключ с этого устройства? Чтение с сайта, избранное и кэш останутся доступны.</p><div className="split-actions"><button className="secondary" autoFocus onClick={()=>setConfirmForget(false)}>Отмена</button><button className="danger-button" disabled={credentials.busy} onClick={onForget}>Удалить с устройства</button></div></div></Motion>
+      <a className="inline-link" href="https://wikimapia.org/api?action=create_key" target="_blank" rel="noreferrer">Получить API-ключ <Icon name="external" size={16}/></a>
+    </section></div>
+    </details>
+    <details className="settings-group settings-accordion" data-settings-section="storage">
+      <summary><span>Данные и хранение</span><small>Кэш областей · Офлайн-чтение</small></summary>
+      <div className="settings-accordion-body settings-inner">
+        <CacheSettings epoch={cacheEpoch} busy={cacheClearing} currentIds={currentAreaIds} demo={demo} onAction={onCacheAction} onShowArea={onShowArea}/>
+        <OfflineSettings epoch={offlineEpoch} onChange={onOfflineChange}/>
+      </div>
+    </details>
+    <details className="settings-group settings-accordion" data-settings-section="advanced">
+      <summary><span>Дополнительно</span><small>Диагностика · Деморежим</small></summary>
+      <div className="settings-accordion-body settings-inner">
+        <section className="settings-group" aria-label="Диагностика API Wikimapia">
       <h2>Диагностика Wikimapia</h2>
-      <p className="helper">Локальная статистика за текущий запуск: число запросов, время ответа, категории ошибок и полнота загрузки. Ключи, координаты, ID объектов и тексты ответов не собираются. Ничего не отправляется автоматически.</p>
       <div className="split-actions">
         <button className="secondary" type="button" onClick={copyApiReport}>Скопировать статистику</button>
         <button className="text-button" type="button" onClick={()=>{clearDiagnostics();setApiReportStatus('Статистика очищена');}}>Очистить</button>
@@ -207,7 +242,7 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
       {apiReportStatus&&<p className="helper" role="status">{apiReportStatus}</p>}
       {Capacitor.isNativePlatform()&&credentials.key&&!demo&&<div className="transport-diagnostic" aria-label="Проверка сетевого подключения Android">
         <h3>Резервный API: диагностика Android</h3>
-        <p className="helper">Основное чтение работает с сайтом без ключа. Эта проверка запускается только вручную и касается дополнительного API. Не более двух запросов на публичной тестовой области, интервал не менее 6 секунд. При отказе по квоте или ключу второй запрос пропускается. Никаких ключей, адресов запросов и координат в отчёте нет.</p>
+        <p className="helper">Проверка резервного API выполняется вручную, без передачи ключа в отчёте.</p>
         <button className="secondary" type="button" disabled={transportBusy} onClick={startTransportProbe}>{transportBusy?'Проверяем соединение…':'Проверить два HTTP-транспорта'}</button>
         {transportProgress&&<p className="helper" role="status">{transportProgress}</p>}
         {transportReport&&<div className="transport-results" role="group" aria-label="Результаты теста транспорта">
@@ -216,10 +251,9 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
         </div>}
       </div>}
     </section>
-    <CacheSettings epoch={cacheEpoch} busy={cacheClearing} currentIds={currentAreaIds} demo={demo} onAction={onCacheAction} onShowArea={onShowArea}/>
-    <OfflineSettings epoch={offlineEpoch} onChange={onOfflineChange}/>
-    <fieldset className="settings-group theme-choice"><legend>Оформление</legend><div>{[['dark','Чёрная'],['light','Светлая'],['system','Как в системе']].map(([value,label])=><button key={value} aria-pressed={theme===value} onClick={()=>setTheme(value)}>{label}</button>)}</div></fieldset>
-    <section className="settings-group"><h2>Демонстрация</h2><p className="helper">Вымышленные объекты для знакомства с карточками. Сохранённый ключ не удаляется.</p><button className="secondary" disabled={credentials.busy} onClick={demo?onReal:onDemo}>{demo?'Вернуться к реальным данным':'Открыть деморежим'}</button></section>
+        <section className="settings-group"><h2>Демонстрация</h2><p className="helper">Тестовые объекты, без изменения ключа.</p><button className="secondary" disabled={credentials.busy} onClick={demo?onReal:onDemo}>{demo?'Вернуться к реальным данным':'Открыть деморежим'}</button></section>
+      </div>
+    </details>
     <p className="about">WikiReader {appPackage.version} · Неофициальный клиент<br/>Данные © участники Wikimapia</p>
   </div>;
 }

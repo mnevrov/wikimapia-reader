@@ -1,3 +1,4 @@
+import {expandSettings} from './helpers.js';
 import {test,expect} from '@playwright/test';
 import {screen,map,tiles} from './helpers.js';
 
@@ -44,7 +45,7 @@ async function mockYandex(page){
 }
 async function enableYandex(page){
  await screen(page,'Настройки');
- await page.locator('#yandex-api-key').fill(key);
+ await expandSettings(page,'phone-key');await page.locator('#yandex-api-key').fill(key);
  await page.locator('#yandex-referer').check();
  await page.getByRole('button',{name:'Яндекс Карты'}).click();
  await map(page);
@@ -89,7 +90,7 @@ test('system theme changes recolor Yandex without API reload, repeated same them
  await page.goto('/');
  await screen(page,'Настройки');
  await page.getByRole('button',{name:'Как в системе',exact:true}).click();
- await page.locator('#yandex-api-key').fill(key);
+ await expandSettings(page,'phone-key');await page.locator('#yandex-api-key').fill(key);
  await page.locator('#yandex-referer').check();
  await page.getByRole('button',{name:'Яндекс Карты'}).click();
  await map(page);

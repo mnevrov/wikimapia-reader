@@ -1,9 +1,10 @@
+import {expandSettings} from './helpers.js';
 import {test,expect} from '@playwright/test';
 import {tiles,screen,map,clickContour} from './helpers.js';
 const testKey='00000000-1111-4222-8333-444444444444';
 async function configure(page){
  await screen(page,'Настройки');
- await page.locator('#yandex-api-key').fill(testKey);
+ await expandSettings(page,'phone-key');await page.locator('#yandex-api-key').fill(testKey);
  await page.locator('#yandex-referer').check();
 }
 test.beforeEach(async({page})=>{await tiles(page);});
