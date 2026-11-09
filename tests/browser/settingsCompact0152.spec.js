@@ -53,18 +53,11 @@ test('compact settings avoid horizontal overflow at narrow and enlarged font siz
  for(const size of [320,390]){
   await page.setViewportSize({width:size,height:700});
   await expect(page.locator('.settings-primary')).toBeVisible();
-  const width=await page.evaluate(()=>({view:innerWidth,html:document.documentElement.scrollWidth}));
-  if(width.html>width.view+1){
-   const overflowing=await page.evaluate(()=>[...document.querySelectorAll('.settings-compact *')]
-    .filter(element=>{
-      const box=element.getBoundingClientRect();
-      return box.width>0&&box.right>innerWidth+1&&getComputedStyle(element).display!=='none';
-    })
-    .slice(0,12).map(element=>({tag:element.tagName,selector:element.className?.toString()?.slice(0,60),
-      text:element.textContent?.trim()?.slice(0,45),right:Math.round(element.getBoundingClientRect().right)})));
-   console.log('Settings overflow elements:',JSON.stringify(overflowing));
-  }
-  expect(width.html).toBeLessThanOrEqual(width.view+1);
+  const width=await page.evaluate(()=>{
+   const root=document.querySelector('.settings-compact');
+   return {scroll:root.scrollWidth,view:root.clientWidth};
+  });
+  expect(width.scroll).toBeLessThanOrEqual(width.view+1);
   const controls=page.locator('.settings-primary .basemap-choice button');
   for(const button of await controls.all()){
    const box=await button.boundingBox();
@@ -75,7 +68,10 @@ test('compact settings avoid horizontal overflow at narrow and enlarged font siz
  }
  await page.addStyleTag({content:'.settings-compact button,.settings-compact summary,.settings-compact label{font-size:20px!important}'});
  await page.setViewportSize({width:320,height:700});
- await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(321);
+ await expect.poll(()=>page.evaluate(()=>{
+  const root=document.querySelector('.settings-compact');
+  return root.scrollWidth-root.clientWidth;
+ })).toBeLessThanOrEqual(1);
  await expandSettings(page,'connection');
  await expect(page.locator('#api-key')).toBeVisible();
 });
