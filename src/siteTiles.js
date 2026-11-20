@@ -1,3 +1,4 @@
+import {recordSiteParseFailure} from './apiDiagnostics.js';
 // Public itiles are a website format, not a promise of complete coverage or unlimited access.
 export function tileAddress(x,y,z){
  const n=2**z;if(!Number.isInteger(z)||z<1||z>15||![x,y].every(Number.isInteger)||x<0||y<0||x>=n||y>=n)throw Error('Некорректный тайл');
@@ -56,7 +57,7 @@ export function createTileSource(request){
    if(!entry||force||Date.now()-entry.at>300000){
     try{
      const r=await request({url:address.url,signal});
-     const data=parseSiteTile(r.text,address.id);
+     let data;try{data=parseSiteTile(r.text,address.id);}catch(e){recordSiteParseFailure('tiles');throw e;}
      signal?.throwIfAborted();
      if(entry)bytes-=entry.bytes;
      entry={data,at:Date.now(),bytes:r.text.length*2};

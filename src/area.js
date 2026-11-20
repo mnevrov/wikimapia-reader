@@ -4,6 +4,15 @@ import {isCovered,contains,intersects} from './coverage.js';
 import {recordCoverage} from './apiDiagnostics.js';
 
 const CACHE_AGE = 5 * 60 * 1000;
+const CACHE_READ_TIMEOUT_MS = 2000;
+// A stalled IndexedDB transaction must not prevent live map loading forever.
+function boundedRead(store) {
+  let timer;
+  return Promise.race([
+    Promise.resolve().then(() => store.read()),
+    new Promise((_,reject) => {timer=setTimeout(() => reject(new Error('Cache read timed out')),CACHE_READ_TIMEOUT_MS);})
+  ]).finally(() => clearTimeout(timer));
+}
 const complete=e=>e.state.complete??(!e.state.more&&(e.state.found!=null?e.state.places.length>=e.state.found:e.state.places.length<50));
 
 
@@ -44,16 +53,16 @@ export class AreaLoader {
     const n=this.sequence;
     const fresh=[...this.cache.values()].filter(e=>Date.now()>=e.updated&&Date.now()-e.updated<CACHE_AGE);
     const inMemoryFresh=fresh.some(e=>(complete(e)||e.state.more)&&contains(e.bbox,view))||isCovered(view,fresh.filter(complete).map(e=>e.bbox));
-    if (this.store && (!this.hydrated || (!force && !inMemoryFresh))) {
+    if (!force && this.store && Date.now() >= (this.cacheBackoffUntil ?? 0) && (!this.hydrated || !inMemoryFresh)) {
       try {
-        const entries=await this.store.read();
+        const entries=await boundedRead(this.store);
         if(n!==this.sequence)return;
         for(const entry of entries) {
           const key=entry.bbox.join(',');
           if(!this.cache.has(key)||this.cache.get(key).updated<=entry.updated)this.cache.set(key,entry);
         }
         this.cache=new Map([...this.cache.entries()].sort((a,b)=>a[1].updated-b[1].updated));
-      } catch {} // Storage unavailable: network and in-memory navigation still work.
+      } catch {this.cacheBackoffUntil=Date.now()+30000;} // Cache stalled/unavailable: proceed to the network.
       if(n!==this.sequence)return;
       this.hydrated=true;
     }

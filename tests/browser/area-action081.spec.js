@@ -66,3 +66,16 @@ test('a failed next page becomes retryable without discarding loaded objects',as
  await expect(action).toHaveAttribute('aria-label','Обновить область',{timeout:25000});
  expect(secondPageAttempts).toBe(2);
 });
+
+
+test('manual refresh is clickable when Android lifecycle state is stale',async({page})=>{
+ // A WebView can report background state even while user controls remain usable.
+ await page.addInitScript(()=>Object.defineProperty(document,'hidden',{configurable:true,get:()=>true}));
+ let apiCalls=0;
+ await start(page,route=>{apiCalls++;return route.fulfill({json:response(1,1)});});
+ const action=page.locator('.map-tools .area-action');
+ await expect(action).toBeEnabled();
+ await action.click();
+ await expect.poll(()=>apiCalls,{timeout:20000}).toBeGreaterThan(0);
+ await expect(action).toHaveAttribute('aria-label','Обновить область',{timeout:25000});
+});

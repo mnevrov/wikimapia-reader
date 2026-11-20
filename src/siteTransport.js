@@ -1,4 +1,5 @@
 import {Capacitor,registerPlugin} from '@capacitor/core';
+import {recordSiteMetric} from './apiDiagnostics.js';
 const native=Capacitor.isNativePlatform()?registerPlugin('WikiReaderSite'):null;
 export class SiteError extends Error {constructor(message,siteKind){super(message);this.name='SiteError';this.siteKind=siteKind;}}
 export const SITE_MAX_BYTES=4*1024*1024;
@@ -11,18 +12,23 @@ export function createSiteTransport(send){
  let blockedUntil=0;
  return async({url,signal,body})=>{
   const safe=siteUrl(url);signal?.throwIfAborted();
-  if(Date.now()<blockedUntil)throw new SiteError('Сайт Wikimapia ограничил доступ. Повторите позже.','quota');
+  const method=new URL(safe).pathname.startsWith('/z1/itiles/')?'tiles':new URL(safe).pathname.startsWith('/search/')?'search':'place';
+  const startedAt=Date.now();let failureKind=null;
   try{
+   if(Date.now()<blockedUntil){failureKind='quota';throw new SiteError('Сайт Wikimapia ограничил доступ. Повторите позже.','quota');}
    const result=await send({url:safe,body,signal});signal?.throwIfAborted();
    if(result.finalUrl)siteUrl(result.finalUrl);
-   if([403,429].includes(result.status)){blockedUntil=Date.now()+60000;throw new SiteError('Сайт Wikimapia ограничил доступ. Повторите позже.',result.status===429?'quota':'auth');}
-   if(result.status!==200)throw Error(`HTTP ${result.status}`);
-   if(typeof result.text!=='string'||result.text.length>SITE_MAX_BYTES||new TextEncoder().encode(result.text).length>SITE_MAX_BYTES)throw Error('Слишком большой ответ сайта');
+   if([403,429].includes(result.status)){blockedUntil=Date.now()+60000;failureKind=result.status===429?'quota':'auth';throw new SiteError('Сайт Wikimapia ограничил доступ. Повторите позже.',failureKind);}
+   if(result.status!==200){failureKind='api';throw Error(`HTTP ${result.status}`);}
+   if(typeof result.text!=='string'||result.text.length>SITE_MAX_BYTES||new TextEncoder().encode(result.text).length>SITE_MAX_BYTES){failureKind='schema';throw Error('Слишком большой ответ сайта');}
    return result;
-  }catch(e){signal?.throwIfAborted();if(e.name==='AbortError'||e instanceof SiteError)throw e;
+  }catch(e){
+   if(signal?.aborted||e.name==='AbortError'){failureKind='cancelled';signal?.throwIfAborted();throw e;}
+   failureKind??=e instanceof SiteError?(e.siteKind||'unknown'):'network';
+   if(e instanceof SiteError)throw e;
    if(/^HTTP (403|429)$/.test(e.message))throw Error('Сайт Wikimapia ограничил доступ. Повторите позже.');
    throw Error('Не удалось загрузить данные сайта Wikimapia. Повторите позже.');
-  }
+  }finally{recordSiteMetric(method,Date.now()-startedAt,failureKind);}
  };
 }
 let sequence=0;

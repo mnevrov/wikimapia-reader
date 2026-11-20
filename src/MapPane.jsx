@@ -2,6 +2,7 @@ import React, {useEffect, useMemo, useRef, useState} from 'react';
 import L from 'leaflet';
 import {wikimapiaSource} from './wikimapiaSource.js';
 import {AreaLoader} from './area.js';
+import {recordManualRefreshEvent} from './apiDiagnostics.js';
 import {areaCache} from './areaCache.js';
 import {areaMessage} from './mapStatus.js';
 import {hitTestPlaces} from './geometry.js';
@@ -72,17 +73,18 @@ export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refr
     return()=>loader.stop();
   },[demo,loader,onState,onMessage]);
   const loadRef=useRef(null);
-  loadRef.current=(force=false)=>{
+  loadRef.current=(force=false,manual=false)=>{
     const map=mapRef.current;
-    if(demo||!active||!map)return;
+    if(demo||(!active&&!force)||!map){if(manual)recordManualRefreshEvent('blocked_'+(demo?'demo':'map'));return;}
     const b=map.getBounds();
     const bbox=[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()];
-    if(bbox[2]-bbox[0]>.035||bbox[3]-bbox[1]>.035){onMessage('Приблизьте карту для загрузки объектов');return;}
+    if(bbox[2]-bbox[0]>.035||bbox[3]-bbox[1]>.035){if(manual)recordManualRefreshEvent('blocked_zoom');onMessage('Приблизьте карту для загрузки объектов');return;}
     // Fetch a small margin with the same documented box request. No requests for
     // unseen remote tiles; stay inside the existing 0.035 degree API safety bound.
     const dx=Math.min((bbox[2]-bbox[0])*.2,(.034999-(bbox[2]-bbox[0]))/2);
     const dy=Math.min((bbox[3]-bbox[1])*.2,(.034999-(bbox[3]-bbox[1]))/2);
     const padded=[Math.max(-180,bbox[0]-dx),Math.max(-85,bbox[1]-dy),Math.min(180,bbox[2]+dx),Math.min(85,bbox[3]+dy)];
+    if(manual)recordManualRefreshEvent('started');
     return loader.load(padded,{force,view:bbox});
   };
   useEffect(()=>{
@@ -100,7 +102,7 @@ export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refr
     const timer=setTimeout(()=>{retries.current++;if(progress.page&&progress.more)loader.more();else loadRef.current(true);},8000);
     return()=>clearTimeout(timer);
   },[auto,active,paused,moving,progress,loader]);
-  useEffect(()=>{if(refresh){blocked.current=false;retries.current=0;loadRef.current(true);}},[refresh]);
+  useEffect(()=>{if(refresh){blocked.current=false;retries.current=0;loadRef.current(true,true);}},[refresh]);
   useEffect(()=>{if(moreRequest&&active&&!paused)loader.remaining();},[moreRequest]);
   // Reconcile only visible polygon layers. Avoid clearLayers() on each API page.
   useEffect(()=>{

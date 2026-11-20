@@ -146,3 +146,26 @@ test('site area explicit partial completeness survives fewer than 50 objects',as
  const loader=new AreaLoader(async()=>({folder:[place(1)],found:null,more:false,complete:false,source:'site'}));await loader.load(bbox);assert.equal(loader.state.complete,false);assert.equal(loader.state.source,'site');assert.equal(loader.state.more,false);
 });
 test('forced refresh forwards the force flag to the source adapter',async()=>{const flags=[];const loader=new AreaLoader(async o=>{flags.push(o.force);return{folder:[],found:0};});await loader.load(bbox);await loader.load(bbox,{force:true});assert.deepEqual(flags,[false,true]);});
+
+
+test('force refresh never waits for a stalled device-cache read',async()=>{
+ let reads=0,calls=0;
+ const store={read:()=>{reads++;return new Promise(()=>{});},put:async()=>{}};
+ const loader=new AreaLoader(async()=>{calls++;return {folder:[place(11)],found:1};},()=>{},store);
+ await loader.load(bbox,{force:true});
+ assert.equal(reads,0);
+ assert.equal(calls,1);
+ assert.equal(loader.state.loading,false);
+ assert.deepEqual(loader.state.places.map(p=>p.id),[11]);
+});
+
+test('ordinary loading falls back to the network when cache read never settles',async()=>{
+ let calls=0;
+ const store={read:()=>new Promise(()=>{}),put:async()=>{}};
+ const loader=new AreaLoader(async()=>{calls++;return {folder:[place(12)],found:1};},()=>{},store);
+ await loader.load(bbox);
+ assert.equal(calls,1);
+ assert.equal(loader.state.loading,false);
+ assert.equal(loader.state.error,'');
+ assert.deepEqual(loader.state.places.map(p=>p.id),[12]);
+});

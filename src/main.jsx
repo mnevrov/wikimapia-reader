@@ -5,6 +5,7 @@ import 'leaflet/dist/leaflet.css';
 import './style.css';
 import {wikimapiaSource} from './wikimapiaSource.js';
 import {diagnosticError} from './api.js';
+import {recordManualRefreshEvent} from './apiDiagnostics.js';
 import {useCredentials} from './useCredentials.js';
 import {useTheme} from './useTheme.js';
 import {usePlatform} from './usePlatform.js';
@@ -323,8 +324,8 @@ function App(){
     :area.more?'Догрузить область':'Обновить область';
   const areaActionTitle=areaBusy?`${areaActionLabel}: ${area.places.length}${area.found!=null?` из ${area.found}`:''} объектов`
     :area.more?'Загрузить остальные объекты области':area.error?'Повторить запрос области':'Обновить область с сервера';
-  const refreshArea=()=>{if(demo||areaBusy||!active)return;closeCard();setRefresh(x=>x+1);};
-  const runAreaAction=()=>{if(demo||areaBusy||!active)return;if(area.more)setMoreRequest(x=>x+1);else refreshArea();};
+  const refreshArea=()=>{recordManualRefreshEvent('pressed');if(demo||areaBusy){recordManualRefreshEvent('blocked_'+(demo?'demo':'busy'));return;}closeCard();setNotice('Обновляем объекты…');setRefresh(x=>x+1);};
+  const runAreaAction=()=>{if(demo||areaBusy)return;if(area.more)setMoreRequest(x=>x+1);else refreshArea();};
   const mapFeedback=pickMapFeedback({areaError:area.error,notice,gpsError,gpsFollow});
   if(!credentials.ready)return <Startup/>;
   return <main className={`${selected||candidates.length?'has-sheet':''} ${screen!=='map'?'has-screen':''} ${mapPanel?'has-map-panel':''} ${toast?'has-toast':''}`}>
@@ -337,7 +338,7 @@ function App(){
         <button className="icon-btn" aria-label="Приблизить карту" title="Приблизить карту" onClick={()=>setZoomRequest(v=>({delta:1,seq:(v?.seq??0)+1}))}><Icon name="plus"/></button>
         <button className="icon-btn" aria-label="Отдалить карту" title="Отдалить карту" onClick={()=>setZoomRequest(v=>({delta:-1,seq:(v?.seq??0)+1}))}><Icon name="minus"/></button>
         <button className={'icon-btn gps-control gps-'+gpsFollow} title={gpsFollow==='off'?'Следовать за GPS':gpsFollow==='paused'?'Возобновить GPS Follow':'Выключить GPS Follow'} aria-label="Моё местоположение" aria-pressed={gpsFollow==='following'} onClick={toggleGps}><Icon name="locate"/></button>
-        {!demo&&<button className={`icon-btn area-action ${areaBusy?'is-loading':''} ${area.error?'has-error':''} ${area.more&&!areaBusy&&!area.error?'can-continue':''}`} aria-label={areaActionLabel} title={areaActionTitle} aria-busy={areaBusy} disabled={areaBusy||!active} onClick={runAreaAction}><Icon name={areaBusy||area.error||!area.more?'refresh':'download'}/></button>}
+        {!demo&&<button className={`icon-btn area-action ${areaBusy?'is-loading':''} ${area.error?'has-error':''} ${area.more&&!areaBusy&&!area.error?'can-continue':''}`} aria-label={areaActionLabel} title={areaActionTitle} aria-busy={areaBusy} disabled={areaBusy} onClick={runAreaAction}><Icon name={areaBusy||area.error||!area.more?'refresh':'download'}/></button>}
       </div>
       <Motion open={!!mapPanel&&!selected&&!candidates.length} identity={mapPanel} kind="discovery"><MapDiscover mode={mapPanel} demo={demo} query={query} onQuery={queryOnMap} onSearch={search} results={results} searchBusy={searchBusy} searchStatus={searchStatus} visiblePlaces={visiblePlaces} area={area} notice={notice} density={density} onDensity={setDensity} onSelect={onSelect} sort={listSort} onSort={setListSort} filter={listFilter} onFilter={setListFilter} listQuery={listQuery} onListQuery={setListQuery} favorites={favorites} offlineEntries={offlineEntries} location={location} onLocate={findNearby} onShowOnMap={showOnMap} highlightedId={highlightedId} onRefreshArea={refreshArea} onCancelSearch={cancelMapSearch} onSettings={()=>navigate('settings')} onClose={closeMapPanel}/></Motion>
       {!selected&&!candidates.length&&mapFeedback&&<div className={'map-feedback'+(mapFeedback.source==='gps'?' gps-feedback':'')+(mapFeedback.isError?' is-error':'')}><div className="status" role="status" aria-live="polite">{mapFeedback.message}</div>{demo&&mapFeedback.source==='map'&&<button className="connect-action" onClick={()=>navigate('settings')}>Подключить Wikimapia <Icon name="arrow" size={18}/></button>}</div>}
