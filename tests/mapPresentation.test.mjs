@@ -58,6 +58,8 @@ test('retained contours are still culled by the active map bounds',()=>{
 test('partial coverage does not clear polygons while a second page is pending',()=>{
  const old=[square],more=[{...square,id:303}];
  assert.equal(stableContourPlaces(old,{page:0,loading:true,displayPlaces:[]}),old);
+ assert.equal(stableContourPlaces(old,{page:1,loading:true,displayPlaces:[]}),old);
+ assert.equal(stableContourPlaces(old,{page:1,draining:true,displayPlaces:[]}),old);
  assert.equal(stableContourPlaces(old,{page:1,loading:true,displayPlaces:more}),more);
  assert.deepEqual(stableContourPlaces(old,{page:1,loading:false,displayPlaces:[],complete:false}),[]);
 });
