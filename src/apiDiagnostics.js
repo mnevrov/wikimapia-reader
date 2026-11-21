@@ -8,6 +8,10 @@ let methods = Object.fromEntries(METHODS.map(k=>[k,empty()]));
 let coverage = {complete:0,partial:0,unknown:0};
 let siteMethods = Object.fromEntries(SITE_METHODS.map(k=>[k,empty()]));
 let siteParseFailures = {tiles:0};
+const TILE_REASONS = ['html','header','rows','empty','body','unknown'];
+const emptyTileReasons = () => Object.fromEntries(TILE_REASONS.map(k=>[k,0]));
+let tileParseReasons = emptyTileReasons();
+let tileDecode = {complete:0,partial:0};
 const emptyRefresh = () => ({pressed:0,started:0,blocked:{busy:0,map:0,zoom:0,demo:0}});
 let manualRefresh = emptyRefresh();
 
@@ -39,8 +43,13 @@ export function recordSiteMetric(method, elapsedMs, failureKind = null) {
   const ms = Number(elapsedMs);
   if (Number.isFinite(ms) && ms >= 0) item.latencyTotalMs += Math.min(Math.round(ms), 60000);
 }
-export function recordSiteParseFailure(method) {
-  if (Object.hasOwn(siteParseFailures, method)) siteParseFailures[method]++;
+export function recordSiteParseFailure(method,reason='unknown') {
+  if (!Object.hasOwn(siteParseFailures, method)) return;
+  siteParseFailures[method]++;
+  tileParseReasons[TILE_REASONS.includes(reason)?reason:'unknown']++;
+}
+export function recordTileDecode(partial=false){
+  tileDecode[partial?'partial':'complete']++;
 }
 export function recordManualRefreshEvent(event) {
   if (event === 'pressed' || event === 'started') manualRefresh[event]++;
@@ -55,12 +64,14 @@ const metricSnapshot = item => ({
 });
 export function diagnosticSnapshot() {
   return {
-    schema: 2,
+    schema: 3,
     storage: 'memory-only',
     sharing: 'manual',
     requests: Object.fromEntries(METHODS.map(name => [name,metricSnapshot(methods[name])])),
     site: Object.fromEntries(SITE_METHODS.map(name => [name,metricSnapshot(siteMethods[name])])),
     siteParseFailures:{...siteParseFailures},
+    tileParseReasons:{...tileParseReasons},
+    tileDecode:{...tileDecode},
     manualRefresh:{...manualRefresh,blocked:{...manualRefresh.blocked}},
     coverage:{...coverage}
   };
@@ -70,5 +81,7 @@ export function clearDiagnostics() {
   coverage = {complete:0,partial:0,unknown:0};
   siteMethods = Object.fromEntries(SITE_METHODS.map(k=>[k,empty()]));
   siteParseFailures = {tiles:0};
+  tileParseReasons = emptyTileReasons();
+  tileDecode = {complete:0,partial:0};
   manualRefresh = emptyRefresh();
 }
