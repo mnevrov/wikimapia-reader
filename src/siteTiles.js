@@ -46,7 +46,7 @@ export function parseSiteTile(text,expectedId){
  for(const [index,line] of lines.entries()){if(!line.trim())continue;
   // Public .xy may include a bounds metadata line (W|E|S|N) between the
   // header and objects. Do not treat this four-integer line as a broken place.
-  if(index===0&&/^[-+]?\\d+\\|[-+]?\\d+\\|[-+]?\\d+\\|[-+]?\\d+$/.test(line.trim()))continue;
+  if(index===0&&/^[-+]?\d+\|[-+]?\d+\|[-+]?\d+\|[-+]?\d+$/.test(line.trim()))continue;
   try{const f=line.split('|'),id=Number(f[0]),bbox=f[2]?.split(',').map(Number);
    if(f.length<8||!Number.isSafeInteger(id)||id<1||bbox?.length!==4||bbox.some(v=>!Number.isFinite(v))||bbox[0]>bbox[1]||bbox[2]>bbox[3]||Math.max(Math.abs(bbox[0]),Math.abs(bbox[1]))>180e7||Math.max(Math.abs(bbox[2]),Math.abs(bbox[3]))>90e7)throw Error();
    const titles=f[5].split('\x1f'),title=(titles.find(t=>t.charCodeAt(0)===33)||titles[0]||' Без названия').slice(1);
