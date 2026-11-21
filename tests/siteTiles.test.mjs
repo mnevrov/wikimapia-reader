@@ -89,14 +89,14 @@ test('one invalid object row does not erase valid geometry, but marks area parti
  const {parseSiteTile,createTileSource}=await mod();
  const good='55|100|376100000,376200000,557500000,557600000|16||!Рабочий объект|0|376200000;557600000;010064000000000064';
  const malformed='56|100|not-a-box|16||!Broken|0|376200000;557600000;010064000000000064';
- const decoded=parseSiteTile('030|0|7\\n'+good+'\\n'+malformed,'030');
+ const decoded=parseSiteTile('030|0|7\n'+good+'\n'+malformed,'030');
  assert.deepEqual(decoded.places.map(p=>p.id),[55]);
  assert.equal(decoded.invalidRows,1);
  let calls=0;
  const source=createTileSource(async({url})=>{
   calls++;
   const id=new URL(url).pathname.split('/itiles/')[1].replaceAll('/','').replace('.xy','');
-  return {text:id+'|0|7\\n'+good+'\\n'+malformed};
+  return {text:id+'|0|7\n'+good+'\n'+malformed};
  });
  const bbox=[37.61,55.75,37.62,55.76];
  const result=await source({bbox});
@@ -110,13 +110,13 @@ test('one invalid object row does not erase valid geometry, but marks area parti
 
 test('a tile containing only invalid rows is rejected, not treated as empty',async()=>{
  const {parseSiteTile}=await mod();
- assert.throws(()=>parseSiteTile('030|0|7\\n56|100|not-a-box|16||!Bad|0|broken','030'),
+ assert.throws(()=>parseSiteTile('030|0|7\n56|100|not-a-box|16||!Bad|0|broken','030'),
   e=>e.tileReason==='rows');
 });
 
 test('UTF-8 BOM and CRLF around otherwise valid headers are tolerated',async()=>{
  const {parseSiteTile}=await mod();
- const result=parseSiteTile('\\uFEFF030|0|7\\r\\n','030');
+ const result=parseSiteTile('\uFEFF030|0|7\r\n','030');
  assert.equal(result.invalidRows,0);
  assert.equal(result.deeperTiles,false);
 });
