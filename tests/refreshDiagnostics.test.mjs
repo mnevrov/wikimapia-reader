@@ -10,7 +10,7 @@ test('manual refresh is observable even when no API request was made',()=>{
   recordManualRefreshEvent('blocked_zoom');
   recordManualRefreshEvent('blocked_invalid'); // Ignore unexpected labels.
   const data=diagnosticSnapshot();
-  assert.equal(data.schema,3);
+  assert.equal(data.schema,4);
   assert.equal(data.manualRefresh.pressed,2);
   assert.equal(data.manualRefresh.started,1);
   assert.equal(data.manualRefresh.blocked.zoom,1);
@@ -30,6 +30,7 @@ test('website tile traffic, parse errors, and REST API are accounted separately'
   recordSiteParseFailure('tiles','header');
   recordTileDecode();
   recordTileDecode(true);
+  recordTileDecode(false,true);
   const data=diagnosticSnapshot();
   assert.equal(data.site.tiles.total,2);
   assert.equal(data.site.tiles.success,1);
@@ -42,9 +43,11 @@ test('website tile traffic, parse errors, and REST API are accounted separately'
   assert.equal(data.tileParseReasons.header,1);
   assert.equal(data.tileDecode.complete,1);
   assert.equal(data.tileDecode.partial,1);
+  assert.equal(data.tileDecode.parent,1);
   assert.equal(data.requests.box.total,0);
   clearDiagnostics();
   assert.equal(diagnosticSnapshot().site.tiles.total,0);
   assert.equal(diagnosticSnapshot().tileParseReasons.html,0);
   assert.equal(diagnosticSnapshot().tileDecode.complete,0);
+  assert.equal(diagnosticSnapshot().tileDecode.parent,0);
 });
