@@ -235,7 +235,7 @@ export default function Settings({confirmForget,setConfirmForget,credentials,onC
       <div className="settings-accordion-body settings-inner">
         <section className="settings-group" aria-label="Диагностика API Wikimapia">
       <h2>Диагностика Wikimapia</h2>
-      <p className="helper">В отчёте раздел «site.tiles.success» означает только HTTP 200, а не успешный разбор объектов. Разделы «tileParseReasons» и «tileDecode» показывают результат декодирования. Ключи, адреса и координаты не записываются.</p>
+      <p className="helper">В отчёте раздел «site.tiles.success» означает только HTTP 200, а не успешный разбор объектов. Разделы «tileParseReasons» и «tileDecode» показывают результат декодирования; «tileDecode.parent» считает ответы родительского уровня, которые не доказывают полное покрытие. Ключи, адреса и координаты не записываются.</p>
       <div className="split-actions">
         <button className="secondary" type="button" onClick={copyApiReport}>Скопировать статистику</button>
         <button className="text-button" type="button" onClick={()=>{clearDiagnostics();setApiReportStatus('Статистика очищена');}}>Очистить</button>
