@@ -68,3 +68,55 @@ test('abort during a multi-tile load immediately propagates and does not return 
  await assert.rejects(()=>createTileSource(request)({bbox:[37.61,55.75,37.62,55.76],signal:controller.signal}),{name:'AbortError'});
  assert.equal(calls,2);
 });
+
+
+test('HTTP 200 HTML or an unexpected header is diagnosed without exposing the body',async()=>{
+ const {parseSiteTile,TileFormatError}=await mod();
+ const samples=[
+  ['<html><body>temporary access challenge with secret</body></html>','html'],
+  ['{ "error": "temporary response" }','header'],
+  ['wrong|0|7','header'],
+  ['','empty']
+ ];
+ for(const [body,reason] of samples){
+  assert.throws(()=>parseSiteTile(body,'030'),e=>
+   e instanceof TileFormatError&&e.siteKind==='schema'&&e.tileReason===reason
+   &&!e.message.includes('secret')&&!e.message.includes('temporary response'));
+ }
+});
+
+test('one invalid object row does not erase valid geometry, but marks area partial',async()=>{
+ const {parseSiteTile,createTileSource}=await mod();
+ const good='55|100|376100000,376200000,557500000,557600000|16||!Рабочий объект|0|376200000;557600000;010064000000000064';
+ const malformed='56|100|not-a-box|16||!Broken|0|376200000;557600000;010064000000000064';
+ const decoded=parseSiteTile('030|0|7\\n'+good+'\\n'+malformed,'030');
+ assert.deepEqual(decoded.places.map(p=>p.id),[55]);
+ assert.equal(decoded.invalidRows,1);
+ let calls=0;
+ const source=createTileSource(async({url})=>{
+  calls++;
+  const id=new URL(url).pathname.split('/itiles/')[1].replaceAll('/','').replace('.xy','');
+  return {text:id+'|0|7\\n'+good+'\\n'+malformed};
+ });
+ const bbox=[37.61,55.75,37.62,55.76];
+ const result=await source({bbox});
+ assert.ok(calls>0);
+ assert.equal(result.complete,false);
+ assert.ok(result.partialTiles>0);
+ assert.ok(result.places.some(p=>p.id===55));
+ const cached=await source({bbox});
+ assert.equal(cached.complete,false,'cached partial tiles must never claim complete coverage');
+});
+
+test('a tile containing only invalid rows is rejected, not treated as empty',async()=>{
+ const {parseSiteTile}=await mod();
+ assert.throws(()=>parseSiteTile('030|0|7\\n56|100|not-a-box|16||!Bad|0|broken','030'),
+  e=>e.tileReason==='rows');
+});
+
+test('UTF-8 BOM and CRLF around otherwise valid headers are tolerated',async()=>{
+ const {parseSiteTile}=await mod();
+ const result=parseSiteTile('\\uFEFF030|0|7\\r\\n','030');
+ assert.equal(result.invalidRows,0);
+ assert.equal(result.deeperTiles,false);
+});
