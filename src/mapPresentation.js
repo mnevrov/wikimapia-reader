@@ -41,6 +41,6 @@ export function stableContourPlaces(previous, state) {
   const incoming=Array.isArray(state?.displayPlaces)
     ? state.displayPlaces
     : Array.isArray(state?.places) ? state.places : [];
-  if(!incoming.length && state?.page===0) return previous;
+  if(!incoming.length && (state?.page===0 || state?.loading || state?.draining)) return previous;
   return incoming;
 }
