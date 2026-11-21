@@ -29,3 +29,18 @@ export function contourStyle(mode,count,zoom,selected=false) {
   const compact=validDensity(mode)==='calm' || (validDensity(mode)==='auto' && (count>160 || zoom<15));
   return {color:'#16ac8d',weight:compact?1:1.5,opacity:compact?.55:.95,fill:false,smoothFactor:compact?2:1};
 }
+
+
+/**
+ * Keep the last validated polygons until a replacement load has a result.
+ * An in-flight request reports page=0 and often no cached displayPlaces;
+ * publishing that empty intermediate value would flash the entire overlay.
+ * A successfully completed empty area (page>0) still clears old polygons.
+ */
+export function stableContourPlaces(previous, state) {
+  const incoming=Array.isArray(state?.displayPlaces)
+    ? state.displayPlaces
+    : Array.isArray(state?.places) ? state.places : [];
+  if(!incoming.length && state?.page===0) return previous;
+  return incoming;
+}
