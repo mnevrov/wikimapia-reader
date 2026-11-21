@@ -19,18 +19,35 @@ function polygon(encoded,type){
  }else throw Error('Неизвестная кодировка');
  if(points.length<3||points.some(([a,b])=>!Number.isFinite(a)||!Number.isFinite(b)||Math.abs(a)>90||Math.abs(b)>180))throw Error('Некорректный контур');return points;
 }
+// Explicit, safe parse categories. Never include the response, URL or tile ID in errors.
+export class TileFormatError extends Error {
+ constructor(reason,message){
+  super(message);this.name='TileFormatError';this.siteKind='schema';this.tileReason=reason;
+ }
+}
 export function parseSiteTile(text,expectedId){
- if(typeof text!=='string'||text.length>4194304)throw Error('Повреждённый тайл');
- const lines=text.split('\n'),header=lines.shift().trim().split('|');if(header[0]!==expectedId||!['0','1'].includes(header[1])||header.length<3)throw Error('Неожиданный тайл');
+ if(typeof text!=='string'||text.length>4194304)
+  throw new TileFormatError('body','Ответ Wikimapia слишком большой или некорректный.');
+ const body=text.replace(/^\uFEFF/,'');
+ if(!body.trim())throw new TileFormatError('empty','Сайт Wikimapia вернул пустой ответ вместо контуров.');
+ // Anti-bot/error pages may arrive as HTTP 200, but are never valid .xy tiles.
+ if(body.trimStart().startsWith('<'))
+  throw new TileFormatError('html','Сайт Wikimapia вернул HTML вместо тайлов объектов. Доступ к данным может быть ограничен.');
+ const lines=body.split(/\r?\n/),header=lines.shift().trim().split('|');
+ if(header[0]!==expectedId||!['0','1'].includes(header[1])||header.length<3)
+  throw new TileFormatError('header','Ответ Wikimapia не соответствует формату тайла объектов.');
  const places=new Map();let invalid=0;
  for(const line of lines){if(!line.trim())continue;
-  try{const f=line.split('|'),id=Number(f[0]),bbox=f[2]?.split(',').map(Number);if(f.length<8||!Number.isSafeInteger(id)||id<1||bbox?.length!==4||bbox.some(v=>!Number.isFinite(v))||bbox[0]>bbox[1]||bbox[2]>bbox[3]||Math.max(Math.abs(bbox[0]),Math.abs(bbox[1]))>180e7||Math.max(Math.abs(bbox[2]),Math.abs(bbox[3]))>90e7)throw Error();
+  try{const f=line.split('|'),id=Number(f[0]),bbox=f[2]?.split(',').map(Number);
+   if(f.length<8||!Number.isSafeInteger(id)||id<1||bbox?.length!==4||bbox.some(v=>!Number.isFinite(v))||bbox[0]>bbox[1]||bbox[2]>bbox[3]||Math.max(Math.abs(bbox[0]),Math.abs(bbox[1]))>180e7||Math.max(Math.abs(bbox[2]),Math.abs(bbox[3]))>90e7)throw Error();
    const titles=f[5].split('\x1f'),title=(titles.find(t=>t.charCodeAt(0)===33)||titles[0]||' Без названия').slice(1);
    places.set(id,{id,title,coords:polygon(f.slice(7).join('|'),Number(f[6])),url:`https://wikimapia.org/${id}/ru/`});
   }catch{invalid++;}
  }
- if(invalid)throw Error('Тайл содержит повреждённые объекты');
- return {places:[...places.values()],deeperTiles:header[1]==='1'};
+ // Never accept a completely corrupt tile as a trustworthy empty region.
+ if(invalid&&places.size===0)
+  throw new TileFormatError('rows','В ответе Wikimapia нет ни одного корректного объекта.');
+ return {places:[...places.values()],deeperTiles:header[1]==='1',invalidRows:invalid};
 }
 export function createTileSource(request){
  const cache=new Map();let bytes=0;
@@ -50,14 +67,15 @@ export function createTileSource(request){
   };
   let range=span(MAX_ZOOM);
   while(range.count>MAX_TILES&&range.z>1)range=span(range.z-1);
-  const unique=new Map();let deeper=false,failed=0,succeeded=0,firstFailure=null;
+  const unique=new Map();let deeper=false,failed=0,succeeded=0,partial=0,firstFailure=null;
   outer:for(let x=range.x0;x<=range.x1;x++)for(let y=range.y0;y<=range.y1;y++){
    signal?.throwIfAborted();
    const address=tileAddress(x,y,range.z);let entry=cache.get(address.id);
    if(!entry||force||Date.now()-entry.at>300000){
     try{
      const r=await request({url:address.url,signal});
-     let data;try{data=parseSiteTile(r.text,address.id);}catch(e){recordSiteParseFailure('tiles');throw e;}
+     let data;try{data=parseSiteTile(r.text,address.id);}catch(e){recordSiteParseFailure('tiles',e?.tileReason??'unknown');throw e;}
+     if(data.invalidRows){partial++;recordSiteParseFailure('tiles','rows');}
      signal?.throwIfAborted();
      if(entry)bytes-=entry.bytes;
      entry={data,at:Date.now(),bytes:r.text.length*2};
@@ -89,6 +107,6 @@ export function createTileSource(request){
   // A wholly failed request must remain an error, not become a false
   // "no Wikimapia objects here" result.
   if(!succeeded&&firstFailure)throw firstFailure;
-  return {places:[...unique.values()],complete:failed===0&&!deeper,source:'site',failedTiles:failed,zoomLevel:range.z};
+  return {places:[...unique.values()],complete:failed===0&&partial===0&&!deeper,source:'site',failedTiles:failed,partialTiles:partial,zoomLevel:range.z};
  };
 }
