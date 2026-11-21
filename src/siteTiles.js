@@ -75,7 +75,7 @@ export function createTileSource(request){
     try{
      const r=await request({url:address.url,signal});
      let data;try{data=parseSiteTile(r.text,address.id);}catch(e){recordSiteParseFailure('tiles',e?.tileReason??'unknown');throw e;}
-     if(data.invalidRows){partial++;recordSiteParseFailure('tiles','rows');}
+     if(data.invalidRows)recordSiteParseFailure('tiles','rows');
      signal?.throwIfAborted();
      if(entry)bytes-=entry.bytes;
      entry={data,at:Date.now(),bytes:r.text.length*2};
@@ -101,6 +101,7 @@ export function createTileSource(request){
     }
    }
    succeeded++;
+   if(entry.data.invalidRows)partial++;
    if(entry.data.deeperTiles)deeper=true;
    for(const p of entry.data.places)unique.set(p.id,p);
   }
