@@ -41,7 +41,7 @@ test('website tile traffic, parse errors, and REST API are accounted separately'
   assert.equal(data.siteParseFailures.tiles,2);
   assert.equal(data.tileParseReasons.html,1);
   assert.equal(data.tileParseReasons.header,1);
-  assert.equal(data.tileDecode.complete,1);
+  assert.equal(data.tileDecode.complete,2);
   assert.equal(data.tileDecode.partial,1);
   assert.equal(data.tileDecode.parent,1);
   assert.equal(data.requests.box.total,0);
