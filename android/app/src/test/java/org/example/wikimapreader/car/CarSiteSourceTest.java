@@ -49,7 +49,7 @@ public class CarSiteSourceTest {
  }
  @Test public void parentTileWithBoundsMetadataIsAcceptedAsPartial()throws Exception {
    java.util.Map<Long,JSONObject> places=new LinkedHashMap<>();
-   String body="030|0|7\\n-1800000000|1800000000|-850511288|850511288\\n"
+   String body="030|0|7\n-1800000000|1800000000|-850511288|850511288\n"
     +"55|100|376100000,376200000,557500000,557600000|16||!Место|1|??????";
    assertFalse("Ancestor tile must not claim full leaf coverage",
     CarSiteSource.parseTile(body,"030213",places));
