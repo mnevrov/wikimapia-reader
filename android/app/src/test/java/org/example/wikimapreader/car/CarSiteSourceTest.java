@@ -47,6 +47,18 @@ public class CarSiteSourceTest {
    assertEquals("Место",places.get(55L).getString("title"));
    assertEquals(3,places.get(55L).getJSONArray("polygon").length());
  }
+ @Test public void parentTileWithBoundsMetadataIsAcceptedAsPartial()throws Exception {
+   java.util.Map<Long,JSONObject> places=new LinkedHashMap<>();
+   String body="030|0|7\n-1800000000|1800000000|-850511288|850511288\n"
+    +"55|100|376100000,376200000,557500000,557600000|16||!Место|1|??????";
+   assertFalse("Ancestor tile must not claim full leaf coverage",
+    CarSiteSource.parseTile(body,"030213",places));
+   assertEquals(1,places.size());
+   assertEquals("Место",places.get(55L).getString("title"));
+   try{CarSiteSource.parseTile(body,"031213",new LinkedHashMap<>());
+    fail("Sibling tile must be rejected");
+   }catch(java.io.IOException expected){}
+ }
  @Test public void phoneFallbackUsesApiDirectlyWhileCarHostReadsWebsiteFirst()throws Exception {
    assertTrue(WikiApi.websiteFirst(new JSONObject()));
    assertFalse(WikiApi.websiteFirst(new JSONObject().put("apiOnly",true)));

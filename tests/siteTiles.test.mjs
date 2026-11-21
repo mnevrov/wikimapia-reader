@@ -120,3 +120,26 @@ test('UTF-8 BOM and CRLF around otherwise valid headers are tolerated',async()=>
  assert.equal(result.invalidRows,0);
  assert.equal(result.deeperTiles,false);
 });
+
+
+test('Wikimapia may return a containing parent tile and a bounds metadata line',async()=>{
+ const {parseSiteTile,createTileSource}=await mod();
+ const object='55|100|376100000,376200000,557500000,557600000|16||!Место|0|376200000;557600000;010064000000000064';
+ const meta='-1800000000|1800000000|-850511288|850511288';
+ const response='030|0|7\n'+meta+'\n'+object;
+ const parsed=parseSiteTile(response,'030213');
+ assert.equal(parsed.returnedParent,true);
+ assert.equal(parsed.deeperTiles,true,'parent fallback does not prove detailed coverage');
+ assert.equal(parsed.invalidRows,0,'bounds metadata is not a broken object');
+ assert.equal(parsed.places.length,1);
+ assert.throws(()=>parseSiteTile(response,'031213'),e=>e.tileReason==='header',
+  'unrelated tile is still rejected');
+ const load=createTileSource(async({url})=>{
+  const id=new URL(url).pathname.split('/itiles/')[1].replaceAll('/','').replace('.xy','');
+  return {text:id.slice(0,-2)+'|0|7\n'+meta+'\n'+object};
+ });
+ const area=await load({bbox:[37.61,55.75,37.62,55.76]});
+ assert.equal(area.complete,false,'ancestor data cannot be presented as full leaf coverage');
+ assert.equal(area.failedTiles,0);
+ assert.ok(area.places.some(p=>p.id===55),'valid parent geometry survives');
+});

@@ -11,7 +11,7 @@ let siteParseFailures = {tiles:0};
 const TILE_REASONS = ['html','header','rows','empty','body','unknown'];
 const emptyTileReasons = () => Object.fromEntries(TILE_REASONS.map(k=>[k,0]));
 let tileParseReasons = emptyTileReasons();
-let tileDecode = {complete:0,partial:0};
+let tileDecode = {complete:0,partial:0,parent:0};
 const emptyRefresh = () => ({pressed:0,started:0,blocked:{busy:0,map:0,zoom:0,demo:0}});
 let manualRefresh = emptyRefresh();
 
@@ -48,8 +48,9 @@ export function recordSiteParseFailure(method,reason='unknown') {
   siteParseFailures[method]++;
   tileParseReasons[TILE_REASONS.includes(reason)?reason:'unknown']++;
 }
-export function recordTileDecode(partial=false){
+export function recordTileDecode(partial=false,parent=false){
   tileDecode[partial?'partial':'complete']++;
+  if(parent)tileDecode.parent++;
 }
 export function recordManualRefreshEvent(event) {
   if (event === 'pressed' || event === 'started') manualRefresh[event]++;
@@ -64,7 +65,7 @@ const metricSnapshot = item => ({
 });
 export function diagnosticSnapshot() {
   return {
-    schema: 3,
+    schema: 4,
     storage: 'memory-only',
     sharing: 'manual',
     requests: Object.fromEntries(METHODS.map(name => [name,metricSnapshot(methods[name])])),
@@ -82,6 +83,6 @@ export function clearDiagnostics() {
   siteMethods = Object.fromEntries(SITE_METHODS.map(k=>[k,empty()]));
   siteParseFailures = {tiles:0};
   tileParseReasons = emptyTileReasons();
-  tileDecode = {complete:0,partial:0};
+  tileDecode = {complete:0,partial:0,parent:0};
   manualRefresh = emptyRefresh();
 }
