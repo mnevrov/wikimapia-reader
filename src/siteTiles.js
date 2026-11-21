@@ -34,10 +34,19 @@ export function parseSiteTile(text,expectedId){
  if(body.trimStart().startsWith('<'))
   throw new TileFormatError('html','Сайт Wikimapia вернул HTML вместо тайлов объектов. Доступ к данным может быть ограничен.');
  const lines=body.split(/\r?\n/),header=lines.shift().trim().split('|');
- if(header[0]!==expectedId||!['0','1'].includes(header[1])||header.length<3)
+ if(!['0','1'].includes(header[1])||header.length<3)
   throw new TileFormatError('header','Ответ Wikimapia не соответствует формату тайла объектов.');
+ const actualId=header[0];
+ // The server may return a valid ancestor tile for an unpopulated requested leaf.
+ // Accept only exact IDs or a quadkey prefix, never an unrelated tile.
+ if(!/^0[0-3]*$/.test(actualId)||!expectedId.startsWith(actualId))
+  throw new TileFormatError('header','Wikimapia вернул данные другой области.');
+ const parent=actualId!==expectedId;
  const places=new Map();let invalid=0;
- for(const line of lines){if(!line.trim())continue;
+ for(const [index,line] of lines.entries()){if(!line.trim())continue;
+  // Public .xy may include a bounds metadata line (W|E|S|N) between the
+  // header and objects. Do not treat this four-integer line as a broken place.
+  if(index===0&&/^[-+]?\\d+\\|[-+]?\\d+\\|[-+]?\\d+\\|[-+]?\\d+$/.test(line.trim()))continue;
   try{const f=line.split('|'),id=Number(f[0]),bbox=f[2]?.split(',').map(Number);
    if(f.length<8||!Number.isSafeInteger(id)||id<1||bbox?.length!==4||bbox.some(v=>!Number.isFinite(v))||bbox[0]>bbox[1]||bbox[2]>bbox[3]||Math.max(Math.abs(bbox[0]),Math.abs(bbox[1]))>180e7||Math.max(Math.abs(bbox[2]),Math.abs(bbox[3]))>90e7)throw Error();
    const titles=f[5].split('\x1f'),title=(titles.find(t=>t.charCodeAt(0)===33)||titles[0]||' Без названия').slice(1);
@@ -47,7 +56,7 @@ export function parseSiteTile(text,expectedId){
  // Never accept a completely corrupt tile as a trustworthy empty region.
  if(invalid&&places.size===0)
   throw new TileFormatError('rows','В ответе Wikimapia нет ни одного корректного объекта.');
- return {places:[...places.values()],deeperTiles:header[1]==='1',invalidRows:invalid};
+ return {places:[...places.values()],deeperTiles:header[1]==='1'||parent,returnedParent:parent,invalidRows:invalid};
 }
 export function createTileSource(request){
  const cache=new Map();let bytes=0;
@@ -76,7 +85,7 @@ export function createTileSource(request){
      const r=await request({url:address.url,signal});
      let data;try{data=parseSiteTile(r.text,address.id);}catch(e){recordSiteParseFailure('tiles',e?.tileReason??'unknown');throw e;}
      if(data.invalidRows)recordSiteParseFailure('tiles','rows');
-     recordTileDecode(Boolean(data.invalidRows));
+     recordTileDecode(Boolean(data.invalidRows),data.returnedParent);
      signal?.throwIfAborted();
      if(entry)bytes-=entry.bytes;
      entry={data,at:Date.now(),bytes:r.text.length*2};
