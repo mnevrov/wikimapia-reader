@@ -162,9 +162,12 @@ final class CarSiteSource {
   if(body==null||body.length()>4194304)throw new IOException("Invalid tile");
   String[] lines=body.split("\n");if(lines.length<1)throw new IOException("Empty tile");
   String[] header=lines[0].trim().split("\\|");
-  if(header.length<3||!header[0].equals(id)||(!header[1].equals("0")&&!header[1].equals("1")))throw new IOException("Unexpected tile");
+  if(header.length<3||!header[0].matches("0[0-3]*")||!id.startsWith(header[0])||(!header[1].equals("0")&&!header[1].equals("1")))throw new IOException("Unexpected tile");
   for(int i=1;i<lines.length;i++){
    if(lines[i].trim().isEmpty())continue;
+   // Website tiles may contain a four-integer W|E|S|N bounds metadata line.
+   if(i==1){String[] bounds=lines[i].trim().split("\\|");
+    if(bounds.length==4 && java.util.Arrays.stream(bounds).allMatch(v->v.matches("-?\\d+")))continue;}
    String[] f=lines[i].split("\\|",8);
    if(f.length<8)throw new IOException("Malformed tile row");
    long placeId=Long.parseLong(f[0]);
@@ -175,7 +178,7 @@ final class CarSiteSource {
    JSONObject object=new JSONObject().put("id",placeId).put("title",title).put("polygon",polygon);
    places.put(placeId,object);
   }
-  return header[1].equals("0");
+  return header[1].equals("0")&&header[0].equals(id);
  }
  static JSONArray polygon(String encoded,int type)throws Exception {
   if(encoded.length()>500000)throw new IOException("Big polygon");
