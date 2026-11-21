@@ -7,7 +7,7 @@ import {areaCache} from './areaCache.js';
 import {areaMessage} from './mapStatus.js';
 import {hitTestPlaces} from './geometry.js';
 import {DEMO_AREA} from './demo.js';
-import {visibleInMap,contourStyle} from './mapPresentation.js';
+import {visibleInMap,contourStyle,stableContourPlaces} from './mapPresentation.js';
 import {useYandexUnderlay} from './useYandexUnderlay.js';
 import {followMovement,followZoom} from './gpsFollow.js';
 
@@ -23,6 +23,7 @@ export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refr
   const [viewport,setViewport]=useState(0);
   const [moving,setMoving]=useState(false);
   const [places,setPlaces]=useState(()=>demo?DEMO_AREA:[]);
+  const lastDemo=useRef(null); // only a real demo/source-mode change clears validated outlines
   const blocked=useRef(false), retries=useRef(0);
   const followRef=useRef({active:false,pause:null});
   followRef.current={active:gpsFollowing,pause:onGpsPause};
@@ -33,7 +34,7 @@ export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refr
   const source=useMemo(()=>wikimapiaSource(apiKey),[apiKey]);
   const loader=useMemo(()=>new AreaLoader(opts=>source.getArea(opts), state=>{
     if(demo)return;
-    setPlaces(state.displayPlaces??state.places);setProgress(state);onState(state);
+    setPlaces(previous=>stableContourPlaces(previous,state));setProgress(state);onState(state);
     if(state.error)blocked.current=!state.retryable;
     else if(state.page&&(!state.more||state.page>=3))retries.current=0;
     onMessage(areaMessage(state));
@@ -67,9 +68,15 @@ export default function MapPane({zoomRequest,demo,apiKey,auto,active,paused,refr
   },[]);
   useEffect(()=>{
     blocked.current=false;
-    setPlaces(demo?DEMO_AREA:[]);
-    onState({places:[],page:0,found:null,more:false,loading:false,error:''});
-    onMessage(demo?'Демо · вымышленные объекты':'');
+    // Android resume/cache hydration may recreate AreaLoader more than once.
+    // Reinitializing the visual layer every time makes valid contours blink.
+    // Reset only when the actual source mode changes (demo ↔ real).
+    if(lastDemo.current!==demo){
+      lastDemo.current=demo;
+      setPlaces(demo?DEMO_AREA:[]);
+      onState({places:[],page:0,found:null,more:false,loading:false,error:''});
+      onMessage(demo?'Демо · вымышленные объекты':'');
+    }
     return()=>loader.stop();
   },[demo,loader,onState,onMessage]);
   const loadRef=useRef(null);
